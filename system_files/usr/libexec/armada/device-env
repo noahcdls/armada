@@ -72,6 +72,7 @@ fi
 # ARMADA_IRQ_CORES means no IRQ restriction.
 case "${ARMADA_SOC_CLASS:-}" in
     SM8250)
+        : "${ARMADA_PROTON_DEFAULT_POLICY:=cachyos}"
         : "${ARMADA_LITTLE_CORES=0-3}"
         : "${ARMADA_BIG_CORES=4-7}"
         : "${ARMADA_PRIME_CORES=7}"
@@ -98,11 +99,13 @@ case "${ARMADA_SOC_CLASS:-}" in
         : "${ARMADA_IRQ_CORES=}"
         ;;
 esac
+: "${ARMADA_PROTON_DEFAULT_POLICY:=automatic}"
 
 vars=(
     ARMADA_DEVICE_ID
     ARMADA_DEVICE_NAME
     ARMADA_SOC_CLASS
+    ARMADA_PROTON_DEFAULT_POLICY
     ARMADA_SUSPEND_MODE
     ARMADA_SYNC_SUSPEND
     ARMADA_PRIMARY_CONNECTOR

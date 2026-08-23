@@ -87,6 +87,7 @@ export interface Config {
   fexProfiles: Record<string, FexProfile>;
   perf?: PerfInfo;
   cpuDeviceClass: string;
+  protonDefaultPolicy: string;
   osVersion: string;
   ablVersion: string;
   ablAutoEnabled: boolean;
