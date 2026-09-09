@@ -323,6 +323,26 @@ wakeup_inventory_report() {
     ((found)) || echo "wakeup_class=unavailable"
 }
 
+runtime_pm_report() {
+    local status device field value found=0
+
+    while IFS= read -r status; do
+        [[ $(read_value "$status") == active ]] || continue
+        found=1
+        device=${status%/power/runtime_status}
+        printf 'device=%s runtime_status=active' "${device#"$sys_root"/devices/}"
+        for field in runtime_usage runtime_active_kids runtime_active_time \
+            runtime_suspended_time control; do
+            value=$(read_value "$device/power/$field" -)
+            [[ $value != - ]] && printf ' %s=%s' "$field" "$value"
+        done
+        echo
+    done < <(find "$sys_root/devices" -path '*/power/runtime_status' -type f \
+        2>/dev/null | sort)
+
+    ((found)) || echo "runtime_pm_active_devices=none"
+}
+
 rtc_and_timer_report() {
     local rtc found=0
 
@@ -1099,6 +1119,9 @@ collect() {
 
     section "Armed wake sources"
     wakeup_inventory_report
+
+    section "Runtime PM active devices"
+    runtime_pm_report
 
     section "IRQ activity since prepare"
     irq_delta_report
