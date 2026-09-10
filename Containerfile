@@ -3,13 +3,14 @@ ARG MESA_PKG=ghcr.io/armada-os/armada-packages/mesa@sha256:559c976d78bcc771f574c
 ARG MESA_ANDROID_PKG=ghcr.io/armada-os/armada-packages/mesa-android@sha256:1e7d5f5e692c38b7545e0c0774bbee45ab1b634309d9240f0e08b407b3fcc526
 ARG MESA_X86_PKG=ghcr.io/armada-os/armada-packages/mesa-x86@sha256:f891d7fc16daf816d68c602655336e5cae1aae8b0aa3e1ef47a6215e4c4b11e5
 ARG MANGOHUD_PKG=ghcr.io/armada-os/armada-packages/mangohud@sha256:c68472ba185d91c25ef0d0cb7046058cedf5a86203ab5e073c6f21ec43694c7b
-ARG GAMESCOPE_PKG=ghcr.io/armada-os/armada-packages/gamescope@sha256:d774bf38913f6c6e06df85e7b2bbe202ee4ea18947bb5cbb6e2c177802acce2d
-ARG GAMESCOPE_SESSION_PKG=ghcr.io/armada-os/armada-packages/gamescope-session@sha256:2f8577c16e5f7ac12b89b1e7d602e399b3d4a52ad4c246f1d28ff1633b43f403
-ARG GAMESCOPE_SESSION_STEAM_PKG=ghcr.io/armada-os/armada-packages/gamescope-session-steam@sha256:776fcc4968f0c82f4c8e6a4b643733e52f068d178a974d33fd4062a90cad063c
-ARG KWIN_PKG=ghcr.io/armada-os/armada-packages/kwin@sha256:04e3692d5badb820a7251e3f3a8ac3944303b10b906922d895899e8400423d01
-ARG POWERDEVIL_PKG=ghcr.io/armada-os/armada-packages/powerdevil@sha256:538904e7895bbe6a3aed0ce1a1122d282fa80f64d650845bf3d606754207f5ca
+ARG GAMESCOPE_PKG=ghcr.io/armada-os/armada-packages/gamescope@sha256:9550a0d0ed0034303c1dff1f6ca4e11bf88f7b3449acd2ed9a05cfd5fc87e9fd
+ARG GAMESCOPE_SESSION_PKG=ghcr.io/armada-os/armada-packages/gamescope-session@sha256:2d789621b7fdf625fdb56c38b6705827503b7e6eb176aa065db466fd12399623
+ARG GAMESCOPE_SESSION_STEAM_PKG=ghcr.io/armada-os/armada-packages/gamescope-session-steam@sha256:bd9abba8a51c5aad9dd8fb8b1ed4ecf55b7fd26268772658603d73953231a2cf
+ARG KWIN_PKG=ghcr.io/armada-os/armada-packages/kwin@sha256:515e14f78f19d2abd3f3b73915e260f4b26cf9a0f84dbe55a06bbcb5f9e8ddce
+ARG PLASMA_MOBILE_PKG=ghcr.io/armada-os/armada-packages/plasma-mobile@sha256:81c08a4ac34f1ffabdd59b89934cc858e47cf6dfe1f0390c0650e397b0919a30
+ARG POWERDEVIL_PKG=ghcr.io/armada-os/armada-packages/powerdevil@sha256:86ad5666a0af470793f480895fb2cef49dc1184800e8445a64d475d0f0d9fe4a
 ARG KERNEL_PKG=ghcr.io/noahcdls/armada-packages/kernel@sha256:563ff3a6661527d3bb16fec90a7a96d4abb43ea3fd05a2f91a5739017c1e7a32
-ARG INPUTPLUMBER_PKG=ghcr.io/armada-os/armada-packages/inputplumber@sha256:894bcb70919f6182c1b1c3ada40c7389d0ffee4b92d9b7a7088a62f540503f6b
+ARG INPUTPLUMBER_PKG=ghcr.io/armada-os/armada-packages/inputplumber@sha256:5d0234db7b69c6acf5319675876fa5f22b4ae7adc2516735631f37ec397baa49
 ARG EXTEST_PKG=ghcr.io/armada-os/armada-packages/extest@sha256:13aee022b77eb9212be1debb74cd1d5a5c6ed94aa42bdac7e6b3a6e72e38101b
 ARG NETWORKMANAGER_PKG=ghcr.io/armada-os/armada-packages/networkmanager@sha256:cea22dd25c2d033ec14bc9154a87153ef8331ba725bde036dd7a05ad1430747d
 ARG JUPITER_HW_SUPPORT_PKG=ghcr.io/armada-os/armada-packages/jupiter-hw-support@sha256:efc0739700ede36ed08c894445973ce2b594c70a0ee487fd5cf209bc07c955ee
@@ -26,6 +27,7 @@ FROM ${GAMESCOPE_PKG} AS gamescope
 FROM ${GAMESCOPE_SESSION_PKG} AS gamescope-session
 FROM ${GAMESCOPE_SESSION_STEAM_PKG} AS gamescope-session-steam
 FROM ${KWIN_PKG} AS kwin
+FROM ${PLASMA_MOBILE_PKG} AS plasma-mobile
 FROM ${POWERDEVIL_PKG} AS powerdevil
 FROM ${KERNEL_PKG} AS kernel
 FROM ${INPUTPLUMBER_PKG} AS inputplumber
@@ -68,6 +70,7 @@ RUN --mount=type=bind,from=ctx,source=/,target=/ctx \
     --mount=type=bind,from=gamescope-session,source=/rpms,target=/packages/gamescope-session \
     --mount=type=bind,from=gamescope-session-steam,source=/rpms,target=/packages/gamescope-session-steam \
     --mount=type=bind,from=kwin,source=/rpms,target=/packages/kwin \
+    --mount=type=bind,from=plasma-mobile,source=/rpms,target=/packages/plasma-mobile \
     --mount=type=bind,from=powerdevil,source=/rpms,target=/packages/powerdevil \
     --mount=type=bind,from=kernel,source=/kernel,target=/packages/kernel \
     --mount=type=bind,from=inputplumber,source=/rpms,target=/packages/inputplumber \

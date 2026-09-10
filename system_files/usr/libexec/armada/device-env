@@ -24,7 +24,9 @@ case "$model" in
     "KONKR Pocket FIT Elite") profile=konkr-pocket-fit-elite ;;
     "AYN Odin 3") profile=ayn-odin-3 ;;
     "Retroid Pocket 5") profile=retroid-pocket-5 ;;
+    "Retroid Pocket 5 Visionox") profile=retroid-pocket-5 ;;
     "Retroid Pocket Flip2") profile=retroid-pocket-flip2 ;;
+    "Retroid Pocket Flip2 Visionox") profile=retroid-pocket-flip2 ;;
     "Retroid Pocket Mini") profile=retroid-pocket-mini ;;
     "Retroid Pocket Mini V2") profile=retroid-pocket-mini-v2 ;;
     "Retroid Pocket 6") profile=retroid-pocket-6 ;;
@@ -81,7 +83,8 @@ case "${ARMADA_SOC_CLASS:-}" in
         : "${ARMADA_LITTLE_CORES=0-2}"
         : "${ARMADA_BIG_CORES=3-7}"
         : "${ARMADA_PRIME_CORES=7}"
-        : "${ARMADA_IRQ_CORES=0-2}"
+        # The A740 GMU wedges if a GPU interrupt wakes CPU 0-2 out of power collapse
+        : "${ARMADA_IRQ_CORES=3-7}"
         ;;
     SM8650)
         : "${ARMADA_LITTLE_CORES=0-1}"
@@ -107,6 +110,7 @@ vars=(
     ARMADA_PRIMARY_CONNECTOR
     ARMADA_PRIMARY_BACKLIGHT
     ARMADA_SECONDARY_CONNECTOR
+    ARMADA_SECONDARY_BACKLIGHT
     ARMADA_VIRTUAL_KEYBOARD_CONNECTOR
     ARMADA_PRIMARY_TOUCHSCREEN
     ARMADA_SECONDARY_TOUCHSCREEN
@@ -114,6 +118,7 @@ vars=(
     ARMADA_PANEL_ORIENTATION
     ARMADA_HDR_NITS
     ARMADA_GAMEPAD_QUIRK
+    ARMADA_IP_TARGETS
     ARMADA_RGB_BACKEND
     ARMADA_RGB_TARGETS
     ARMADA_RGB_CORRECTION
