@@ -1,0 +1,13 @@
+#!/bin/bash
+set -uo pipefail
+
+sysfs_root=${ARMADA_SYSFS_ROOT:-/sys}
+
+case "$1/$2" in
+    pre/*)
+        echo serial1-0 | tee "$sysfs_root/bus/serial/devices/serial1-0/driver/unbind"
+        ;;
+    post/*)
+        echo serial1-0 | tee "$sysfs_root/bus/serial/devices/serial1-0/driver/bind"
+        ;;
+esac
