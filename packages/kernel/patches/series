@@ -106,6 +106,9 @@ v9_20260729_qualcomm_crypto_qce_runtime_pm_interconnect.patch
 0513-PCI-qcom-honour-an-opp-suspend-opp-as-the-non-s2ram-memory-floor.patch
 0514-PCI-qcom-honor-iommu-map-cell-count.patch
 0514a-of-property-honor-iommu-cells-in-iommu-map-devlinks.patch
+0521-sm8750-gcc-cx-power-domain.patch
+0522-common-clock-controller-probe.patch
+0523-skip-phy-management-by-usb.patch
 
 # ============== SM8550 DTSI prerequisites ==============
 0001-pcie-update-sm8550-dtsi.patch
