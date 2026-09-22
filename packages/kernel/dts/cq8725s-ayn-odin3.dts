@@ -20,10 +20,6 @@
 
 		gpio = <&tlmm 56 GPIO_ACTIVE_HIGH>;
 		enable-active-high;
-
-		regulator-state-mem {
-			regulator-off-in-suspend;
-		};
 	};
 
 	vdd_disp_2v8: vdd-disp-2v8-regulator {
@@ -35,10 +31,6 @@
 
 		gpio = <&tlmm 97 GPIO_ACTIVE_HIGH>;
 		enable-active-high;
-
-		regulator-state-mem {
-			regulator-off-in-suspend;
-		};
 	};
 };
 

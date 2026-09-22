@@ -971,10 +971,6 @@
 	pinctrl-0 = <&pcie0_default_state>;
 	pinctrl-names = "default";
 
-	vdda-supply = <&vreg_l1f_0p88>;
-	vddpe-3v3-supply = <&vdd_mcu_3v3>;
-	pcie_aspm = <0x3>;
-
 	status = "okay";
 };
 
