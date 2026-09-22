@@ -16,10 +16,9 @@ that do not implement qTimestamp and skip the optional timestamp write.
  1 file changed, 3 insertions(+)
 
 diff --git a/drivers/ufs/core/ufshcd.c b/drivers/ufs/core/ufshcd.c
-index 4805e40ed4d7..000000000000 100644
 --- a/drivers/ufs/core/ufshcd.c
 +++ b/drivers/ufs/core/ufshcd.c
-@@ -320,6 +320,9 @@ static const struct ufs_dev_quirk ufs_fixups[] = {
+@@ -318,6 +318,9 @@ static const struct ufs_dev_quirk ufs_fixups[] = {
  	{ .wmanufacturerid = UFS_VENDOR_TOSHIBA,
  	  .model = "THGJFJT0E25BAIP",
  	  .quirk = UFS_DEVICE_QUIRK_NO_TIMESTAMP_SUPPORT },
