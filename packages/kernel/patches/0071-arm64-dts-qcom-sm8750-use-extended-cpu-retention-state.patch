@@ -1,0 +1,42 @@
+From: Armada <noreply@armada.local>
+Subject: [PATCH] arm64: dts: qcom: sm8750: use extended CPU retention state
+
+The SM8750 CPU idle states currently pass the legacy PSCI value 0x4.
+Qualcomm's newer arm64 device trees describe the corresponding rail/CPU
+retention state with the extended value 0x40000004. On the Odin 3, the
+legacy state enters suspend but does not return from s2idle, while WFI
+remains wakeable.
+
+Use the extended state encoding for both SM8750 clusters. This keeps the
+existing hierarchy and latency values intact while selecting the encoding
+used by the other recent Qualcomm platforms.
+
+This is a diagnostic and functional fix for firmware that distinguishes
+the legacy and extended state encodings.
+
+---
+ arch/arm64/boot/dts/qcom/sm8750.dtsi | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
+
+diff --git a/arch/arm64/boot/dts/qcom/sm8750.dtsi b/arch/arm64/boot/dts/qcom/sm8750.dtsi
+index 735e7628df96..armada000000 100644
+--- a/arch/arm64/boot/dts/qcom/sm8750.dtsi
++++ b/arch/arm64/boot/dts/qcom/sm8750.dtsi
+@@ -180,15 +180,15 @@
+ 				compatible = "arm,idle-state";
+ 				idle-state-name = "ret";
+-				arm,psci-suspend-param = <0x00000004>;
++				arm,psci-suspend-param = <0x40000004>;
+ 				entry-latency-us = <93>;
+ 				exit-latency-us = <129>;
+ 				min-residency-us = <560>;
+ 			};
+ 
+ 			cluster1_c4: cpu-sleep-1 {
+ 				compatible = "arm,idle-state";
+ 				idle-state-name = "ret";
+-				arm,psci-suspend-param = <0x00000004>;
++				arm,psci-suspend-param = <0x40000004>;
+ 				entry-latency-us = <172>;
+ 				exit-latency-us = <130>;
+ 				min-residency-us = <686>;
