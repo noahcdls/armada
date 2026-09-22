@@ -175,6 +175,7 @@ v2_20260420_neil_armstrong_arm64_qcom_sm8650_misc_enhancements.patch
 0044-clk-qcom-gcc-sm8750-Do-not-turn-off-PCIe-GDSCs-durin.patch
 0045-Bluetooth-qca-add-WCN7860-support.patch
 0066-scsi-ufs-ufs-qcom-add-sm8750-compatible.patch
+0068-scsi-ufs-disable-timestamp-for-kioxia-thgjfjt2t85bat0c.patch
 0509-soc-qcom-pmic_glink_altmode-defer-until-mux-switch-ready.patch
 0517-usb-typec-mux-dont-swallow-EPROBE_DEFER.patch
 0519-usb-typec-ucsi-clear-USB-role.patch

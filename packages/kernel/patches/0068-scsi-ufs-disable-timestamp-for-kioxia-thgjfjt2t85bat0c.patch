@@ -1,0 +1,31 @@
+From: Armada <noreply@armada.local>
+Subject: [PATCH] scsi: ufs: disable timestamp for Kioxia THGJFJT2T85BAT0C
+
+The Kioxia UFS device used by the AYN Odin 3 identifies as
+THGJFJT2T85BAT0C but rejects the UFS qTimestamp attribute write. This
+causes repeated messages such as:
+
+    ufshcd_dev_cmd_completion: unexpected response in Query RSP: fd
+    ufshcd_query_attr_qword: opcode 0x04 for idn 48 failed, ... err = -22
+
+The device is otherwise usable. Treat it like the other Kioxia devices
+that do not implement qTimestamp and skip the optional timestamp write.
+
+---
+ drivers/ufs/core/ufshcd.c | 3 +++
+ 1 file changed, 3 insertions(+)
+
+diff --git a/drivers/ufs/core/ufshcd.c b/drivers/ufs/core/ufshcd.c
+index 4805e40ed4d7..000000000000 100644
+--- a/drivers/ufs/core/ufshcd.c
++++ b/drivers/ufs/core/ufshcd.c
+@@ -320,6 +320,9 @@ static const struct ufs_dev_quirk ufs_fixups[] = {
+ 	{ .wmanufacturerid = UFS_VENDOR_TOSHIBA,
+ 	  .model = "THGJFJT0E25BAIP",
+ 	  .quirk = UFS_DEVICE_QUIRK_NO_TIMESTAMP_SUPPORT },
++	{ .wmanufacturerid = UFS_VENDOR_TOSHIBA,
++	  .model = "THGJFJT2T85BAT0C",
++	  .quirk = UFS_DEVICE_QUIRK_NO_TIMESTAMP_SUPPORT },
+ 	{ .wmanufacturerid = UFS_VENDOR_TOSHIBA,
+ 	  .model = "THGJFJT1E45BATP",
+ 	  .quirk = UFS_DEVICE_QUIRK_NO_TIMESTAMP_SUPPORT },

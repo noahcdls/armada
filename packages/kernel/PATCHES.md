@@ -502,6 +502,10 @@ no equivalent submission was found, or a permanent URL to the upstream submissio
 - `patches/0066-scsi-ufs-ufs-qcom-add-sm8750-compatible.patch`
   source: https://github.com/ROCKNIX/distribution/blob/bcf3b5bc574990b96543484575b06f912153a715/projects/ROCKNIX/devices/SM8750/patches/linux/0066-scsi-ufs-ufs-qcom-add-sm8750-compatible.patch
   upstream: unknown
+- `patches/0068-scsi-ufs-disable-timestamp-for-kioxia-thgjfjt2t85bat0c.patch`
+  source: Armada
+  upstream: local
+  notes: Skips the optional qTimestamp write rejected by the Kioxia UFS device installed in the AYN Odin 3.
 - `patches/0509-soc-qcom-pmic_glink_altmode-defer-until-mux-switch-ready.patch`
   source: https://github.com/ROCKNIX/distribution/blob/bcf3b5bc574990b96543484575b06f912153a715/projects/ROCKNIX/devices/SM8750/patches/linux/0509-soc-qcom-pmic_glink_altmode-defer-until-mux-switch-ready.patch
   upstream: unknown
