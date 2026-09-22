@@ -12,8 +12,8 @@ https://lkml.iu.edu/2609.1/09329.html
 ---
 diff --git a/drivers/ufs/core/ufshcd.c b/drivers/ufs/core/ufshcd.c
 index 27f2058176d4..06007369f26a 100644
---- a/~repos/linux/drivers/ufs/core/ufshcd.c
-+++ b/~/repos/linux/drivers/ufs/core/ufshcd.c
+--- a/drivers/ufs/core/ufshcd.c
++++ b/drivers/ufs/core/ufshcd.c
 @@ -8844,6 +8844,9 @@ static int ufs_get_device_desc(struct ufs_hba *hba)
  
  	ufs_fixup_device_setup(hba);
@@ -45,8 +45,8 @@ index 27f2058176d4..06007369f26a 100644
  }
 diff --git a/include/ufs/ufs.h b/include/ufs/ufs.h
 index 0d48e137d66d..5de8ea4c399a 100644
---- a/~repos/linux/include/ufs/ufs.h
-+++ b/~repos/linux/include/ufs/ufs.h
+--- a/include/ufs/ufs.h
++++ b/include/ufs/ufs.h
 @@ -656,6 +656,7 @@ struct ufs_dev_info {
  	u8 rtt_cap; /* bDeviceRTTCap */
  
