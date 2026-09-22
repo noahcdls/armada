@@ -1,0 +1,82 @@
+From: Armada <noreply@armada.local>
+Subject: [PATCH] scsi: ufs: core: fast-abort unsupported Query IDNs
+
+UFS devices may legally reject optional Query IDNs with
+QUERY_RESULT_INVALID_IDN (0xfd). Return -EOPNOTSUPP for that response,
+stop retrying the request, and avoid reporting the standards-compliant
+unsupported feature as a device error.
+
+Based on Stanley Jhu's upstream patch:
+https://lkml.iu.edu/2609.1/09328.html
+
+---
+diff --git a/drivers/ufs/core/ufshcd.c b/drivers/ufs/core/ufshcd.c
+index 13e6357a8bbb..27f2058176d4 100644
+--- a/drivers/ufs/core/ufshcd.c
++++ b/drivers/ufs/core/ufshcd.c
+@@ -3248,6 +3248,11 @@ ufshcd_dev_cmd_completion(struct ufs_hba *hba, struct ufshcd_lrb *lrbp)
+ 
+ 		if (response == 0) {
+ 			err = ufshcd_copy_query_response(hba, lrbp);
++		} else if (response == QUERY_RESULT_INVALID_IDN) {
++			err = -EOPNOTSUPP;
++			dev_dbg(hba->dev, "%s: unsupported opcode 0x%x idn 0x%x\n",
++				__func__, lrbp->ucd_req_ptr->qr.opcode,
++				lrbp->ucd_req_ptr->qr.idn);
+ 		} else {
+ 			err = -EINVAL;
+ 			dev_err(hba->dev, "%s: unexpected response in Query RSP: %x\n",
+@@ -3473,6 +3478,8 @@ int ufshcd_query_flag(struct ufs_hba *hba, enum query_opcode opcode,
+ 
+ 	err = ufshcd_exec_dev_cmd(hba, DEV_CMD_TYPE_QUERY, timeout);
+ 
++	if (err == -EOPNOTSUPP)
++		goto out_unlock;
+ 	if (err) {
+ 		dev_err(hba->dev,
+ 			"%s: Sending flag query for idn %d failed, err = %d\n",
+@@ -3538,6 +3545,8 @@ int ufshcd_query_attr(struct ufs_hba *hba, enum query_opcode opcode,
+ 
+ 	err = ufshcd_exec_dev_cmd(hba, DEV_CMD_TYPE_QUERY, dev_cmd_timeout);
+ 
++	if (err == -EOPNOTSUPP)
++		goto out_unlock;
+ 	if (err) {
+ 		dev_err(hba->dev, "%s: opcode 0x%.2x for idn %d failed, index %d, err = %d\n",
+ 				__func__, opcode, idn, index, err);
+@@ -3575,6 +3584,8 @@ int ufshcd_query_attr_retry(struct ufs_hba *hba,
+ 	for (retries = QUERY_REQ_RETRIES; retries > 0; retries--) {
+ 		ret = ufshcd_query_attr(hba, opcode, idn, index,
+ 						selector, attr_val);
++		if (ret == -EOPNOTSUPP)
++			return ret;
+ 		if (ret)
+ 			dev_dbg(hba->dev, "%s: failed with error %d, retries %d\n",
+ 				__func__, ret, retries);
+@@ -3636,6 +3647,8 @@ int ufshcd_query_attr_qword(struct ufs_hba *hba, enum query_opcode opcode,
+ 	}
+ 
+ 	err = ufshcd_exec_dev_cmd(hba, DEV_CMD_TYPE_QUERY, dev_cmd_timeout);
++	if (err == -EOPNOTSUPP)
++		goto out_unlock;
+ 	if (err) {
+ 		dev_err(hba->dev, "%s: opcode 0x%.2x for idn %d failed, index %d, selector %d, err = %d\n",
+ 			__func__, opcode, idn, index, sel, err);
+@@ -3700,6 +3713,8 @@ static int __ufshcd_query_descriptor(struct ufs_hba *hba,
+ 
+ 	err = ufshcd_exec_dev_cmd(hba, DEV_CMD_TYPE_QUERY, dev_cmd_timeout);
+ 
++	if (err == -EOPNOTSUPP)
++		goto out_unlock;
+ 	if (err) {
+ 		dev_err(hba->dev, "%s: opcode 0x%.2x for idn %d failed, index %d, err = %d\n",
+ 				__func__, opcode, idn, index, err);
+@@ -3742,7 +3757,7 @@ int ufshcd_query_descriptor_retry(struct ufs_hba *hba,
+ 	for (retries = QUERY_REQ_RETRIES; retries > 0; retries--) {
+ 		err = __ufshcd_query_descriptor(hba, opcode, idn, index,
+ 						selector, desc_buf, buf_len);
+-		if (!err || err == -EINVAL)
++		if (!err || err == -EINVAL || err == -EOPNOTSUPP)
+ 			break;
+ 	}
+ 

@@ -504,8 +504,16 @@ no equivalent submission was found, or a permanent URL to the upstream submissio
   upstream: unknown
 - `patches/0068-scsi-ufs-disable-timestamp-for-kioxia-thgjfjt2t85bat0c.patch`
   source: Armada
-  upstream: local
-  notes: Skips the optional qTimestamp write rejected by the Kioxia UFS device installed in the AYN Odin 3.
+  upstream: superseded by 0069/0070
+  notes: Original model-specific workaround for the Odin 3 UFS device. It is no longer registered so the dynamic capability handling is exercised.
+- `patches/0069-scsi-ufs-core-fast-abort-unsupported-query-idns.patch`
+  source: https://lkml.iu.edu/2609.1/09328.html
+  upstream: pending
+  notes: Carries the prerequisite half of Stanley Jhu's UFS optional-Query-IDN series, translating QUERY_RESULT_INVALID_IDN to -EOPNOTSUPP and avoiding retries.
+- `patches/0070-scsi-ufs-core-dynamically-disable-unsupported-timestamp.patch`
+  source: https://lkml.iu.edu/2609.1/09329.html
+  upstream: pending
+  notes: Remembers a rejected optional qTimestamp attribute and disables only that capability for the lifetime of the device instance.
 - `patches/0509-soc-qcom-pmic_glink_altmode-defer-until-mux-switch-ready.patch`
   source: https://github.com/ROCKNIX/distribution/blob/bcf3b5bc574990b96543484575b06f912153a715/projects/ROCKNIX/devices/SM8750/patches/linux/0509-soc-qcom-pmic_glink_altmode-defer-until-mux-switch-ready.patch
   upstream: unknown
