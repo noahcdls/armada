@@ -349,4 +349,44 @@
 			debounce-interval = <15>;
 		};
 	};
+
+	cpu0 {
+		/delete-property/ power-domains;
+		/delete-property/ power-domain-names;
+	};
+
+	cpu1 {
+		/delete-property/ power-domains;
+		/delete-property/ power-domain-names;
+	};
+
+	cpu2 {
+		/delete-property/ power-domains;
+		/delete-property/ power-domain-names;
+	};
+
+	cpu3 {
+		/delete-property/ power-domains;
+		/delete-property/ power-domain-names;
+	};
+
+	cpu4 {
+		/delete-property/ power-domains;
+		/delete-property/ power-domain-names;
+	};
+
+	cpu5 {
+		/delete-property/ power-domains;
+		/delete-property/ power-domain-names;
+	};
+
+	cpu6 {
+		/delete-property/ power-domains;
+		/delete-property/ power-domain-names;
+	};
+
+	cpu7 {
+		/delete-property/ power-domains;
+		/delete-property/ power-domain-names;
+	};
 };
