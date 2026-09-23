@@ -177,7 +177,7 @@ v2_20260420_neil_armstrong_arm64_qcom_sm8650_misc_enhancements.patch
 0066-scsi-ufs-ufs-qcom-add-sm8750-compatible.patch
 0069-scsi-ufs-core-fast-abort-unsupported-query-idns.patch
 0070-scsi-ufs-core-dynamically-disable-unsupported-timestamp.patch
-0071-arm64-dts-qcom-sm8750-use-extended-cpu-retention-state.patch
+0071-arm64-dts-qcom-sm8750-disable-unstable-cpu-retention.patch
 0509-soc-qcom-pmic_glink_altmode-defer-until-mux-switch-ready.patch
 0517-usb-typec-mux-dont-swallow-EPROBE_DEFER.patch
 0519-usb-typec-ucsi-clear-USB-role.patch

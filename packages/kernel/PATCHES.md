@@ -514,9 +514,9 @@ no equivalent submission was found, or a permanent URL to the upstream submissio
   source: https://lkml.iu.edu/2609.1/09329.html
   upstream: pending
   notes: Remembers a rejected optional qTimestamp attribute and disables only that capability for the lifetime of the device instance.
-- `patches/0071-arm64-dts-qcom-sm8750-use-extended-cpu-retention-state.patch`
+- `patches/0071-arm64-dts-qcom-sm8750-disable-unstable-cpu-retention.patch`
   source: Armada
-  notes: Changes the SM8750 CPU idle request from legacy PSCI value `0x4` to the extended Qualcomm retention encoding `0x40000004`; this targets the Odin 3 s2idle hang while preserving the existing PSCI hierarchy.
+  notes: Disables the SM8750 CPU retention states after live testing showed that UFS reaches `UIC_LINK_OFF_STATE` successfully but the Odin 3 fails to wake from the PSCI retention transition. WFI remains available as the safe suspend fallback.
 - `patches/0509-soc-qcom-pmic_glink_altmode-defer-until-mux-switch-ready.patch`
   source: https://github.com/ROCKNIX/distribution/blob/bcf3b5bc574990b96543484575b06f912153a715/projects/ROCKNIX/devices/SM8750/patches/linux/0509-soc-qcom-pmic_glink_altmode-defer-until-mux-switch-ready.patch
   upstream: unknown

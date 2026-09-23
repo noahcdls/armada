@@ -1,0 +1,32 @@
+From: Armada <noreply@armada.local>
+Subject: [PATCH] arm64: dts: qcom: sm8750: disable unstable CPU retention states
+
+The SM8750 CPU retention states enter s2idle but fail to return from
+RTC- or power-button-triggered wake on the AYN Odin 3. The same device
+wakes reliably when these states are disabled and the CPUs use WFI.
+
+The UFS controller has been observed to complete system suspend with the
+link in UIC_LINK_OFF_STATE before the hang, so avoid changing UFS power
+management for this platform issue. Keep the idle-state definitions
+available for future firmware validation, but do not expose them to the
+generic CPU idle-state parser.
+
+---
+ arch/arm64/boot/dts/qcom/sm8750.dtsi | 2 ++
+ 1 file changed, 2 insertions(+)
+
+diff --git a/arch/arm64/boot/dts/qcom/sm8750.dtsi b/arch/arm64/boot/dts/qcom/sm8750.dtsi
+--- a/arch/arm64/boot/dts/qcom/sm8750.dtsi
++++ b/arch/arm64/boot/dts/qcom/sm8750.dtsi
+@@ -180,4 +180,5 @@
+ 				compatible = "arm,idle-state";
++				status = "disabled";
+ 				idle-state-name = "ret";
+ 				arm,psci-suspend-param = <0x00000004>;
+ 				entry-latency-us = <93>;
+@@ -189,4 +190,5 @@
+ 				compatible = "arm,idle-state";
++				status = "disabled";
+ 				idle-state-name = "ret";
+ 				arm,psci-suspend-param = <0x00000004>;
+ 				entry-latency-us = <172>;
