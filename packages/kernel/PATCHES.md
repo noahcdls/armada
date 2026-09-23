@@ -514,6 +514,14 @@ no equivalent submission was found, or a permanent URL to the upstream submissio
   source: https://lkml.iu.edu/2609.1/09329.html
   upstream: pending
   notes: Remembers a rejected optional qTimestamp attribute and disables only that capability for the lifetime of the device instance.
+- `dts/cq8725s-ayn-odin3-psci-pc-mode.patch`
+  source: Armada
+  upstream: local
+  notes: Odin 3 board-specific diagnostic workaround. Removes the CPU-to-PSCI power-domain links while retaining the generic idle states, forcing PSCI platform-coordinated mode instead of OSI/genpd coordination.
+- `dts/cq8725s-ayn-odin3-ramoops.patch`
+  source: Armada
+  upstream: local
+  notes: Reserves a 2 MiB Odin 3 RAM region for built-in ramoops/pstore records, including kernel log, console, ftrace, and pmsg buffers.
 - `patches/0509-soc-qcom-pmic_glink_altmode-defer-until-mux-switch-ready.patch`
   source: https://github.com/ROCKNIX/distribution/blob/bcf3b5bc574990b96543484575b06f912153a715/projects/ROCKNIX/devices/SM8750/patches/linux/0509-soc-qcom-pmic_glink_altmode-defer-until-mux-switch-ready.patch
   upstream: unknown

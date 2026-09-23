@@ -1,0 +1,27 @@
+From: Armada <noreply@armada.local>
+Subject: [PATCH] arm64: dts: qcom: odin3: reserve ramoops storage
+
+Reserve a persistent RAM region for Odin 3 kernel diagnostics. The region
+is outside the SM8750 firmware carveouts and is consumed by the ramoops
+pstore backend after a panic, oops, or watchdog-triggered crash.
+
+---
+ arch/arm64/boot/dts/qcom/cq8725s-ayn-odin3.dts | 12 ++++++++++++
+ 1 file changed, 12 insertions(+)
+
+diff --git a/arch/arm64/boot/dts/qcom/cq8725s-ayn-odin3.dts b/arch/arm64/boot/dts/qcom/cq8725s-ayn-odin3.dts
+--- a/arch/arm64/boot/dts/qcom/cq8725s-ayn-odin3.dts
++++ b/arch/arm64/boot/dts/qcom/cq8725s-ayn-odin3.dts
+@@ -233,0 +234,12 @@
++&{/reserved-memory} {
++	odin3_ramoops: ramoops@a3000000 {
++		compatible = "ramoops";
++		reg = <0x0 0xa3000000 0x0 0x200000>;
++		record-size = <0x100000>;
++		console-size = <0x40000>;
++		ftrace-size = <0x40000>;
++		pmsg-size = <0x40000>;
++		max-reason = <0x7fffffff>;
++		no-map;
++	};
++};
