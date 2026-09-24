@@ -102,6 +102,8 @@
 0513-PCI-qcom-honour-an-opp-suspend-opp-as-the-non-s2ram-memory-floor.patch
 0514-PCI-qcom-honor-iommu-map-cell-count.patch
 0514a-of-property-honor-iommu-cells-in-iommu-map-devlinks.patch
+0070-ufs-invalid-idn-support.patch
+0071-ufs-dynamically-disable-timestamps.patch
 
 # ============== SM8550 DTSI prerequisites ==============
 0001-pcie-update-sm8550-dtsi.patch
