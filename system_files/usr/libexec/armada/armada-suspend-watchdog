@@ -1,0 +1,38 @@
+#!/bin/sh
+set -eu
+
+watchdog=/dev/watchdog0
+sysfs=/sys/class/watchdog/watchdog0
+
+[ -c "$watchdog" ] || {
+    echo "No watchdog device at $watchdog" >&2
+    exit 1
+}
+
+sysctl -qw kernel.panic_on_oops=1
+sysctl -qw kernel.panic=5
+sysctl -qw kernel.hung_task_panic=1
+sysctl -qw kernel.softlockup_panic=1
+
+if [ -w /proc/sys/kernel/ftrace_dump_on_oops ]; then
+    printf '%s\n' 1 > /proc/sys/kernel/ftrace_dump_on_oops
+fi
+
+if [ -w "$sysfs/pretimeout_governor" ]; then
+    printf '%s\n' panic > "$sysfs/pretimeout_governor"
+fi
+
+if [ -w "$sysfs/timeout" ]; then
+    printf '%s\n' 30 > "$sysfs/timeout"
+fi
+
+if [ -w "$sysfs/pretimeout" ]; then
+    printf '%s\n' 10 > "$sysfs/pretimeout"
+fi
+
+exec 3>"$watchdog"
+
+while :; do
+    printf '%s\n' . >&3
+    sleep 5
+done

@@ -522,6 +522,10 @@ no equivalent submission was found, or a permanent URL to the upstream submissio
   source: Armada
   upstream: local
   notes: Reserves a 2 MiB Odin 3 RAM region for built-in ramoops/pstore records, including kernel log, console, ftrace, and pmsg buffers.
+- `system_files/usr/lib/systemd/system/armada-suspend-watchdog.service`
+  source: Armada
+  upstream: local
+  notes: Opt-in suspend-hang diagnostic service. Programs a 30-second hardware watchdog with a 10-second panic pretimeout so a stuck suspend can generate a ramoops record; it is not enabled by default.
 - `patches/0509-soc-qcom-pmic_glink_altmode-defer-until-mux-switch-ready.patch`
   source: https://github.com/ROCKNIX/distribution/blob/bcf3b5bc574990b96543484575b06f912153a715/projects/ROCKNIX/devices/SM8750/patches/linux/0509-soc-qcom-pmic_glink_altmode-defer-until-mux-switch-ready.patch
   upstream: unknown
