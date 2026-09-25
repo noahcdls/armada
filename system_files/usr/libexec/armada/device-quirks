@@ -96,7 +96,7 @@ if [[ "${ARMADA_SYNC_SUSPEND:-0}" == "1" ]]; then
     fi
 fi
 
-if [[ "${ARMADA_SOC_CLASS:-}" == "SM8550" || "${ARMADA_SOC_CLASS:-}" == "SM8750" ]]; then
+if [[ "${ARMADA_SOC_CLASS:-}" == "SM8550" ]]; then
     # SM8550 UFS needs up to 3 seconds for UIC completion across suspend.
     uic_timeout=/sys/module/ufshcd_core/parameters/uic_cmd_timeout
     if [[ -w "$uic_timeout" ]]; then
