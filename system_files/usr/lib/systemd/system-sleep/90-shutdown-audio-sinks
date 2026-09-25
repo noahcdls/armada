@@ -3,9 +3,9 @@
 
 case "$1" in
     pre)
-        systemctl --user --machine="armada@" stop wireplumber.service
+        systemctl --user --machine="armada@" stop pipewire.socket pipewire.service pipewire-pulse.socket pipewire-pulse.service wireplumber.service
         ;;
     post)
-        systemctl --user --machine="armada@" start wireplumber.service
+        systemctl --user --machine="armada@" start pipewire.socket pipewire.service pipewire-pulse.socket pipewire-pulse.service wireplumber.service
         ;;
 esac
