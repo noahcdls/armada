@@ -3,7 +3,9 @@
 
 case "$1" in
     pre)
-        systemctl --user --machine=$USER@ stop wireplumber.service
+        systemctl --user --machine="armada@" stop wireplumber.service
+        ;;
     post)
-        systemctl --user --machine=$USER@ start wireplumber.service
+        systemctl --user --machine="armada@" start wireplumber.service
+        ;;
 esac
