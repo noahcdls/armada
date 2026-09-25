@@ -13,111 +13,13 @@ Subject: [PATCH] arm64: dts: qcom: odin3: enable DPU dithering and codec rail sl
  	reset-gpios = <&tlmm 98 GPIO_ACTIVE_LOW>;
  
  	vddio-supply = <&vreg_l12b_1p8>;
-@@ -350,3 +353,305 @@
+@@ -350,3 +353,39 @@
  		};
  	};
  };
 +
-+/* Keep RPMh rails enabled through s2idle while allowing low-power mode */
++/* The codec keeps these rails enabled through s2idle; idle them in LPM */
 +&vreg_bob1 {
-+	regulator-state-mem {
-+		regulator-on-in-suspend;
-+		regulator-mode = <RPMH_REGULATOR_MODE_LPM>;
-+	};
-+};
-+
-+&vreg_bob2 {
-+	regulator-state-mem {
-+		regulator-on-in-suspend;
-+		regulator-mode = <RPMH_REGULATOR_MODE_LPM>;
-+	};
-+};
-+
-+&vreg_l1b_1p8 {
-+	regulator-state-mem {
-+		regulator-on-in-suspend;
-+		regulator-mode = <RPMH_REGULATOR_MODE_LPM>;
-+	};
-+};
-+
-+&vreg_l2b_3p0 {
-+	regulator-state-mem {
-+		regulator-on-in-suspend;
-+		regulator-mode = <RPMH_REGULATOR_MODE_LPM>;
-+	};
-+};
-+
-+&vreg_l4b_1p8 {
-+	regulator-state-mem {
-+		regulator-on-in-suspend;
-+		regulator-mode = <RPMH_REGULATOR_MODE_LPM>;
-+	};
-+};
-+
-+&vreg_l5b_3p1 {
-+	regulator-state-mem {
-+		regulator-on-in-suspend;
-+		regulator-mode = <RPMH_REGULATOR_MODE_LPM>;
-+	};
-+};
-+
-+&vreg_l6b_1p8 {
-+	regulator-state-mem {
-+		regulator-on-in-suspend;
-+		regulator-mode = <RPMH_REGULATOR_MODE_LPM>;
-+	};
-+};
-+
-+&vreg_l7b_1p8 {
-+	regulator-state-mem {
-+		regulator-on-in-suspend;
-+		regulator-mode = <RPMH_REGULATOR_MODE_LPM>;
-+	};
-+};
-+
-+&vreg_l8b_1p8 {
-+	regulator-state-mem {
-+		regulator-on-in-suspend;
-+		regulator-mode = <RPMH_REGULATOR_MODE_LPM>;
-+	};
-+};
-+
-+&vreg_l9b_2p9 {
-+	regulator-state-mem {
-+		regulator-on-in-suspend;
-+		regulator-mode = <RPMH_REGULATOR_MODE_LPM>;
-+	};
-+};
-+
-+&vreg_l10b_1p8 {
-+	regulator-state-mem {
-+		regulator-on-in-suspend;
-+		regulator-mode = <RPMH_REGULATOR_MODE_LPM>;
-+	};
-+};
-+
-+&vreg_l11b_1p0 {
-+	regulator-state-mem {
-+		regulator-on-in-suspend;
-+		regulator-mode = <RPMH_REGULATOR_MODE_LPM>;
-+	};
-+};
-+
-+&vreg_l12b_1p8 {
-+	regulator-state-mem {
-+		regulator-on-in-suspend;
-+		regulator-mode = <RPMH_REGULATOR_MODE_LPM>;
-+	};
-+};
-+
-+&vreg_l13b_3p0 {
-+	regulator-state-mem {
-+		regulator-on-in-suspend;
-+		regulator-mode = <RPMH_REGULATOR_MODE_LPM>;
-+	};
-+};
-+
-+&vreg_l14b_3p2 {
 +	regulator-state-mem {
 +		regulator-on-in-suspend;
 +		regulator-mode = <RPMH_REGULATOR_MODE_LPM>;
@@ -131,91 +33,7 @@ Subject: [PATCH] arm64: dts: qcom: odin3: enable DPU dithering and codec rail sl
 +	};
 +};
 +
-+&vreg_l16b_2p8 {
-+	regulator-state-mem {
-+		regulator-on-in-suspend;
-+		regulator-mode = <RPMH_REGULATOR_MODE_LPM>;
-+	};
-+};
-+
-+&vreg_l17b_2p5 {
-+	regulator-state-mem {
-+		regulator-on-in-suspend;
-+		regulator-mode = <RPMH_REGULATOR_MODE_LPM>;
-+	};
-+};
-+
-+&vreg_s1d_0p97 {
-+	regulator-state-mem {
-+		regulator-on-in-suspend;
-+		regulator-mode = <RPMH_REGULATOR_MODE_LPM>;
-+	};
-+};
-+
-+&vreg_s3d_1p2 {
-+	regulator-state-mem {
-+		regulator-on-in-suspend;
-+		regulator-mode = <RPMH_REGULATOR_MODE_LPM>;
-+	};
-+};
-+
-+&vreg_s4d_0p85 {
-+	regulator-state-mem {
-+		regulator-on-in-suspend;
-+		regulator-mode = <RPMH_REGULATOR_MODE_LPM>;
-+	};
-+};
-+
-+&vreg_l1d_1p2 {
-+	regulator-state-mem {
-+		regulator-on-in-suspend;
-+		regulator-mode = <RPMH_REGULATOR_MODE_LPM>;
-+	};
-+};
-+
-+&vreg_l2d_0p88 {
-+	regulator-state-mem {
-+		regulator-on-in-suspend;
-+		regulator-mode = <RPMH_REGULATOR_MODE_LPM>;
-+	};
-+};
-+
-+&vreg_l3d_0p88 {
-+	regulator-state-mem {
-+		regulator-on-in-suspend;
-+		regulator-mode = <RPMH_REGULATOR_MODE_LPM>;
-+	};
-+};
-+
-+&vreg_s5f_0p85 {
-+	regulator-state-mem {
-+		regulator-on-in-suspend;
-+		regulator-mode = <RPMH_REGULATOR_MODE_LPM>;
-+	};
-+};
-+
-+&vreg_l1f_0p88 {
-+	regulator-state-mem {
-+		regulator-on-in-suspend;
-+		regulator-mode = <RPMH_REGULATOR_MODE_LPM>;
-+	};
-+};
-+
-+&vreg_l2f_1p2 {
-+	regulator-state-mem {
-+		regulator-on-in-suspend;
-+		regulator-mode = <RPMH_REGULATOR_MODE_LPM>;
-+	};
-+};
-+
-+&vreg_l3f_1p8 {
-+	regulator-state-mem {
-+		regulator-on-in-suspend;
-+		regulator-mode = <RPMH_REGULATOR_MODE_LPM>;
-+	};
-+};
-+
-+&vreg_s1g_0p5 {
++&vreg_l2i_1p2 {
 +	regulator-state-mem {
 +		regulator-on-in-suspend;
 +		regulator-mode = <RPMH_REGULATOR_MODE_LPM>;
@@ -229,91 +47,7 @@ Subject: [PATCH] arm64: dts: qcom: odin3: enable DPU dithering and codec rail sl
 +	};
 +};
 +
-+&vreg_s4g_0p75 {
-+	regulator-state-mem {
-+		regulator-on-in-suspend;
-+		regulator-mode = <RPMH_REGULATOR_MODE_LPM>;
-+	};
-+};
-+
-+&vreg_l1g_0p91 {
-+	regulator-state-mem {
-+		regulator-on-in-suspend;
-+		regulator-mode = <RPMH_REGULATOR_MODE_LPM>;
-+	};
-+};
-+
-+&vreg_l2g_1p8 {
-+	regulator-state-mem {
-+		regulator-on-in-suspend;
-+		regulator-mode = <RPMH_REGULATOR_MODE_LPM>;
-+	};
-+};
-+
-+&vreg_l3g_1p2 {
-+	regulator-state-mem {
-+		regulator-on-in-suspend;
-+		regulator-mode = <RPMH_REGULATOR_MODE_LPM>;
-+	};
-+};
-+
 +&vreg_s7i_1p2 {
-+	regulator-state-mem {
-+		regulator-on-in-suspend;
-+		regulator-mode = <RPMH_REGULATOR_MODE_LPM>;
-+	};
-+};
-+
-+&vreg_s8i_0p9 {
-+	regulator-state-mem {
-+		regulator-on-in-suspend;
-+		regulator-mode = <RPMH_REGULATOR_MODE_LPM>;
-+	};
-+};
-+
-+&vreg_l1i_1p2 {
-+	regulator-state-mem {
-+		regulator-on-in-suspend;
-+		regulator-mode = <RPMH_REGULATOR_MODE_LPM>;
-+	};
-+};
-+
-+&vreg_l2i_1p2 {
-+	regulator-state-mem {
-+		regulator-on-in-suspend;
-+		regulator-mode = <RPMH_REGULATOR_MODE_LPM>;
-+	};
-+};
-+
-+&vreg_l3i_0p88 {
-+	regulator-state-mem {
-+		regulator-on-in-suspend;
-+		regulator-mode = <RPMH_REGULATOR_MODE_LPM>;
-+	};
-+};
-+
-+&vreg_s2j_1p1 {
-+	regulator-state-mem {
-+		regulator-on-in-suspend;
-+		regulator-mode = <RPMH_REGULATOR_MODE_LPM>;
-+	};
-+};
-+
-+&vreg_s3j_1p1 {
-+	regulator-state-mem {
-+		regulator-on-in-suspend;
-+		regulator-mode = <RPMH_REGULATOR_MODE_LPM>;
-+	};
-+};
-+
-+&vreg_l1j_0p91 {
-+	regulator-state-mem {
-+		regulator-on-in-suspend;
-+		regulator-mode = <RPMH_REGULATOR_MODE_LPM>;
-+	};
-+};
-+
-+&vreg_l2j_1p2 {
 +	regulator-state-mem {
 +		regulator-on-in-suspend;
 +		regulator-mode = <RPMH_REGULATOR_MODE_LPM>;
