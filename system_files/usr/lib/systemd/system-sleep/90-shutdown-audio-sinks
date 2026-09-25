@@ -3,27 +3,7 @@
 
 case "$1" in
     pre)
-        for dir in /run/user/*; do
-            [ -d "$dir" ] || continue
-            uid=$(basename "$dir")
-            user=$(id -un "$uid")
-            
-            # Identify all active sinks and force them into a suspended state
-            for sink in $(runuser -u "$user" -- env XDG_RUNTIME_DIR="$dir" pactl list short sinks | cut -f1); do
-                runuser -u "$user" -- env XDG_RUNTIME_DIR="$dir" pactl suspend-sink "$sink" 1
-            done
-        done
-        ;;
+        systemctl --user --machine=$USER@ stop wireplumber.service
     post)
-        for dir in /run/user/*; do
-            [ -d "$dir" ] || continue
-            uid=$(basename "$dir")
-            user=$(id -un "$uid")
-            
-            # Release the suspend lock on wake
-            for sink in $(runuser -u "$user" -- env XDG_RUNTIME_DIR="$dir" pactl list short sinks | cut -f1); do
-                runuser -u "$user" -- env XDG_RUNTIME_DIR="$dir" pactl suspend-sink "$sink" 0
-            done
-        done
-        ;;
+        systemctl --user --machine=$USER@ start wireplumber.service
 esac
