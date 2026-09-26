@@ -17,13 +17,17 @@ DT defines no suspend OPP.
 
 In D3cold the controller is deinitialised, its clocks and PHY are off
 and the endpoint is in L2/L3, so nothing on the PCIe side can reach
-DDR. Drop the OPP to NULL there as upstream does: the suspend OPP's DDR
-bandwidth and its CX required-opps would otherwise sit in the sleep set
-and veto the SoC's DDR, CXSD and AOSD sleep states for the whole
-suspend. The DDR/SH0/MC0 wake-set floor that makes the exit safe comes
-from the keepalive BCMs in the interconnect provider, not from PCIe.
-pcie_qcom.d3cold_mem_floor=1 (also writable at runtime) restores the
-old D3cold floor for bisecting a wake failure.
+DDR. The suspend OPP's DDR bandwidth and its CX required-opps would
+otherwise sit in the sleep set and veto the SoC's DDR, CXSD and AOSD
+sleep states for the whole suspend. On the Odin 3, however, dropping
+both leaves the SoC unable to wake from s2idle (it needs a long press
+to restart), so which half is load-bearing is still being bisected.
+pcie_qcom.d3cold_mem_floor (writable at runtime) selects what D3cold
+keeps: 0 nothing, 1 the whole suspend OPP (default, the known-good
+behaviour), 2 only its memory-path bandwidth, 3 only its CX level. The
+bandwidth-only floor uses its own
+"pcie-mem" request so it never touches pcie->icc_mem, and resume clears
+it before restoring the OPP.
 
 Non-obvious choices:
 - Do not populate pcie->icc_mem as an alternative on OPP platforms:
@@ -43,7 +47,7 @@ this is an independent implementation for Linux 7.2.
 ---
 --- a/drivers/pci/controller/dwc/pcie-qcom.c
 +++ b/drivers/pci/controller/dwc/pcie-qcom.c
-@@ -20,6 +20,7 @@
+@@ -20,11 +20,13 @@
  #include <linux/kernel.h>
  #include <linux/limits.h>
  #include <linux/init.h>
@@ -51,14 +55,60 @@ this is an independent implementation for Linux 7.2.
  #include <linux/of.h>
  #include <linux/of_pci.h>
  #include <linux/pci.h>
-@@ -2197,6 +2198,40 @@
+ #include <linux/pci-ecam.h>
+ #include <linux/pci-pwrctrl.h>
++#include <linux/pm_domain.h>
+ #include <linux/pm_opp.h>
+ #include <linux/pm_runtime.h>
+ #include <linux/platform_device.h>
+@@ -287,6 +289,7 @@
+ 	union qcom_pcie_resources res;
+ 	struct icc_path *icc_mem;
+ 	struct icc_path *icc_cpu;
++	struct icc_path *icc_floor;
+ 	const struct qcom_pcie_cfg *cfg;
+ 	struct dentry *debugfs;
+ 	struct list_head ports;
+@@ -2132,6 +2135,13 @@
+ 			goto err_pm_runtime_put;
+ 		}
+ 
++		/* Separate request so a D3cold floor never touches pcie->icc_mem */
++		pcie->icc_floor = devm_of_icc_get(dev, "pcie-mem");
++		if (IS_ERR(pcie->icc_floor)) {
++			ret = PTR_ERR(pcie->icc_floor);
++			goto err_pm_runtime_put;
++		}
++
+ 		pcie->use_pm_opp = true;
+ 	} else {
+ 		/* Skip ICC init if OPP is supported as it is handled by OPP */
+@@ -2197,6 +2207,83 @@
  	return ret;
  }
  
++enum qcom_pcie_d3cold_floor {
++	QCOM_PCIE_D3COLD_FLOOR_NONE,
++	QCOM_PCIE_D3COLD_FLOOR_OPP,
++	QCOM_PCIE_D3COLD_FLOOR_BW,
++	QCOM_PCIE_D3COLD_FLOOR_CX,
++};
++
 +/* Any DDR/CX sleep-set vote left in D3cold vetoes the SoC's DDR, CXSD and AOSD states */
-+static bool d3cold_mem_floor;
-+module_param(d3cold_mem_floor, bool, 0644);
-+MODULE_PARM_DESC(d3cold_mem_floor, "Keep the suspend OPP memory floor while the link is in D3cold");
++static unsigned int d3cold_mem_floor = QCOM_PCIE_D3COLD_FLOOR_OPP;
++module_param(d3cold_mem_floor, uint, 0644);
++MODULE_PARM_DESC(d3cold_mem_floor,
++		 "Suspend OPP votes kept while the link is in D3cold: 0 none, 1 whole OPP (default), 2 memory bandwidth only, 3 CX level only");
++
++static struct dev_pm_opp *qcom_pcie_get_suspend_opp(struct device *dev)
++{
++	unsigned long freq = dev_pm_opp_get_suspend_opp_freq(dev);
++
++	if (!freq)
++		return NULL;
++
++	return dev_pm_opp_find_freq_exact(dev, freq, true);
++}
 +
 +/*
 + * A link kept up through s2idle still needs its DDR/LLCC sleep-set votes, so
@@ -69,21 +119,46 @@ this is an independent implementation for Linux 7.2.
 +{
 +	struct device *dev = pcie->pci->dev;
 +	struct dev_pm_opp *opp;
-+	unsigned long freq;
 +	int ret;
 +
 +	if (pm_suspend_target_state == PM_SUSPEND_MEM)
 +		return dev_pm_opp_set_opp(dev, NULL);
 +
-+	freq = dev_pm_opp_get_suspend_opp_freq(dev);
-+	if (!freq)
-+		return dev_pm_opp_set_opp(dev, NULL);
-+
-+	opp = dev_pm_opp_find_freq_exact(dev, freq, true);
-+	if (IS_ERR(opp))
-+		return PTR_ERR(opp);
++	opp = qcom_pcie_get_suspend_opp(dev);
++	if (IS_ERR_OR_NULL(opp))
++		return opp ? PTR_ERR(opp) : dev_pm_opp_set_opp(dev, NULL);
 +
 +	ret = dev_pm_opp_set_opp(dev, opp);
++	dev_pm_opp_put(opp);
++
++	return ret;
++}
++
++/* Drop the OPP in D3cold, optionally keeping one half of the suspend OPP */
++static int qcom_pcie_set_d3cold_floor(struct qcom_pcie *pcie)
++{
++	struct device *dev = pcie->pci->dev;
++	unsigned int mode = READ_ONCE(d3cold_mem_floor);
++	struct dev_pm_opp *opp;
++	int ret;
++
++	if (mode == QCOM_PCIE_D3COLD_FLOOR_OPP)
++		return qcom_pcie_set_suspend_opp(pcie);
++
++	ret = dev_pm_opp_set_opp(dev, NULL);
++	if (ret || pm_suspend_target_state == PM_SUSPEND_MEM ||
++	    (mode != QCOM_PCIE_D3COLD_FLOOR_BW && mode != QCOM_PCIE_D3COLD_FLOOR_CX))
++		return ret;
++
++	opp = qcom_pcie_get_suspend_opp(dev);
++	if (IS_ERR_OR_NULL(opp))
++		return PTR_ERR_OR_ZERO(opp);
++
++	if (mode == QCOM_PCIE_D3COLD_FLOOR_BW)
++		ret = icc_set_bw(pcie->icc_floor, 0, dev_pm_opp_get_bw(opp, true, 0));
++	else
++		ret = dev_pm_domain_set_performance_state(dev,
++							  dev_pm_opp_get_required_pstate(opp, 0));
 +	dev_pm_opp_put(opp);
 +
 +	return ret;
@@ -92,24 +167,21 @@ this is an independent implementation for Linux 7.2.
  static int qcom_pcie_suspend_noirq(struct device *dev)
  {
  	struct qcom_pcie *pcie;
-@@ -2219,8 +2254,14 @@
+@@ -2219,8 +2306,11 @@
  		if (ret)
  			dev_err(dev, "Failed to disable CPU-PCIe interconnect path: %d\n", ret);
  
 -		if (pcie->use_pm_opp)
 -			dev_pm_opp_set_opp(pcie->pci->dev, NULL);
 +		if (pcie->use_pm_opp) {
-+			if (d3cold_mem_floor)
-+				ret = qcom_pcie_set_suspend_opp(pcie);
-+			else
-+				ret = dev_pm_opp_set_opp(pcie->pci->dev, NULL);
++			ret = qcom_pcie_set_d3cold_floor(pcie);
 +			if (ret)
-+				dev_err(dev, "Failed to drop OPP: %d\n", ret);
++				dev_err(dev, "Failed to set D3cold floor: %d\n", ret);
 +		}
  	} else {
  		/*
  		 * Set minimum bandwidth required to keep data path
-@@ -2248,8 +2289,12 @@
+@@ -2248,8 +2338,12 @@
  				dev_err(dev, "Failed to disable CPU-PCIe interconnect path: %d\n",
  					ret);
  
@@ -124,3 +196,12 @@ this is an independent implementation for Linux 7.2.
  		}
  	}
  	return ret;
+@@ -2266,6 +2360,8 @@
+ 
+ 	if (pcie->pci->suspended) {
+ 		if (pcie->use_pm_opp) {
++			icc_set_bw(pcie->icc_floor, 0, 0);
++
+ 			ret = qcom_pcie_set_max_opp(dev);
+ 			if (ret) {
+ 				dev_err(dev, "Failed to set max OPP: %d\n", ret);
