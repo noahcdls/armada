@@ -311,6 +311,10 @@ no equivalent submission was found, or a permanent URL to the upstream submissio
 - `patches/0522-PCI-host-common-let-only-endpoints-veto-d3cold.patch`
   source: armada
   upstream: local
+- `patches/0532-interconnect-debug-enable-the-debugfs-test-client.patch`
+  source: armada
+  upstream: local
+  notes: Debug-only. Enables `/sys/kernel/debug/interconnect/test_client` to find which BCM on the SM8750 PCIe memory path (SN4, SH1, SH0, ACV, MC0) must stay in the RPMh sleep set for s2idle wake. Drop once that is known.
 - `patches/0523-regulator-qcom-rpmh-add-suspend-state-support.patch`
   source: https://github.com/thorch-os/thorch/blob/82e7472e6cad5c08a55c3aef92ef5be218621b2c/packages/linux-thorch/patches/0218-regulator-qcom-rpmh-add-suspend-state-support.patch
   upstream: unknown

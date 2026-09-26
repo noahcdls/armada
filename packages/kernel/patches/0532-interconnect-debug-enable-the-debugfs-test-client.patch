@@ -1,0 +1,21 @@
+From: Armada <noreply@armada.local>
+Subject: [PATCH] interconnect: DEBUG: enable the debugfs test client
+
+Debug-only, drop once the SM8750 s2idle wake bisect is done. Enables
+/sys/kernel/debug/interconnect/test_client so an interconnect path can
+be voted from userspace, to find which BCM on the PCIe memory path must
+stay in the RPMh sleep set for the SoC to wake from s2idle. Upstream
+keeps this behind a source edit because root can vote arbitrary
+bandwidth with it.
+---
+--- a/drivers/interconnect/debugfs-client.c
++++ b/drivers/interconnect/debugfs-client.c
+@@ -13,7 +13,7 @@
+  * configuration option for this feature.
+  * People who want to use this will need to modify the source code directly.
+  */
+-#undef INTERCONNECT_ALLOW_WRITE_DEBUGFS
++#define INTERCONNECT_ALLOW_WRITE_DEBUGFS
+ 
+ #if defined(INTERCONNECT_ALLOW_WRITE_DEBUGFS) && defined(CONFIG_DEBUG_FS)
+ 
