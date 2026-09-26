@@ -1,0 +1,481 @@
+From: Armada <noreply@armada.local>
+Subject: [PATCH] arm64: dts: qcom: sm8750: set CPU interconnect paths as ACTIVE_ONLY
+
+Port upstream commit 48c84d96dcd0 ("arm64: dts: qcom: sm8550: set CPU
+interconnect paths as ACTIVE_ONLY") to SM8750. SM8550 and SM8650 already
+tag every MASTER_APPSS_PROC path ACTIVE_ONLY; SM8750 still tags 42 of
+them ALWAYS: the QUP config/I2C paths and the PCIe cpu-pcie path.
+
+An ALWAYS tag copies the vote into the RPMh sleep set, so any of these
+consumers left voting keeps the config NoC (CN0) and CX up after the CPU
+subsystem collapses, even though the CPU cannot issue register accesses
+while collapsed. ACTIVE_ONLY keeps the vote in the active and wake sets
+only. The QUP and PCIe memory paths (to SLAVE_EBI1) keep their ALWAYS
+tags, as on SM8550.
+---
+diff --git a/arch/arm64/boot/dts/qcom/sm8750.dtsi b/arch/arm64/boot/dts/qcom/sm8750.dtsi
+index 2983669af..cccbea252 100644
+--- a/arch/arm64/boot/dts/qcom/sm8750.dtsi
++++ b/arch/arm64/boot/dts/qcom/sm8750.dtsi
+@@ -756,8 +756,8 @@ i2c8: i2c@880000 {
+ 
+ 				interconnects = <&clk_virt MASTER_QUP_CORE_2 QCOM_ICC_TAG_ALWAYS
+ 						 &clk_virt SLAVE_QUP_CORE_2 QCOM_ICC_TAG_ALWAYS>,
+-						<&gem_noc MASTER_APPSS_PROC QCOM_ICC_TAG_ALWAYS
+-						 &config_noc SLAVE_QUP_2 QCOM_ICC_TAG_ALWAYS>,
++						<&gem_noc MASTER_APPSS_PROC QCOM_ICC_TAG_ACTIVE_ONLY
++						 &config_noc SLAVE_QUP_2 QCOM_ICC_TAG_ACTIVE_ONLY>,
+ 						<&aggre2_noc MASTER_QUP_2 QCOM_ICC_TAG_ALWAYS
+ 						 &mc_virt SLAVE_EBI1 QCOM_ICC_TAG_ALWAYS>;
+ 				interconnect-names = "qup-core",
+@@ -789,8 +789,8 @@ spi8: spi@880000 {
+ 
+ 				interconnects = <&clk_virt MASTER_QUP_CORE_2 QCOM_ICC_TAG_ALWAYS
+ 						 &clk_virt SLAVE_QUP_CORE_2 QCOM_ICC_TAG_ALWAYS>,
+-						<&gem_noc MASTER_APPSS_PROC QCOM_ICC_TAG_ALWAYS
+-						 &config_noc SLAVE_QUP_2 QCOM_ICC_TAG_ALWAYS>,
++						<&gem_noc MASTER_APPSS_PROC QCOM_ICC_TAG_ACTIVE_ONLY
++						 &config_noc SLAVE_QUP_2 QCOM_ICC_TAG_ACTIVE_ONLY>,
+ 						<&aggre2_noc MASTER_QUP_2 QCOM_ICC_TAG_ALWAYS
+ 						 &mc_virt SLAVE_EBI1 QCOM_ICC_TAG_ALWAYS>;
+ 				interconnect-names = "qup-core",
+@@ -822,8 +822,8 @@ i2c9: i2c@884000 {
+ 
+ 				interconnects = <&clk_virt MASTER_QUP_CORE_2 QCOM_ICC_TAG_ALWAYS
+ 						 &clk_virt SLAVE_QUP_CORE_2 QCOM_ICC_TAG_ALWAYS>,
+-						<&gem_noc MASTER_APPSS_PROC QCOM_ICC_TAG_ALWAYS
+-						 &config_noc SLAVE_QUP_2 QCOM_ICC_TAG_ALWAYS>,
++						<&gem_noc MASTER_APPSS_PROC QCOM_ICC_TAG_ACTIVE_ONLY
++						 &config_noc SLAVE_QUP_2 QCOM_ICC_TAG_ACTIVE_ONLY>,
+ 						<&aggre2_noc MASTER_QUP_2 QCOM_ICC_TAG_ALWAYS
+ 						 &mc_virt SLAVE_EBI1 QCOM_ICC_TAG_ALWAYS>;
+ 				interconnect-names = "qup-core",
+@@ -855,8 +855,8 @@ spi9: spi@884000 {
+ 
+ 				interconnects = <&clk_virt MASTER_QUP_CORE_2 QCOM_ICC_TAG_ALWAYS
+ 						 &clk_virt SLAVE_QUP_CORE_2 QCOM_ICC_TAG_ALWAYS>,
+-						<&gem_noc MASTER_APPSS_PROC QCOM_ICC_TAG_ALWAYS
+-						 &config_noc SLAVE_QUP_2 QCOM_ICC_TAG_ALWAYS>,
++						<&gem_noc MASTER_APPSS_PROC QCOM_ICC_TAG_ACTIVE_ONLY
++						 &config_noc SLAVE_QUP_2 QCOM_ICC_TAG_ACTIVE_ONLY>,
+ 						<&aggre2_noc MASTER_QUP_2 QCOM_ICC_TAG_ALWAYS
+ 						 &mc_virt SLAVE_EBI1 QCOM_ICC_TAG_ALWAYS>;
+ 				interconnect-names = "qup-core",
+@@ -888,8 +888,8 @@ i2c10: i2c@888000 {
+ 
+ 				interconnects = <&clk_virt MASTER_QUP_CORE_2 QCOM_ICC_TAG_ALWAYS
+ 						 &clk_virt SLAVE_QUP_CORE_2 QCOM_ICC_TAG_ALWAYS>,
+-						<&gem_noc MASTER_APPSS_PROC QCOM_ICC_TAG_ALWAYS
+-						 &config_noc SLAVE_QUP_2 QCOM_ICC_TAG_ALWAYS>,
++						<&gem_noc MASTER_APPSS_PROC QCOM_ICC_TAG_ACTIVE_ONLY
++						 &config_noc SLAVE_QUP_2 QCOM_ICC_TAG_ACTIVE_ONLY>,
+ 						<&aggre2_noc MASTER_QUP_2 QCOM_ICC_TAG_ALWAYS
+ 						 &mc_virt SLAVE_EBI1 QCOM_ICC_TAG_ALWAYS>;
+ 				interconnect-names = "qup-core",
+@@ -921,8 +921,8 @@ spi10: spi@888000 {
+ 
+ 				interconnects = <&clk_virt MASTER_QUP_CORE_2 QCOM_ICC_TAG_ALWAYS
+ 						 &clk_virt SLAVE_QUP_CORE_2 QCOM_ICC_TAG_ALWAYS>,
+-						<&gem_noc MASTER_APPSS_PROC QCOM_ICC_TAG_ALWAYS
+-						 &config_noc SLAVE_QUP_2 QCOM_ICC_TAG_ALWAYS>,
++						<&gem_noc MASTER_APPSS_PROC QCOM_ICC_TAG_ACTIVE_ONLY
++						 &config_noc SLAVE_QUP_2 QCOM_ICC_TAG_ACTIVE_ONLY>,
+ 						<&aggre2_noc MASTER_QUP_2 QCOM_ICC_TAG_ALWAYS
+ 						 &mc_virt SLAVE_EBI1 QCOM_ICC_TAG_ALWAYS>;
+ 				interconnect-names = "qup-core",
+@@ -954,8 +954,8 @@ i2c11: i2c@88c000 {
+ 
+ 				interconnects = <&clk_virt MASTER_QUP_CORE_2 QCOM_ICC_TAG_ALWAYS
+ 						 &clk_virt SLAVE_QUP_CORE_2 QCOM_ICC_TAG_ALWAYS>,
+-						<&gem_noc MASTER_APPSS_PROC QCOM_ICC_TAG_ALWAYS
+-						 &config_noc SLAVE_QUP_2 QCOM_ICC_TAG_ALWAYS>,
++						<&gem_noc MASTER_APPSS_PROC QCOM_ICC_TAG_ACTIVE_ONLY
++						 &config_noc SLAVE_QUP_2 QCOM_ICC_TAG_ACTIVE_ONLY>,
+ 						<&aggre2_noc MASTER_QUP_2 QCOM_ICC_TAG_ALWAYS
+ 						 &mc_virt SLAVE_EBI1 QCOM_ICC_TAG_ALWAYS>;
+ 				interconnect-names = "qup-core",
+@@ -987,8 +987,8 @@ spi11: spi@88c000 {
+ 
+ 				interconnects = <&clk_virt MASTER_QUP_CORE_2 QCOM_ICC_TAG_ALWAYS
+ 						 &clk_virt SLAVE_QUP_CORE_2 QCOM_ICC_TAG_ALWAYS>,
+-						<&gem_noc MASTER_APPSS_PROC QCOM_ICC_TAG_ALWAYS
+-						 &config_noc SLAVE_QUP_2 QCOM_ICC_TAG_ALWAYS>,
++						<&gem_noc MASTER_APPSS_PROC QCOM_ICC_TAG_ACTIVE_ONLY
++						 &config_noc SLAVE_QUP_2 QCOM_ICC_TAG_ACTIVE_ONLY>,
+ 						<&aggre2_noc MASTER_QUP_2 QCOM_ICC_TAG_ALWAYS
+ 						 &mc_virt SLAVE_EBI1 QCOM_ICC_TAG_ALWAYS>;
+ 				interconnect-names = "qup-core",
+@@ -1020,8 +1020,8 @@ i2c12: i2c@890000 {
+ 
+ 				interconnects = <&clk_virt MASTER_QUP_CORE_2 QCOM_ICC_TAG_ALWAYS
+ 						 &clk_virt SLAVE_QUP_CORE_2 QCOM_ICC_TAG_ALWAYS>,
+-						<&gem_noc MASTER_APPSS_PROC QCOM_ICC_TAG_ALWAYS
+-						 &config_noc SLAVE_QUP_2 QCOM_ICC_TAG_ALWAYS>,
++						<&gem_noc MASTER_APPSS_PROC QCOM_ICC_TAG_ACTIVE_ONLY
++						 &config_noc SLAVE_QUP_2 QCOM_ICC_TAG_ACTIVE_ONLY>,
+ 						<&aggre2_noc MASTER_QUP_2 QCOM_ICC_TAG_ALWAYS
+ 						 &mc_virt SLAVE_EBI1 QCOM_ICC_TAG_ALWAYS>;
+ 				interconnect-names = "qup-core",
+@@ -1053,8 +1053,8 @@ spi12: spi@890000 {
+ 
+ 				interconnects = <&clk_virt MASTER_QUP_CORE_2 QCOM_ICC_TAG_ALWAYS
+ 						 &clk_virt SLAVE_QUP_CORE_2 QCOM_ICC_TAG_ALWAYS>,
+-						<&gem_noc MASTER_APPSS_PROC QCOM_ICC_TAG_ALWAYS
+-						 &config_noc SLAVE_QUP_2 QCOM_ICC_TAG_ALWAYS>,
++						<&gem_noc MASTER_APPSS_PROC QCOM_ICC_TAG_ACTIVE_ONLY
++						 &config_noc SLAVE_QUP_2 QCOM_ICC_TAG_ACTIVE_ONLY>,
+ 						<&aggre2_noc MASTER_QUP_2 QCOM_ICC_TAG_ALWAYS
+ 						 &mc_virt SLAVE_EBI1 QCOM_ICC_TAG_ALWAYS>;
+ 				interconnect-names = "qup-core",
+@@ -1086,8 +1086,8 @@ i2c13: i2c@894000 {
+ 
+ 				interconnects = <&clk_virt MASTER_QUP_CORE_2 QCOM_ICC_TAG_ALWAYS
+ 						 &clk_virt SLAVE_QUP_CORE_2 QCOM_ICC_TAG_ALWAYS>,
+-						<&gem_noc MASTER_APPSS_PROC QCOM_ICC_TAG_ALWAYS
+-						 &config_noc SLAVE_QUP_2 QCOM_ICC_TAG_ALWAYS>,
++						<&gem_noc MASTER_APPSS_PROC QCOM_ICC_TAG_ACTIVE_ONLY
++						 &config_noc SLAVE_QUP_2 QCOM_ICC_TAG_ACTIVE_ONLY>,
+ 						<&aggre2_noc MASTER_QUP_2 QCOM_ICC_TAG_ALWAYS
+ 						 &mc_virt SLAVE_EBI1 QCOM_ICC_TAG_ALWAYS>;
+ 				interconnect-names = "qup-core",
+@@ -1119,8 +1119,8 @@ spi13: spi@894000 {
+ 
+ 				interconnects = <&clk_virt MASTER_QUP_CORE_2 QCOM_ICC_TAG_ALWAYS
+ 						 &clk_virt SLAVE_QUP_CORE_2 QCOM_ICC_TAG_ALWAYS>,
+-						<&gem_noc MASTER_APPSS_PROC QCOM_ICC_TAG_ALWAYS
+-						 &config_noc SLAVE_QUP_2 QCOM_ICC_TAG_ALWAYS>,
++						<&gem_noc MASTER_APPSS_PROC QCOM_ICC_TAG_ACTIVE_ONLY
++						 &config_noc SLAVE_QUP_2 QCOM_ICC_TAG_ACTIVE_ONLY>,
+ 						<&aggre2_noc MASTER_QUP_2 QCOM_ICC_TAG_ALWAYS
+ 						 &mc_virt SLAVE_EBI1 QCOM_ICC_TAG_ALWAYS>;
+ 				interconnect-names = "qup-core",
+@@ -1152,8 +1152,8 @@ uart14: serial@898000 {
+ 
+ 				interconnects = <&clk_virt MASTER_QUP_CORE_2 QCOM_ICC_TAG_ALWAYS
+ 						 &clk_virt SLAVE_QUP_CORE_2 QCOM_ICC_TAG_ALWAYS>,
+-						<&gem_noc MASTER_APPSS_PROC QCOM_ICC_TAG_ALWAYS
+-						 &config_noc SLAVE_QUP_2 QCOM_ICC_TAG_ALWAYS>;
++						<&gem_noc MASTER_APPSS_PROC QCOM_ICC_TAG_ACTIVE_ONLY
++						 &config_noc SLAVE_QUP_2 QCOM_ICC_TAG_ACTIVE_ONLY>;
+ 				interconnect-names = "qup-core",
+ 						     "qup-config";
+ 
+@@ -1174,8 +1174,8 @@ i2c15: i2c@89c000 {
+ 
+ 				interconnects = <&clk_virt MASTER_QUP_CORE_2 QCOM_ICC_TAG_ALWAYS
+ 						 &clk_virt SLAVE_QUP_CORE_2 QCOM_ICC_TAG_ALWAYS>,
+-						<&gem_noc MASTER_APPSS_PROC QCOM_ICC_TAG_ALWAYS
+-						 &config_noc SLAVE_QUP_2 QCOM_ICC_TAG_ALWAYS>,
++						<&gem_noc MASTER_APPSS_PROC QCOM_ICC_TAG_ACTIVE_ONLY
++						 &config_noc SLAVE_QUP_2 QCOM_ICC_TAG_ACTIVE_ONLY>,
+ 						<&aggre2_noc MASTER_QUP_2 QCOM_ICC_TAG_ALWAYS
+ 						 &mc_virt SLAVE_EBI1 QCOM_ICC_TAG_ALWAYS>;
+ 				interconnect-names = "qup-core",
+@@ -1207,8 +1207,8 @@ spi15: spi@89c000 {
+ 
+ 				interconnects = <&clk_virt MASTER_QUP_CORE_2 QCOM_ICC_TAG_ALWAYS
+ 						 &clk_virt SLAVE_QUP_CORE_2 QCOM_ICC_TAG_ALWAYS>,
+-						<&gem_noc MASTER_APPSS_PROC QCOM_ICC_TAG_ALWAYS
+-						 &config_noc SLAVE_QUP_2 QCOM_ICC_TAG_ALWAYS>,
++						<&gem_noc MASTER_APPSS_PROC QCOM_ICC_TAG_ACTIVE_ONLY
++						 &config_noc SLAVE_QUP_2 QCOM_ICC_TAG_ACTIVE_ONLY>,
+ 						<&aggre2_noc MASTER_QUP_2 QCOM_ICC_TAG_ALWAYS
+ 						 &mc_virt SLAVE_EBI1 QCOM_ICC_TAG_ALWAYS>;
+ 				interconnect-names = "qup-core",
+@@ -1240,8 +1240,8 @@ uart15: serial@89c000 {
+ 
+ 				interconnects = <&clk_virt MASTER_QUP_CORE_2 QCOM_ICC_TAG_ALWAYS
+ 						 &clk_virt SLAVE_QUP_CORE_2 QCOM_ICC_TAG_ALWAYS>,
+-						<&gem_noc MASTER_APPSS_PROC QCOM_ICC_TAG_ALWAYS
+-						 &config_noc SLAVE_QUP_2 QCOM_ICC_TAG_ALWAYS>;
++						<&gem_noc MASTER_APPSS_PROC QCOM_ICC_TAG_ACTIVE_ONLY
++						 &config_noc SLAVE_QUP_2 QCOM_ICC_TAG_ACTIVE_ONLY>;
+ 				interconnect-names = "qup-core",
+ 						     "qup-config";
+ 
+@@ -1278,8 +1278,8 @@ i2c_hub_0: i2c@980000 {
+ 
+ 				interconnects = <&clk_virt MASTER_QUP_CORE_0 QCOM_ICC_TAG_ALWAYS
+ 						 &clk_virt SLAVE_QUP_CORE_0 QCOM_ICC_TAG_ALWAYS>,
+-						<&gem_noc MASTER_APPSS_PROC QCOM_ICC_TAG_ALWAYS
+-						 &config_noc SLAVE_I2C QCOM_ICC_TAG_ALWAYS>;
++						<&gem_noc MASTER_APPSS_PROC QCOM_ICC_TAG_ACTIVE_ONLY
++						 &config_noc SLAVE_I2C QCOM_ICC_TAG_ACTIVE_ONLY>;
+ 				interconnect-names = "qup-core",
+ 						     "qup-config";
+ 
+@@ -1305,8 +1305,8 @@ i2c_hub_1: i2c@984000 {
+ 
+ 				interconnects = <&clk_virt MASTER_QUP_CORE_0 QCOM_ICC_TAG_ALWAYS
+ 						 &clk_virt SLAVE_QUP_CORE_0 QCOM_ICC_TAG_ALWAYS>,
+-						<&gem_noc MASTER_APPSS_PROC QCOM_ICC_TAG_ALWAYS
+-						 &config_noc SLAVE_I2C QCOM_ICC_TAG_ALWAYS>;
++						<&gem_noc MASTER_APPSS_PROC QCOM_ICC_TAG_ACTIVE_ONLY
++						 &config_noc SLAVE_I2C QCOM_ICC_TAG_ACTIVE_ONLY>;
+ 				interconnect-names = "qup-core",
+ 						     "qup-config";
+ 
+@@ -1332,8 +1332,8 @@ i2c_hub_2: i2c@988000 {
+ 
+ 				interconnects = <&clk_virt MASTER_QUP_CORE_0 QCOM_ICC_TAG_ALWAYS
+ 						 &clk_virt SLAVE_QUP_CORE_0 QCOM_ICC_TAG_ALWAYS>,
+-						<&gem_noc MASTER_APPSS_PROC QCOM_ICC_TAG_ALWAYS
+-						 &config_noc SLAVE_I2C QCOM_ICC_TAG_ALWAYS>;
++						<&gem_noc MASTER_APPSS_PROC QCOM_ICC_TAG_ACTIVE_ONLY
++						 &config_noc SLAVE_I2C QCOM_ICC_TAG_ACTIVE_ONLY>;
+ 				interconnect-names = "qup-core",
+ 						     "qup-config";
+ 
+@@ -1359,8 +1359,8 @@ i2c_hub_3: i2c@98c000 {
+ 
+ 				interconnects = <&clk_virt MASTER_QUP_CORE_0 QCOM_ICC_TAG_ALWAYS
+ 						 &clk_virt SLAVE_QUP_CORE_0 QCOM_ICC_TAG_ALWAYS>,
+-						<&gem_noc MASTER_APPSS_PROC QCOM_ICC_TAG_ALWAYS
+-						 &config_noc SLAVE_I2C QCOM_ICC_TAG_ALWAYS>;
++						<&gem_noc MASTER_APPSS_PROC QCOM_ICC_TAG_ACTIVE_ONLY
++						 &config_noc SLAVE_I2C QCOM_ICC_TAG_ACTIVE_ONLY>;
+ 				interconnect-names = "qup-core",
+ 						     "qup-config";
+ 
+@@ -1386,8 +1386,8 @@ i2c_hub_4: i2c@990000 {
+ 
+ 				interconnects = <&clk_virt MASTER_QUP_CORE_0 QCOM_ICC_TAG_ALWAYS
+ 						 &clk_virt SLAVE_QUP_CORE_0 QCOM_ICC_TAG_ALWAYS>,
+-						<&gem_noc MASTER_APPSS_PROC QCOM_ICC_TAG_ALWAYS
+-						 &config_noc SLAVE_I2C QCOM_ICC_TAG_ALWAYS>;
++						<&gem_noc MASTER_APPSS_PROC QCOM_ICC_TAG_ACTIVE_ONLY
++						 &config_noc SLAVE_I2C QCOM_ICC_TAG_ACTIVE_ONLY>;
+ 				interconnect-names = "qup-core",
+ 						     "qup-config";
+ 
+@@ -1413,8 +1413,8 @@ i2c_hub_5: i2c@994000 {
+ 
+ 				interconnects = <&clk_virt MASTER_QUP_CORE_0 QCOM_ICC_TAG_ALWAYS
+ 						 &clk_virt SLAVE_QUP_CORE_0 QCOM_ICC_TAG_ALWAYS>,
+-						<&gem_noc MASTER_APPSS_PROC QCOM_ICC_TAG_ALWAYS
+-						 &config_noc SLAVE_I2C QCOM_ICC_TAG_ALWAYS>;
++						<&gem_noc MASTER_APPSS_PROC QCOM_ICC_TAG_ACTIVE_ONLY
++						 &config_noc SLAVE_I2C QCOM_ICC_TAG_ACTIVE_ONLY>;
+ 				interconnect-names = "qup-core",
+ 						     "qup-config";
+ 
+@@ -1440,8 +1440,8 @@ i2c_hub_6: i2c@998000 {
+ 
+ 				interconnects = <&clk_virt MASTER_QUP_CORE_0 QCOM_ICC_TAG_ALWAYS
+ 						 &clk_virt SLAVE_QUP_CORE_0 QCOM_ICC_TAG_ALWAYS>,
+-						<&gem_noc MASTER_APPSS_PROC QCOM_ICC_TAG_ALWAYS
+-						 &config_noc SLAVE_I2C QCOM_ICC_TAG_ALWAYS>;
++						<&gem_noc MASTER_APPSS_PROC QCOM_ICC_TAG_ACTIVE_ONLY
++						 &config_noc SLAVE_I2C QCOM_ICC_TAG_ACTIVE_ONLY>;
+ 				interconnect-names = "qup-core",
+ 						     "qup-config";
+ 
+@@ -1467,8 +1467,8 @@ i2c_hub_7: i2c@99c000 {
+ 
+ 				interconnects = <&clk_virt MASTER_QUP_CORE_0 QCOM_ICC_TAG_ALWAYS
+ 						 &clk_virt SLAVE_QUP_CORE_0 QCOM_ICC_TAG_ALWAYS>,
+-						<&gem_noc MASTER_APPSS_PROC QCOM_ICC_TAG_ALWAYS
+-						 &config_noc SLAVE_I2C QCOM_ICC_TAG_ALWAYS>;
++						<&gem_noc MASTER_APPSS_PROC QCOM_ICC_TAG_ACTIVE_ONLY
++						 &config_noc SLAVE_I2C QCOM_ICC_TAG_ACTIVE_ONLY>;
+ 				interconnect-names = "qup-core",
+ 						     "qup-config";
+ 
+@@ -1494,8 +1494,8 @@ i2c_hub_8: i2c@9a0000 {
+ 
+ 				interconnects = <&clk_virt MASTER_QUP_CORE_0 QCOM_ICC_TAG_ALWAYS
+ 						 &clk_virt SLAVE_QUP_CORE_0 QCOM_ICC_TAG_ALWAYS>,
+-						<&gem_noc MASTER_APPSS_PROC QCOM_ICC_TAG_ALWAYS
+-						 &config_noc SLAVE_I2C QCOM_ICC_TAG_ALWAYS>;
++						<&gem_noc MASTER_APPSS_PROC QCOM_ICC_TAG_ACTIVE_ONLY
++						 &config_noc SLAVE_I2C QCOM_ICC_TAG_ACTIVE_ONLY>;
+ 				interconnect-names = "qup-core",
+ 						     "qup-config";
+ 
+@@ -1521,8 +1521,8 @@ i2c_hub_9: i2c@9a4000 {
+ 
+ 				interconnects = <&clk_virt MASTER_QUP_CORE_0 QCOM_ICC_TAG_ALWAYS
+ 						 &clk_virt SLAVE_QUP_CORE_0 QCOM_ICC_TAG_ALWAYS>,
+-						<&gem_noc MASTER_APPSS_PROC QCOM_ICC_TAG_ALWAYS
+-						 &config_noc SLAVE_I2C QCOM_ICC_TAG_ALWAYS>;
++						<&gem_noc MASTER_APPSS_PROC QCOM_ICC_TAG_ACTIVE_ONLY
++						 &config_noc SLAVE_I2C QCOM_ICC_TAG_ACTIVE_ONLY>;
+ 				interconnect-names = "qup-core",
+ 						     "qup-config";
+ 
+@@ -1590,8 +1590,8 @@ i2c0: i2c@a80000 {
+ 
+ 				interconnects = <&clk_virt MASTER_QUP_CORE_1 QCOM_ICC_TAG_ALWAYS
+ 						 &clk_virt SLAVE_QUP_CORE_1 QCOM_ICC_TAG_ALWAYS>,
+-						<&gem_noc MASTER_APPSS_PROC QCOM_ICC_TAG_ALWAYS
+-						 &config_noc SLAVE_QUP_1 QCOM_ICC_TAG_ALWAYS>,
++						<&gem_noc MASTER_APPSS_PROC QCOM_ICC_TAG_ACTIVE_ONLY
++						 &config_noc SLAVE_QUP_1 QCOM_ICC_TAG_ACTIVE_ONLY>,
+ 						<&aggre1_noc MASTER_QUP_1 QCOM_ICC_TAG_ALWAYS
+ 						 &mc_virt SLAVE_EBI1 QCOM_ICC_TAG_ALWAYS>;
+ 				interconnect-names = "qup-core",
+@@ -1623,8 +1623,8 @@ spi0: spi@a80000 {
+ 
+ 				interconnects = <&clk_virt MASTER_QUP_CORE_1 QCOM_ICC_TAG_ALWAYS
+ 						 &clk_virt SLAVE_QUP_CORE_1 QCOM_ICC_TAG_ALWAYS>,
+-						<&gem_noc MASTER_APPSS_PROC QCOM_ICC_TAG_ALWAYS
+-						 &config_noc SLAVE_QUP_1 QCOM_ICC_TAG_ALWAYS>,
++						<&gem_noc MASTER_APPSS_PROC QCOM_ICC_TAG_ACTIVE_ONLY
++						 &config_noc SLAVE_QUP_1 QCOM_ICC_TAG_ACTIVE_ONLY>,
+ 						<&aggre1_noc MASTER_QUP_1 QCOM_ICC_TAG_ALWAYS
+ 						 &mc_virt SLAVE_EBI1 QCOM_ICC_TAG_ALWAYS>;
+ 				interconnect-names = "qup-core",
+@@ -1656,8 +1656,8 @@ i2c1: i2c@a84000 {
+ 
+ 				interconnects = <&clk_virt MASTER_QUP_CORE_1 QCOM_ICC_TAG_ALWAYS
+ 						 &clk_virt SLAVE_QUP_CORE_1 QCOM_ICC_TAG_ALWAYS>,
+-						<&gem_noc MASTER_APPSS_PROC QCOM_ICC_TAG_ALWAYS
+-						 &config_noc SLAVE_QUP_1 QCOM_ICC_TAG_ALWAYS>,
++						<&gem_noc MASTER_APPSS_PROC QCOM_ICC_TAG_ACTIVE_ONLY
++						 &config_noc SLAVE_QUP_1 QCOM_ICC_TAG_ACTIVE_ONLY>,
+ 						<&aggre1_noc MASTER_QUP_1 QCOM_ICC_TAG_ALWAYS
+ 						 &mc_virt SLAVE_EBI1 QCOM_ICC_TAG_ALWAYS>;
+ 				interconnect-names = "qup-core",
+@@ -1689,8 +1689,8 @@ spi1: spi@a84000 {
+ 
+ 				interconnects = <&clk_virt MASTER_QUP_CORE_1 QCOM_ICC_TAG_ALWAYS
+ 						 &clk_virt SLAVE_QUP_CORE_1 QCOM_ICC_TAG_ALWAYS>,
+-						<&gem_noc MASTER_APPSS_PROC QCOM_ICC_TAG_ALWAYS
+-						 &config_noc SLAVE_QUP_1 QCOM_ICC_TAG_ALWAYS>,
++						<&gem_noc MASTER_APPSS_PROC QCOM_ICC_TAG_ACTIVE_ONLY
++						 &config_noc SLAVE_QUP_1 QCOM_ICC_TAG_ACTIVE_ONLY>,
+ 						<&aggre1_noc MASTER_QUP_1 QCOM_ICC_TAG_ALWAYS
+ 						 &mc_virt SLAVE_EBI1 QCOM_ICC_TAG_ALWAYS>;
+ 				interconnect-names = "qup-core",
+@@ -1722,8 +1722,8 @@ i2c2: i2c@a88000 {
+ 
+ 				interconnects = <&clk_virt MASTER_QUP_CORE_1 QCOM_ICC_TAG_ALWAYS
+ 						 &clk_virt SLAVE_QUP_CORE_1 QCOM_ICC_TAG_ALWAYS>,
+-						<&gem_noc MASTER_APPSS_PROC QCOM_ICC_TAG_ALWAYS
+-						 &config_noc SLAVE_QUP_1 QCOM_ICC_TAG_ALWAYS>,
++						<&gem_noc MASTER_APPSS_PROC QCOM_ICC_TAG_ACTIVE_ONLY
++						 &config_noc SLAVE_QUP_1 QCOM_ICC_TAG_ACTIVE_ONLY>,
+ 						<&aggre1_noc MASTER_QUP_1 QCOM_ICC_TAG_ALWAYS
+ 						 &mc_virt SLAVE_EBI1 QCOM_ICC_TAG_ALWAYS>;
+ 				interconnect-names = "qup-core",
+@@ -1755,8 +1755,8 @@ spi2: spi@a88000 {
+ 
+ 				interconnects = <&clk_virt MASTER_QUP_CORE_1 QCOM_ICC_TAG_ALWAYS
+ 						 &clk_virt SLAVE_QUP_CORE_1 QCOM_ICC_TAG_ALWAYS>,
+-						<&gem_noc MASTER_APPSS_PROC QCOM_ICC_TAG_ALWAYS
+-						 &config_noc SLAVE_QUP_1 QCOM_ICC_TAG_ALWAYS>,
++						<&gem_noc MASTER_APPSS_PROC QCOM_ICC_TAG_ACTIVE_ONLY
++						 &config_noc SLAVE_QUP_1 QCOM_ICC_TAG_ACTIVE_ONLY>,
+ 						<&aggre1_noc MASTER_QUP_1 QCOM_ICC_TAG_ALWAYS
+ 						 &mc_virt SLAVE_EBI1 QCOM_ICC_TAG_ALWAYS>;
+ 				interconnect-names = "qup-core",
+@@ -1788,8 +1788,8 @@ i2c3: i2c@a8c000 {
+ 
+ 				interconnects = <&clk_virt MASTER_QUP_CORE_1 QCOM_ICC_TAG_ALWAYS
+ 						 &clk_virt SLAVE_QUP_CORE_1 QCOM_ICC_TAG_ALWAYS>,
+-						<&gem_noc MASTER_APPSS_PROC QCOM_ICC_TAG_ALWAYS
+-						 &config_noc SLAVE_QUP_1 QCOM_ICC_TAG_ALWAYS>,
++						<&gem_noc MASTER_APPSS_PROC QCOM_ICC_TAG_ACTIVE_ONLY
++						 &config_noc SLAVE_QUP_1 QCOM_ICC_TAG_ACTIVE_ONLY>,
+ 						<&aggre1_noc MASTER_QUP_1 QCOM_ICC_TAG_ALWAYS
+ 						 &mc_virt SLAVE_EBI1 QCOM_ICC_TAG_ALWAYS>;
+ 				interconnect-names = "qup-core",
+@@ -1821,8 +1821,8 @@ spi3: spi@a8c000 {
+ 
+ 				interconnects = <&clk_virt MASTER_QUP_CORE_1 QCOM_ICC_TAG_ALWAYS
+ 						 &clk_virt SLAVE_QUP_CORE_1 QCOM_ICC_TAG_ALWAYS>,
+-						<&gem_noc MASTER_APPSS_PROC QCOM_ICC_TAG_ALWAYS
+-						 &config_noc SLAVE_QUP_1 QCOM_ICC_TAG_ALWAYS>,
++						<&gem_noc MASTER_APPSS_PROC QCOM_ICC_TAG_ACTIVE_ONLY
++						 &config_noc SLAVE_QUP_1 QCOM_ICC_TAG_ACTIVE_ONLY>,
+ 						<&aggre1_noc MASTER_QUP_1 QCOM_ICC_TAG_ALWAYS
+ 						 &mc_virt SLAVE_EBI1 QCOM_ICC_TAG_ALWAYS>;
+ 				interconnect-names = "qup-core",
+@@ -1854,8 +1854,8 @@ i2c4: i2c@a90000 {
+ 
+ 				interconnects = <&clk_virt MASTER_QUP_CORE_1 QCOM_ICC_TAG_ALWAYS
+ 						 &clk_virt SLAVE_QUP_CORE_1 QCOM_ICC_TAG_ALWAYS>,
+-						<&gem_noc MASTER_APPSS_PROC QCOM_ICC_TAG_ALWAYS
+-						 &config_noc SLAVE_QUP_1 QCOM_ICC_TAG_ALWAYS>,
++						<&gem_noc MASTER_APPSS_PROC QCOM_ICC_TAG_ACTIVE_ONLY
++						 &config_noc SLAVE_QUP_1 QCOM_ICC_TAG_ACTIVE_ONLY>,
+ 						<&aggre1_noc MASTER_QUP_1 QCOM_ICC_TAG_ALWAYS
+ 						 &mc_virt SLAVE_EBI1 QCOM_ICC_TAG_ALWAYS>;
+ 				interconnect-names = "qup-core",
+@@ -1887,8 +1887,8 @@ spi4: spi@a90000 {
+ 
+ 				interconnects = <&clk_virt MASTER_QUP_CORE_1 QCOM_ICC_TAG_ALWAYS
+ 						 &clk_virt SLAVE_QUP_CORE_1 QCOM_ICC_TAG_ALWAYS>,
+-						<&gem_noc MASTER_APPSS_PROC QCOM_ICC_TAG_ALWAYS
+-						 &config_noc SLAVE_QUP_1 QCOM_ICC_TAG_ALWAYS>,
++						<&gem_noc MASTER_APPSS_PROC QCOM_ICC_TAG_ACTIVE_ONLY
++						 &config_noc SLAVE_QUP_1 QCOM_ICC_TAG_ACTIVE_ONLY>,
+ 						<&aggre1_noc MASTER_QUP_1 QCOM_ICC_TAG_ALWAYS
+ 						 &mc_virt SLAVE_EBI1 QCOM_ICC_TAG_ALWAYS>;
+ 				interconnect-names = "qup-core",
+@@ -1920,8 +1920,8 @@ i2c5: i2c@a94000 {
+ 
+ 				interconnects = <&clk_virt MASTER_QUP_CORE_1 QCOM_ICC_TAG_ALWAYS
+ 						 &clk_virt SLAVE_QUP_CORE_1 QCOM_ICC_TAG_ALWAYS>,
+-						<&gem_noc MASTER_APPSS_PROC QCOM_ICC_TAG_ALWAYS
+-						 &config_noc SLAVE_QUP_1 QCOM_ICC_TAG_ALWAYS>,
++						<&gem_noc MASTER_APPSS_PROC QCOM_ICC_TAG_ACTIVE_ONLY
++						 &config_noc SLAVE_QUP_1 QCOM_ICC_TAG_ACTIVE_ONLY>,
+ 						<&aggre1_noc MASTER_QUP_1 QCOM_ICC_TAG_ALWAYS
+ 						 &mc_virt SLAVE_EBI1 QCOM_ICC_TAG_ALWAYS>;
+ 				interconnect-names = "qup-core",
+@@ -1953,8 +1953,8 @@ spi5: spi@a94000 {
+ 
+ 				interconnects = <&clk_virt MASTER_QUP_CORE_1 QCOM_ICC_TAG_ALWAYS
+ 						 &clk_virt SLAVE_QUP_CORE_1 QCOM_ICC_TAG_ALWAYS>,
+-						<&gem_noc MASTER_APPSS_PROC QCOM_ICC_TAG_ALWAYS
+-						 &config_noc SLAVE_QUP_1 QCOM_ICC_TAG_ALWAYS>,
++						<&gem_noc MASTER_APPSS_PROC QCOM_ICC_TAG_ACTIVE_ONLY
++						 &config_noc SLAVE_QUP_1 QCOM_ICC_TAG_ACTIVE_ONLY>,
+ 						<&aggre1_noc MASTER_QUP_1 QCOM_ICC_TAG_ALWAYS
+ 						 &mc_virt SLAVE_EBI1 QCOM_ICC_TAG_ALWAYS>;
+ 				interconnect-names = "qup-core",
+@@ -1986,8 +1986,8 @@ i2c6: i2c@a98000 {
+ 
+ 				interconnects = <&clk_virt MASTER_QUP_CORE_1 QCOM_ICC_TAG_ALWAYS
+ 						 &clk_virt SLAVE_QUP_CORE_1 QCOM_ICC_TAG_ALWAYS>,
+-						<&gem_noc MASTER_APPSS_PROC QCOM_ICC_TAG_ALWAYS
+-						 &config_noc SLAVE_QUP_1 QCOM_ICC_TAG_ALWAYS>,
++						<&gem_noc MASTER_APPSS_PROC QCOM_ICC_TAG_ACTIVE_ONLY
++						 &config_noc SLAVE_QUP_1 QCOM_ICC_TAG_ACTIVE_ONLY>,
+ 						<&aggre1_noc MASTER_QUP_1 QCOM_ICC_TAG_ALWAYS
+ 						 &mc_virt SLAVE_EBI1 QCOM_ICC_TAG_ALWAYS>;
+ 				interconnect-names = "qup-core",
+@@ -2019,8 +2019,8 @@ spi6: spi@a98000 {
+ 
+ 				interconnects = <&clk_virt MASTER_QUP_CORE_1 QCOM_ICC_TAG_ALWAYS
+ 						 &clk_virt SLAVE_QUP_CORE_1 QCOM_ICC_TAG_ALWAYS>,
+-						<&gem_noc MASTER_APPSS_PROC QCOM_ICC_TAG_ALWAYS
+-						 &config_noc SLAVE_QUP_1 QCOM_ICC_TAG_ALWAYS>,
++						<&gem_noc MASTER_APPSS_PROC QCOM_ICC_TAG_ACTIVE_ONLY
++						 &config_noc SLAVE_QUP_1 QCOM_ICC_TAG_ACTIVE_ONLY>,
+ 						<&aggre1_noc MASTER_QUP_1 QCOM_ICC_TAG_ALWAYS
+ 						 &mc_virt SLAVE_EBI1 QCOM_ICC_TAG_ALWAYS>;
+ 				interconnect-names = "qup-core",
+@@ -2052,8 +2052,8 @@ uart7: serial@a9c000 {
+ 
+ 				interconnects = <&clk_virt MASTER_QUP_CORE_1 QCOM_ICC_TAG_ALWAYS
+ 						 &clk_virt SLAVE_QUP_CORE_1 QCOM_ICC_TAG_ALWAYS>,
+-						<&gem_noc MASTER_APPSS_PROC QCOM_ICC_TAG_ALWAYS
+-						 &config_noc SLAVE_QUP_1 QCOM_ICC_TAG_ALWAYS>;
++						<&gem_noc MASTER_APPSS_PROC QCOM_ICC_TAG_ACTIVE_ONLY
++						 &config_noc SLAVE_QUP_1 QCOM_ICC_TAG_ACTIVE_ONLY>;
+ 				interconnect-names = "qup-core",
+ 						     "qup-config";
+ 
+@@ -5565,8 +5565,8 @@ pcie0: pcie@1c00000 {
+ 
+ 			interconnects = <&pcie_noc MASTER_PCIE_0 QCOM_ICC_TAG_ALWAYS
+ 					 &mc_virt SLAVE_EBI1 QCOM_ICC_TAG_ALWAYS>,
+-					<&gem_noc MASTER_APPSS_PROC QCOM_ICC_TAG_ALWAYS
+-					 &cnoc_main SLAVE_PCIE_0 QCOM_ICC_TAG_ALWAYS>;
++					<&gem_noc MASTER_APPSS_PROC QCOM_ICC_TAG_ACTIVE_ONLY
++					 &cnoc_main SLAVE_PCIE_0 QCOM_ICC_TAG_ACTIVE_ONLY>;
+ 			interconnect-names = "pcie-mem",
+ 					     "cpu-pcie";
+ 

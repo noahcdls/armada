@@ -2,11 +2,14 @@ From: Armada <noreply@armada.local>
 Subject: [PATCH] arm64: dts: qcom: sm8750: add a PCIe suspend OPP
 
 Give pcie0 a suspend-only OPP so pcie-qcom keeps a nonzero DDR/LLCC
-sleep-set contract once the CPU subsystem collapses in s2idle. Without
-it pcie-qcom votes 0/0 on the PCIe memory path during suspend. When no
-other subsystem holds a DDR vote (for example the ADSP with no audio
-stream open), the device does not resume from the collapse and resets
-instead of waking.
+sleep-set contract when the link is kept up through s2idle (an endpoint
+vetoed D3cold). Without it a live controller and endpoint are left with
+0/0 on the PCIe memory path once the CPU subsystem collapses, and the
+device resets instead of waking when nothing else holds DDR.
+
+pcie-qcom only selects this OPP while the link stays up. In D3cold it
+drops the OPP to NULL, so the floor does not veto the SoC's DDR, CXSD
+and AOSD sleep states.
 
 Same floor as the SM8550 companion: 1000 kBps peak, of the same order
 as the vendor kernel's 800 kBps PCIe suspend vote.

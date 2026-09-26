@@ -2,10 +2,10 @@ From: Armada <noreply@armada.local>
 Subject: [PATCH] arm64: dts: qcom: sm8650: add a PCIe suspend OPP
 
 Give pcie0 a suspend-only OPP so pcie-qcom keeps a nonzero DDR/LLCC
-sleep-set vote once the CPU subsystem collapses in s2idle. Without one,
-pcie-qcom votes 0/0 on the PCIe memory path during suspend; SM8550 and
-SM8750 reset instead of waking when nothing else votes DDR in the sleep
-set. Give SM8650 the same floor.
+sleep-set vote when the link is kept up through s2idle. Without one, a
+live link is left with 0/0 on the PCIe memory path; SM8550 resets
+instead of waking when nothing else votes DDR in the sleep set. Give
+SM8650 the same floor. pcie-qcom drops the OPP in D3cold.
 ---
 --- a/arch/arm64/boot/dts/qcom/sm8650.dtsi
 +++ b/arch/arm64/boot/dts/qcom/sm8650.dtsi

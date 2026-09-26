@@ -307,7 +307,7 @@ no equivalent submission was found, or a permanent URL to the upstream submissio
 - `patches/0513-PCI-qcom-honour-an-opp-suspend-opp-as-the-non-s2ram-memory-floor.patch`
   source: armada
   upstream: not submitted
-  notes: On OPP-scaling platforms the OPP carries the only PCIe memory-path votes, so dropping it to NULL on non-S2RAM suspend leaves the RPMh sleep set with no DDR/LLCC contract and the AOP never resumes. Deliberately does not populate `pcie->icc_mem` on OPP platforms: `qcom_pcie_icc_opp_update()` prefers an `icc_mem` handle over the OPP branch, so providing one silently disables the post-link-training OPP update and pins the OPP at the probe-time maximum.
+  notes: On OPP-scaling platforms the OPP carries the only PCIe memory-path votes, so dropping it to NULL while the link is kept up through s2idle leaves a live controller with no DDR/LLCC sleep-set contract and the AOP never resumes. The suspend OPP is selected only on that link-up path. In D3cold the controller is deinitialised and the OPP drops to NULL, because the suspend OPP's DDR bandwidth and CX `required-opps` would otherwise veto the SoC's `ddr`, `cxsd` and `aosd` sleep states; `pcie_qcom.d3cold_mem_floor=1` (writable at runtime) restores the floor for bisecting a wake failure. Deliberately does not populate `pcie->icc_mem` on OPP platforms: `qcom_pcie_icc_opp_update()` prefers an `icc_mem` handle over the OPP branch, so providing one silently disables the post-link-training OPP update and pins the OPP at the probe-time maximum.
 - `patches/0522-PCI-host-common-let-only-endpoints-veto-d3cold.patch`
   source: armada
   upstream: local
@@ -336,10 +336,11 @@ no equivalent submission was found, or a permanent URL to the upstream submissio
 - `patches/0520-arm64-dts-qcom-sm8550-add-a-pcie-suspend-opp.patch`
   source: armada
   upstream: not submitted
-  notes: Companion DT for 0513. `opp-hz` is synthetic and `opp-level` is omitted so the OPP can never be selected for a trained link by either match in `qcom_pcie_icc_opp_update()`. pcie1 is disabled in the SM8550 board DTS files that use this table and gets no suspend OPP.
+  notes: Companion DT for 0513, used only while the link stays up in s2idle. `opp-hz` is synthetic and `opp-level` is omitted so the OPP can never be selected for a trained link by either match in `qcom_pcie_icc_opp_update()`. pcie1 is disabled in the SM8550 board DTS files that use this table and gets no suspend OPP.
 - `patches/0521-arm64-dts-qcom-sm8750-add-a-pcie-suspend-opp.patch`
   source: armada
   upstream: local
+  notes: Companion DT for 0513, used only while the link stays up in s2idle; with 0522 the Odin 3 Wi-Fi link normally reaches D3cold and this OPP is not selected.
 - `patches/0527-arm64-dts-qcom-sm8650-add-a-pcie-suspend-opp.patch`
   source: armada
   upstream: local
@@ -505,6 +506,10 @@ no equivalent submission was found, or a permanent URL to the upstream submissio
   source: https://github.com/ROCKNIX/distribution/blob/b1e9d07b251c5a013d303a518106c547db001b74/projects/ROCKNIX/devices/SM8750/patches/linux/0075-arm64-dts-qcom-sm8750-add-CPU-thermal-cooling.patch
   upstream: unknown
   notes: Linux 7.2 supplies the CPU cooling-cell properties; Armada retains the missing passive trips and cooling maps.
+- `patches/0531-arm64-dts-qcom-sm8750-set-cpu-interconnect-paths-as-active-only.patch`
+  source: armada
+  upstream: local
+  notes: Port of upstream 48c84d96dcd0 (SM8550) to SM8750, covering the QUP config/I2C paths, UART15 from 0034, and the PCIe `cpu-pcie` path. Keeps CPU-to-config-NoC votes out of the RPMh sleep set; memory paths to `SLAVE_EBI1` stay ALWAYS. Sits after the SM8750 DT patches so it also retags nodes they add.
 - `patches/0049-drm-msm-a8xx-add-adreno-830-catalog.patch`
   source: https://github.com/ROCKNIX/distribution/blob/bcf3b5bc574990b96543484575b06f912153a715/projects/ROCKNIX/devices/SM8750/patches/linux/0049-drm-msm-a8xx-add-adreno-830-catalog.patch
   upstream: unknown
