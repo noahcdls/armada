@@ -1,0 +1,201 @@
+From: Armada <noreply@armada.local>
+Subject: [PATCH] soc: qcom: add a driver that parks the SM8750 SOCCP in D3
+
+On the AYN Odin 3 the boot firmware leaves the SoC Control Processor
+(SOCCP) running in D0: its TCSR status word reads 0x2 after boot. It
+executes from DDR (the soccp region) but has no RPMh vote of its own.
+The vendor kernel votes DDR, CX, MX and XO for SOCCP whenever it is in
+D0, and after handover SOCCP drops to D3; the vendor kernel only wakes
+it through the SMP2P "wakeup" bit when it needs it, and releases its
+votes once SOCCP reports D3 again.
+
+Upstream Linux neither describes SOCCP nor votes for it. Once nothing
+else keeps DDR up in s2idle, DDR collapses under the running SOCCP and
+the SoC never wakes, which is why the PCIe D3cold floor was needed.
+
+Add a small driver that holds the vendor's 1200 kBps low-SVS DDR vote
+for SOCCP, sets the SMP2P "sleep" bit, waits up to five seconds for the
+TCSR D3 bit and then drops the vote. If SOCCP does not reach D3 the
+vote stays, so a failure costs no more than today's floor. It does not
+take over SOCCP's lifecycle; nothing on this platform asks it to wake.
+---
+diff --git a/drivers/soc/qcom/Kconfig b/drivers/soc/qcom/Kconfig
+index 2caadbbcf..4651c2325 100644
+--- a/drivers/soc/qcom/Kconfig
++++ b/drivers/soc/qcom/Kconfig
+@@ -219,6 +219,17 @@ config QCOM_SMSM
+ 	  Say yes here to support the Qualcomm Shared Memory State Machine.
+ 	  The state machine is represented by bits in shared memory.
+ 
++config QCOM_SOCCP_SLEEP
++	tristate "Qualcomm SM8750 SOCCP D3 support"
++	depends on ARCH_QCOM || COMPILE_TEST
++	depends on INTERCONNECT
++	select QCOM_SMEM_STATE
++	help
++	  Ask the SoC Control Processor that the SM8750 boot firmware leaves
++	  running to enter its dormant D3 state, voting DDR for it until it
++	  does. Without this, s2idle cannot collapse DDR without hanging the
++	  SoC.
++
+ config QCOM_SOCINFO
+ 	tristate "Qualcomm socinfo driver"
+ 	depends on QCOM_SMEM
+diff --git a/drivers/soc/qcom/Makefile b/drivers/soc/qcom/Makefile
+index b7f1d2a57..d7cf54641 100644
+--- a/drivers/soc/qcom/Makefile
++++ b/drivers/soc/qcom/Makefile
+@@ -27,6 +27,7 @@ obj-$(CONFIG_QCOM_SMEM) +=	smem.o
+ obj-$(CONFIG_QCOM_SMEM_STATE) += smem_state.o
+ CFLAGS_smp2p.o := -I$(src)
+ obj-$(CONFIG_QCOM_SMP2P)	+= smp2p.o
++obj-$(CONFIG_QCOM_SOCCP_SLEEP)	+= qcom-soccp-sleep.o
+ obj-$(CONFIG_QCOM_SMSM)	+= smsm.o
+ obj-$(CONFIG_QCOM_SOCINFO)	+= socinfo.o
+ obj-$(CONFIG_QCOM_SPM)		+= spm.o
+diff --git a/drivers/soc/qcom/qcom-soccp-sleep.c b/drivers/soc/qcom/qcom-soccp-sleep.c
+new file mode 100644
+index 000000000..850200800
+--- /dev/null
++++ b/drivers/soc/qcom/qcom-soccp-sleep.c
+@@ -0,0 +1,140 @@
++// SPDX-License-Identifier: GPL-2.0-only
++/*
++ * Park the SM8750 SoC Control Processor (SOCCP) in its dormant D3 state.
++ *
++ * The boot firmware leaves SOCCP running in D0, executing from DDR with no
++ * RPMh vote of its own. The vendor kernel votes DDR for it while it is in D0
++ * and asks it to enter D3 through SMP2P; without that, DDR collapse in
++ * s2idle pulls memory out from under SOCCP and the SoC never wakes.
++ */
++
++#include <linux/bits.h>
++#include <linux/devm-helpers.h>
++#include <linux/interconnect.h>
++#include <linux/io.h>
++#include <linux/iopoll.h>
++#include <linux/mod_devicetable.h>
++#include <linux/module.h>
++#include <linux/platform_device.h>
++#include <linux/soc/qcom/smem_state.h>
++#include <linux/workqueue.h>
++
++/* SMP2P wakeup (bit 10) and sleep (bit 9) requests share one field */
++#define SOCCP_STATE_MASK	GENMASK(10, 9)
++
++/* TCSR status bits reported by SOCCP */
++#define SOCCP_D0		BIT(1)
++#define SOCCP_D1		BIT(2)
++#define SOCCP_D3		BIT(3)
++
++/* The vendor kernel's low-SVS DDR vote for SOCCP */
++#define SOCCP_DDR_KBPS		1200
++
++#define SOCCP_POLL_US		1000
++#define SOCCP_TIMEOUT_US	(5 * USEC_PER_SEC)
++
++struct soccp_sleep {
++	struct device *dev;
++	void __iomem *status;
++	struct qcom_smem_state *sleep_state;
++	unsigned int sleep_bit;
++	struct icc_path *ddr;
++	struct work_struct work;
++};
++
++static void soccp_sleep_work(struct work_struct *work)
++{
++	struct soccp_sleep *s = container_of(work, struct soccp_sleep, work);
++	u32 val;
++	int ret;
++
++	ret = qcom_smem_state_update_bits(s->sleep_state, SOCCP_STATE_MASK,
++					  BIT(s->sleep_bit));
++	if (ret) {
++		dev_err(s->dev, "failed to request D3: %d\n", ret);
++		return;
++	}
++
++	ret = readl_poll_timeout(s->status, val, val & SOCCP_D3,
++				 SOCCP_POLL_US, SOCCP_TIMEOUT_US);
++	if (ret) {
++		dev_warn(s->dev, "SOCCP did not enter D3 (status %#x), keeping its DDR vote\n",
++			 val);
++		return;
++	}
++
++	icc_set_bw(s->ddr, 0, 0);
++	dev_info(s->dev, "SOCCP entered D3 (status %#x)\n", val);
++}
++
++static int soccp_sleep_probe(struct platform_device *pdev)
++{
++	struct device *dev = &pdev->dev;
++	struct soccp_sleep *s;
++	struct resource *res;
++	u32 val;
++	int ret;
++
++	s = devm_kzalloc(dev, sizeof(*s), GFP_KERNEL);
++	if (!s)
++		return -ENOMEM;
++
++	s->dev = dev;
++
++	/* The status word sits inside the TCSR block, which another driver maps */
++	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
++	if (!res)
++		return -EINVAL;
++
++	s->status = devm_ioremap(dev, res->start, resource_size(res));
++	if (!s->status)
++		return -ENOMEM;
++
++	s->sleep_state = devm_qcom_smem_state_get(dev, "sleep", &s->sleep_bit);
++	if (IS_ERR(s->sleep_state))
++		return dev_err_probe(dev, PTR_ERR(s->sleep_state),
++				     "failed to get sleep state\n");
++
++	s->ddr = devm_of_icc_get(dev, NULL);
++	if (IS_ERR(s->ddr))
++		return dev_err_probe(dev, PTR_ERR(s->ddr), "failed to get DDR path\n");
++
++	val = readl(s->status);
++	if (val & SOCCP_D3) {
++		dev_info(dev, "SOCCP already in D3 (status %#x)\n", val);
++		return 0;
++	}
++
++	ret = icc_set_bw(s->ddr, kBps_to_icc(SOCCP_DDR_KBPS), kBps_to_icc(SOCCP_DDR_KBPS));
++	if (ret)
++		return dev_err_probe(dev, ret, "failed to vote DDR\n");
++
++	dev_info(dev, "SOCCP in %s (status %#x), requesting D3\n",
++		 val & (SOCCP_D0 | SOCCP_D1) ? "D0" : "an unknown state", val);
++
++	ret = devm_work_autocancel(dev, &s->work, soccp_sleep_work);
++	if (ret)
++		return ret;
++
++	schedule_work(&s->work);
++
++	return 0;
++}
++
++static const struct of_device_id soccp_sleep_of_match[] = {
++	{ .compatible = "qcom,sm8750-soccp-sleep" },
++	{ }
++};
++MODULE_DEVICE_TABLE(of, soccp_sleep_of_match);
++
++static struct platform_driver soccp_sleep_driver = {
++	.probe = soccp_sleep_probe,
++	.driver = {
++		.name = "qcom-soccp-sleep",
++		.of_match_table = soccp_sleep_of_match,
++	},
++};
++module_platform_driver(soccp_sleep_driver);
++
++MODULE_DESCRIPTION("Park the Qualcomm SM8750 SOCCP in D3");
++MODULE_LICENSE("GPL");

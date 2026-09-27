@@ -1,0 +1,62 @@
+From: Armada <noreply@armada.local>
+Subject: [PATCH] arm64: dts: qcom: sm8750: describe the SOCCP SMP2P and D3 control
+
+Add the SMP2P channel to the SoC Control Processor, using the SMEM
+items (617/616), IPCC client (46) and remote PID (19) from the SM8750
+vendor devicetree, and a node for the qcom-soccp-sleep driver: the
+TCSR word where SOCCP reports its D-state, the SMP2P "sleep" bit (9),
+and SOCCP's path to DDR for the vote held while it is awake.
+
+Both are disabled here; boards whose boot firmware leaves SOCCP running
+enable them.
+---
+--- a/arch/arm64/boot/dts/qcom/sm8750.dtsi
++++ b/arch/arm64/boot/dts/qcom/sm8750.dtsi
+@@ -675,6 +675,47 @@
+ 		/* TODO: smem mailbox in and out */
+ 	};
+ 
++	/* SMEM items, IPCC client and PID from the SM8750 vendor devicetree */
++	smp2p_soccp: smp2p-soccp {
++		compatible = "qcom,smp2p";
++
++		interrupts-extended = <&ipcc 46 IPCC_MPROC_SIGNAL_SMP2P
++					     IRQ_TYPE_EDGE_RISING>;
++
++		mboxes = <&ipcc 46 IPCC_MPROC_SIGNAL_SMP2P>;
++
++		qcom,smem = <617>, <616>;
++		qcom,local-pid = <0>;
++		qcom,remote-pid = <19>;
++
++		status = "disabled";
++
++		smp2p_soccp_out: master-kernel {
++			qcom,entry-name = "master-kernel";
++			#qcom,smem-state-cells = <1>;
++		};
++
++		smp2p_soccp_in: slave-kernel {
++			qcom,entry-name = "slave-kernel";
++			interrupt-controller;
++			#interrupt-cells = <2>;
++		};
++	};
++
++	/* SOCCP D-state word in TCSR */
++	soccp_sleep: soccp-sleep@1fda000 {
++		compatible = "qcom,sm8750-soccp-sleep";
++		reg = <0x0 0x01fda000 0x0 0x4>;
++
++		qcom,smem-states = <&smp2p_soccp_out 9>;
++		qcom,smem-state-names = "sleep";
++
++		interconnects = <&aggre2_noc MASTER_SOCCP_AGGR_NOC QCOM_ICC_TAG_ALWAYS
++				 &mc_virt SLAVE_EBI1 QCOM_ICC_TAG_ALWAYS>;
++
++		status = "disabled";
++	};
++
+ 	soc: soc@0 {
+ 		compatible = "simple-bus";
+ 

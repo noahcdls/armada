@@ -521,7 +521,15 @@ no equivalent submission was found, or a permanent URL to the upstream submissio
 - `patches/0534-interconnect-qcom-sm8750-stop-voting-acv-like-the-vendor-kernel.patch`
   source: armada
   upstream: local
-  notes: Compared against the CQ8725S vendor kernel's `drivers/interconnect/qcom/sun.c` (https://github.com/AynCQ8725SDev/android_kernel_ayn_cq8725s, lineage-23.2): its ACV BCM is mask-type with no enable bit for any voter, while upstream sets BIT(0) with every DDR vote, including in the wake set. ACV is the only DDR-related BCM setting that differs. Candidate fix for the SM8750 s2idle hang when DDR may collapse; test with `pcie_qcom.d3cold_mem_floor=0`. Not yet verified on hardware.
+  notes: Compared against the CQ8725S vendor kernel's `drivers/interconnect/qcom/sun.c` (https://github.com/AynCQ8725SDev/android_kernel_ayn_cq8725s, lineage-23.2): its ACV BCM is mask-type with no enable bit for any voter, while upstream sets BIT(0) with every DDR vote, including in the wake set. ACV is the only DDR-related BCM setting that differs. Tested on the Odin 3: it does not fix the s2idle hang when DDR may collapse (see 0536).
+- `patches/0535-arm64-dts-qcom-sm8750-describe-the-soccp-smp2p-and-d3-control.patch`
+  source: armada
+  upstream: local
+  notes: SMEM items, IPCC client and remote PID come from the SunP v2 vendor devicetree (`qcom,smp2p-soccp`, `soccp_pas`). Both nodes are disabled in the SoC dtsi; the Odin 3 board enables them.
+- `patches/0536-soc-qcom-add-an-sm8750-soccp-d3-driver.patch`
+  source: armada
+  upstream: local
+  notes: On the Odin 3 the boot firmware leaves SOCCP in D0 (TCSR 0x1fda000 reads 0x2) with no DDR vote, and upstream never touches it, so s2idle hangs whenever nothing else keeps DDR up. Mirrors the D0-to-D3 half of the vendor `rproc_set_state()` in `qcom_q6v5_pas.c` (https://github.com/AynCQ8725SDev/android_kernel_ayn_cq8725s, lineage-23.2): DDR vote while awake, SMP2P sleep bit 9, wait for TCSR D3, then drop the vote. Not yet verified on hardware; check `dmesg | grep -i soccp`, then test with `pcie_qcom.d3cold_mem_floor=0`.
 - `patches/0049-drm-msm-a8xx-add-adreno-830-catalog.patch`
   source: https://github.com/ROCKNIX/distribution/blob/bcf3b5bc574990b96543484575b06f912153a715/projects/ROCKNIX/devices/SM8750/patches/linux/0049-drm-msm-a8xx-add-adreno-830-catalog.patch
   upstream: unknown
@@ -709,7 +717,7 @@ no equivalent submission was found, or a permanent URL to the upstream submissio
   notes: Armada enables DPU dithering and codec-rail LPM sleep states after copying `dts/cq8725s-ayn-odin3.dts`.
 - `dts/cq8725s-ayn-common.dtsi.patch`
   source: armada
-  notes: Armada keeps volume-up from waking the system, marks Odin 3's RSInput node as connected to the Qualcomm haptics device, supplies the device's 1024 range, and marks PCIe WAKE# active-low. The 70-count `axis-deadzone` (an unmeasured ROCKNIX bring-up value) was dropped; like the RP6 and every other RSInput device the Odin 3 now passes its stick value through, leaving deadzone policy to Steam Input and the game.
+  notes: Armada keeps volume-up from waking the system, marks Odin 3's RSInput node as connected to the Qualcomm haptics device, supplies the device's 1024 range, marks PCIe WAKE# active-low, and enables the SOCCP SMP2P channel and D3 control from 0535/0536. The 70-count `axis-deadzone` (an unmeasured ROCKNIX bring-up value) was dropped; like the RP6 and every other RSInput device the Odin 3 now passes its stick value through, leaving deadzone policy to Steam Input and the game.
 - `dts/qcs8550-ayaneo-pocket-common.dtsi.patch`
   source: armada
   notes: Armada keeps volume-up from waking the system, removes the SDHCI capability mask, marks PCIe WAKE# active-low, and idles the codec rail in LPM during s2idle after copying `dts/qcs8550-ayaneo-pocket-common.dtsi`.
