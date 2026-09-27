@@ -39,10 +39,22 @@ TRACE_EVENTS = (
 )
 TRACE_FILTERS = {
     **{event: '!(name ~ "genpd:*:cpu*")' for event in TRACE_EVENTS if event.startswith('rpm/')},
-    # RPMh state 2 is active-only; retain sleep and wake requests.
-    'rpmh/rpmh_send_msg': 'state != 2',
 }
 TRACE_LIMIT = 8_000_000
+# Active RPMh requests share the busiest CPU's buffer with PM callbacks during resume.
+TRACE_BUFFER_KB = 2048
+# Voltage corners from include/dt-bindings/power/qcom-rpmpd.h. An ARC request is an
+# index into the resource's cmd-db table of these levels.
+RPMH_LEVELS = {
+    16: 'retention', 48: 'min_svs', 49: 'low_svs_d3_0', 50: 'low_svs_d3', 51: 'low_svs_d2_1',
+    52: 'low_svs_d2', 54: 'low_svs_d1_1', 55: 'low_svs_d1_0', 56: 'low_svs_d1', 59: 'low_svs_d0_0',
+    60: 'low_svs_d0', 64: 'low_svs', 72: 'low_svs_p1', 76: 'low_svs_l0', 80: 'low_svs_l1',
+    96: 'low_svs_l2', 128: 'svs', 144: 'svs_l0', 192: 'svs_l1', 224: 'svs_l2', 225: 'svs_l2_0',
+    256: 'nom', 288: 'nom_l0', 320: 'nom_l1', 336: 'nom_l2', 384: 'turbo', 400: 'turbo_l0',
+    416: 'turbo_l1', 432: 'turbo_l2', 448: 'turbo_l3', 452: 'turbo_l4', 456: 'turbo_l5',
+    464: 'super_turbo', 480: 'super_turbo_no_cpr',
+}
+VRM_FIELDS = {0: 'voltage', 4: 'enable', 8: 'mode', 12: 'headroom'}
 
 
 def trace_instance():
@@ -59,7 +71,7 @@ def trace_start(cycle):
     path = cycle_path(cycle)
     instance = trace_instance()
     result = {'status': 'starting', 'enabled_events': [], 'unavailable_events': [],
-              'started': clock(), 'buffer_kb_per_cpu': 1024, 'filters': {}, 'event_errors': {}}
+              'started': clock(), 'buffer_kb_per_cpu': TRACE_BUFFER_KB, 'filters': {}, 'event_errors': {}}
     save(path / 'trace.json', result)
     created = False
     # Defer the hook's SIGTERM until trace ownership and setup cleanup are recorded.
@@ -70,7 +82,7 @@ def trace_start(cycle):
         save(STATE / 'trace-owner.json', {'cycle_id': cycle,
              'boot_id': read(PROC / 'sys/kernel/random/boot_id')})
         (instance / 'tracing_on').write_text('0')
-        (instance / 'buffer_size_kb').write_text('1024')
+        (instance / 'buffer_size_kb').write_text(str(TRACE_BUFFER_KB))
         (instance / 'trace_clock').write_text('boot')
         for event in TRACE_EVENTS:
             try:
@@ -311,6 +323,12 @@ def supplies():
 
 def qcom():
     return {p.name: read(p) for p in (SYS / 'kernel/debug/qcom_stats').glob('*') if p.is_file()}
+
+
+def power_votes():
+    # Consumers behind rail and bus votes; the trace shows only aggregated RPMh requests.
+    return {'power_domains': read(SYS / 'kernel/debug/pm_genpd/pm_genpd_summary'),
+            'interconnect': read(SYS / 'kernel/debug/interconnect/interconnect_summary')}
 
 
 def processes():
@@ -571,7 +589,7 @@ def snapshot(path, phase):
                                   'mem_sleep': read(SYS / 'power/mem_sleep'),
                                   'wake_irq': read(SYS / 'power/pm_wakeup_irq'),
                                   'settings': fields(SYS / 'power', ('pm_debug_messages', 'pm_print_times', 'pm_async'))}),
-              ('battery', supplies), ('qcom', qcom), ('audio', audio),
+              ('battery', supplies), ('qcom', qcom), ('power_votes', power_votes), ('audio', audio),
               ('interrupts', lambda: read(PROC / 'interrupts')),
               ('wake_sources', lambda: read(SYS / 'kernel/debug/wakeup_sources')),
               ('wake_actions', lambda: {p.parent.name: read(p) for p in SYS.glob('kernel/irq/*/actions')}),
@@ -951,14 +969,18 @@ def trace_summary(trace):
             else:
                 result['parse_failures'] += 1
         elif event == 'rpmh_send_msg':
-            m = re.match(r'(.*?): tcs\(m\): \d+ \[(sleep|wake)\].* addr: (\w+) data: (\w+)', message)
+            m = re.match(r'(.*?): tcs\(m\): \d+ \[(sleep|wake|active)\].* addr: (\w+) data: (\w+)', message)
             if m:
                 controller, state, address, word = m.groups()
-                result['rpmh_commands'].append({'controller': controller, 'state': state, 'address': address, 'word': word})
+                result['rpmh_commands'].append({'controller': controller, 'state': state, 'address': address,
+                                                'word': word, 'timestamp': float(timestamp)})
             else:
                 result['parse_failures'] += 1
         elif event in ('ufshcd_system_suspend', 'ufshcd_wl_suspend', 'ufshcd_system_resume', 'ufshcd_wl_resume'):
             ufs[message.split(':', 1)[0]] = event + ': ' + message
+        elif (event == 'suspend_resume' and result['sleep_entries'] and 'first_sleep_end' not in result and
+              re.fullmatch(r'(machine_suspend|timekeeping_freeze)\[\d+\] end', message)):
+            result['first_sleep_end'] = float(timestamp)
         elif event == 'suspend_resume' and re.fullmatch(r'machine_suspend\[\d+\] begin', message):
             result['sleep_entries'].append({'timestamp': float(timestamp),
                 'clocks': {k: dict(v) for k, v in clocks.items()}, 'bandwidth': list(bandwidth.values()),
@@ -971,7 +993,116 @@ def trace_summary(trace):
     return result
 
 
-def trace_report(trace):
+def command_db(text):
+    """Map RPMh addresses to their cmd-db kind, names and auxiliary data."""
+    entries, kind = {}, None
+    for line in (text or '').splitlines():
+        m = re.match(r'Slave (\w+)', line)
+        if m:
+            kind = m[1]
+            continue
+        m = re.fullmatch(r'0x([0-9a-fA-F]+): (\S+?)(?: \[([0-9a-fA-F ]*)\])?', line.strip())
+        if m:
+            item = entries.setdefault(int(m[1], 16), {'kind': kind, 'names': [], 'aux': bytes.fromhex(m[3] or '')})
+            item['names'].append(m[2])
+    return entries
+
+
+def rpmh_decode(address, word, db):
+    """Name one RPMh request and render its word; held means it keeps the resource on."""
+    for offset in (0, 4, 8, 12):
+        entry = db.get(address - offset)
+        # VRM fields sit at fixed offsets from the resource address cmd-db lists.
+        if entry and (offset == 0 or entry['kind'] == 'VRM'):
+            break
+    else:
+        return {'name': f'{address:#x}', 'kind': 'unknown', 'text': f'{word:#x}', 'held': None}
+    name = '/'.join(entry['names']) + (f'+{offset:#x}' if offset else '')
+    kind = entry['kind']
+    if kind == 'BCM':
+        x, y = word >> 14 & 0x3fff, word & 0x3fff
+        held = bool(word >> 29 & 1 and (x or y))
+        text = f'vote_x={x} vote_y={y}' if word >> 29 & 1 else 'no vote'
+    elif kind == 'ARC':
+        aux = entry['aux']
+        levels = [int.from_bytes(aux[i:i + 2], 'little') for i in range(0, len(aux) - 1, 2)]
+        level = levels[word] if word < len(levels) else None
+        label = 'off' if level == 0 else RPMH_LEVELS.get(level)
+        text = f'index {word}' + (f' = level {level}' if level is not None else ' (outside cmd-db table)')
+        text += f' ({label})' if label else ''
+        held = word > 0
+    elif kind == 'VRM':
+        field = VRM_FIELDS.get(offset, f'{offset:#x}')
+        text = {'voltage': f'{word} mV', 'enable': 'on' if word else 'off',
+                'headroom': f'{word} mV headroom'}.get(field, f'{field} {word}')
+        held = bool(word) if field == 'enable' else None
+    else:
+        text, held = f'{word:#x}', None
+    return {'name': name, 'kind': kind, 'text': text, 'held': held}
+
+
+def rpmh_sleep_votes(summary, db):
+    """Reconstruct the RPMh requests in force at the first sleep entry."""
+    end = summary.get('first_sleep_end', float('inf'))
+    by_controller = {}
+    for item in summary['rpmh_commands']:
+        if item['timestamp'] <= end:
+            by_controller.setdefault(item['controller'], []).append(item)
+    flushes, rows = {}, []
+    for controller, commands in by_controller.items():
+        # rpmh_flush() writes the whole sleep/wake cache in one burst; the last burst
+        # before the first wake is what the RSC applies when the CPUs power down.
+        flush = []
+        for item in reversed([c for c in commands if c['state'] != 'active']):
+            if flush and flush[-1]['timestamp'] - item['timestamp'] > 0.005:
+                break
+            flush.append(item)
+        flushes[controller] = {'timestamp': flush[-1]['timestamp'], 'count': len(flush)} if flush else None
+        requests = {}
+        for item in list(reversed(flush)) + [c for c in commands if c['state'] == 'active']:
+            requests.setdefault(int(item['address'], 16), {})[item['state']] = int(item['word'], 16)
+        for address, words in requests.items():
+            if 'sleep' in words:
+                asleep, source = words['sleep'], 'sleep set'
+            elif 'active' in words:
+                asleep = words['active']
+                source = ('last active request (sleep equals wake)' if flush else
+                          'last active request; no sleep-set flush observed')
+            else:
+                asleep, source = None, 'wake request only'
+            wake = words.get('wake', words.get('active'))
+            decoded = rpmh_decode(address, wake if asleep is None else asleep, db)
+            rows.append({'controller': controller, 'address': address, 'name': decoded['name'],
+                         'kind': decoded['kind'], 'asleep': 'unknown' if asleep is None else decoded['text'],
+                         'held': None if asleep is None else decoded['held'],
+                         'wake': 'unknown' if wake is None else rpmh_decode(address, wake, db)['text'],
+                         'source': source})
+    order = {'ARC': 0, 'VRM': 1, 'BCM': 2}
+    rows.sort(key=lambda r: (r['controller'], order.get(r['kind'], 3), r['address']))
+    return flushes, rows
+
+
+def rpmh_votes_report(summary, command_db_text):
+    print('\nRPMh votes at the first sleep entry (requests decoded with cmd-db, not hardware readback):')
+    db = command_db(command_db_text)
+    if not db:
+        print('  cmd-db unavailable; resources are shown by address.')
+    flushes, rows = rpmh_sleep_votes(summary, db)
+    if not rows:
+        print('  No RPMh requests captured before the first wake; retained votes are unknown.')
+        return
+    for controller, flush in sorted(flushes.items()):
+        print(f"  {controller}: " + (f"sleep set flushed at {flush['timestamp']:.6f} with {flush['count']} commands"
+                                     if flush else 'no sleep-set flush observed; sleep requests are unknown'))
+    print('  Resources outside the sleep set keep their last active request while asleep.')
+    print('  Resources last requested before the capture started are not listed.')
+    held = [r['name'] for r in rows if r['held']]
+    print('  Held on while asleep: ' + (', '.join(held) if held else 'none of the listed resources'))
+    for r in rows:
+        print(f"  {r['name']:<20} {r['kind']:<7} asleep: {r['asleep']:<32} wake: {r['wake']:<32} [{r['source']}]")
+
+
+def trace_report(trace, command_db_text=None):
     summary = trace_summary(trace)
     print('\n## Device sleep transitions')
     print(f"Capture: {summary['status']}; coverage: {summary['coverage']}")
@@ -1047,9 +1178,12 @@ def trace_report(trace):
             requests.setdefault((item['device'], item['path']), set()).add((item['avg'], item['peak']))
         for (device, path), values in sorted(requests.items()):
             print(f"  {device} / {path}: " + '; '.join(f'avg={avg} peak={peak}' for avg, peak in sorted(values)))
+    rpmh_votes_report(summary, command_db_text)
     print('RPMh sleep/wake commands observed during capture (encoded words, not hardware acknowledgement):')
     requests = {}
     for item in summary['rpmh_commands']:
+        if item['state'] == 'active':
+            continue
         states = requests.setdefault((item['controller'], item['address']), {})
         states.setdefault(item['state'], set()).add(item['word'])
     for (controller, address), states in sorted(requests.items()):
@@ -1291,7 +1425,7 @@ def report_body(cycle, details=False):
     summary = summarize(before, after, meta)
     overview(summary, before, after)
     trace = load(path / 'trace.json') or {'status': 'not requested'}
-    trace_report(trace)
+    trace_report(trace, (data(before, 'identity') or {}).get('rpmh_command_db'))
     capture_report(before, after)
     print('\n## Supporting measurements')
     supporting = {k: v for k, v in summary.items() if k not in (
@@ -1304,7 +1438,7 @@ def report_body(cycle, details=False):
     render({'attempt': meta, 'before': {k: v for k, v in (before or {}).items() if k != 'groups'},
             'after': {k: v for k, v in (after or {}).items() if k != 'groups'}})
     print('\nRAW EVIDENCE — fixed snapshots, followed by the journal and transition trace')
-    for name in ('identity', 'suspend', 'battery', 'qcom', 'audio', 'pipewire', 'connectivity', 'health',
+    for name in ('identity', 'suspend', 'battery', 'qcom', 'power_votes', 'audio', 'pipewire', 'connectivity', 'health',
                  'interrupts', 'wake_sources', 'wake_actions', 'wake_inventory', 'fake_suspend', 'peripherals', 'pstore'):
         snapshot_report(name, before, after)
     print('\n## Attempt journal')

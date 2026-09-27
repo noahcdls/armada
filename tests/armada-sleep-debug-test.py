@@ -323,6 +323,75 @@ class SleepDebugTests(unittest.TestCase):
             debug.trace_report(trace)
         self.assertIn('sleep=0x60000001; wake=0x60004001', out.getvalue())
 
+    COMMAND_DB = '\n'.join([
+        'Command DB DUMP', 'Slave ARC (v16.0)', '-------------------------',
+        '0x30000: cx.lvl [00 00 10 00 40 00 80 00 c0 00 00 01]', '0x30004: cx.tmr',
+        'Slave BCM (v16.0)', '-------------------------',
+        '0x50000: MC0 [00 3e 49 00 10 00 00 00]', '0x50030: CN0 [00 3e 49 00 10 00 00 00]',
+        'Slave VRM (v1.0)', '-------------------------',
+        '0x40000: bobb1 [03 c2 00 00]', '0x45000: clka1 [02 5b 00 00]', '0x45000: rfclka1 [02 5b 00 00]',
+    ])
+
+    def rpmh_trace(self, records):
+        return {'status': 'captured', 'cpu_stats': {'cpu0': 'overrun: 0\ncommit overrun: 0\ndropped events: 0'},
+                'text': '\n'.join(f'worker-10 [000] .... {ts:.6f}: {event}: {message}' for ts, event, message in records)}
+
+    @staticmethod
+    def rpmh(state, address, data, tcs=3):
+        return ('rpmh_send_msg', f'apps_rsc: tcs(m): {tcs} [{state}] cmd(n): 0 msgid: 0x10008 '
+                                 f'addr: {address} data: {data} complete: 0')
+
+    def test_rpmh_votes_at_first_sleep_entry_are_decoded(self):
+        trace = self.rpmh_trace([
+            (1.0, *self.rpmh('active', '0x30000', '0x3', tcs=1)),
+            (1.1, *self.rpmh('active', '0x45004', '0x1', tcs=1)),
+            (1.5, *self.rpmh('sleep', '0x50000', '0x60000001')),
+            (1.5, *self.rpmh('wake', '0x50000', '0x6000071f')),
+            (2.0, 'suspend_resume', 'machine_suspend[1] begin'),
+            (2.0, 'suspend_resume', 'timekeeping_freeze[3] begin'),
+            # One flush burst: the cache holds MC0, CN0 and the bob mode.
+            (2.001, *self.rpmh('sleep', '0x50000', '0x60000001')),
+            (2.001, *self.rpmh('sleep', '0x50030', '0x40000000')),
+            (2.001, *self.rpmh('wake', '0x50030', '0x60004001')),
+            (2.002, *self.rpmh('sleep', '0x40008', '0x4')),
+            (2.002, *self.rpmh('wake', '0x40008', '0x7')),
+            (900.0, 'suspend_resume', 'timekeeping_freeze[0] end'),
+            # Requests after the first wake do not describe the first sleep.
+            (900.1, *self.rpmh('active', '0x30000', '0x5', tcs=1)),
+            (900.2, *self.rpmh('sleep', '0x50030', '0x60000001')),
+        ])
+        summary = debug.trace_summary(trace)
+        self.assertEqual(summary['parse_failures'], 0)
+        self.assertEqual(summary['first_sleep_end'], 900.0)
+        flushes, rows = debug.rpmh_sleep_votes(summary, debug.command_db(self.COMMAND_DB))
+        self.assertEqual(flushes['apps_rsc'], {'timestamp': 2.001, 'count': 5})
+        votes = {r['name']: r for r in rows}
+        self.assertEqual(votes['cx.lvl']['asleep'], 'index 3 = level 128 (svs)')
+        self.assertEqual(votes['cx.lvl']['source'], 'last active request (sleep equals wake)')
+        self.assertEqual(votes['clka1/rfclka1+0x4']['asleep'], 'on')
+        self.assertEqual(votes['bobb1+0x8']['asleep'], 'mode 4')
+        self.assertEqual(votes['MC0']['asleep'], 'vote_x=0 vote_y=1')
+        self.assertEqual(votes['CN0']['asleep'], 'no vote')
+        self.assertEqual([r['name'] for r in rows if r['held']], ['cx.lvl', 'clka1/rfclka1+0x4', 'MC0'])
+        with contextlib.redirect_stdout(io.StringIO()) as out:
+            debug.trace_report(trace, self.COMMAND_DB)
+        self.assertIn('sleep set flushed at 2.001000 with 5 commands', out.getvalue())
+        self.assertIn('Held on while asleep: cx.lvl, clka1/rfclka1+0x4, MC0', out.getvalue())
+
+    def test_rpmh_votes_without_flush_or_cmd_db_stay_qualified(self):
+        trace = self.rpmh_trace([
+            (1.0, *self.rpmh('active', '0x30000', '0x3', tcs=1)),
+            (2.0, 'suspend_resume', 'machine_suspend[1] begin'),
+        ])
+        flushes, rows = debug.rpmh_sleep_votes(debug.trace_summary(trace), {})
+        self.assertIsNone(flushes['apps_rsc'])
+        self.assertEqual((rows[0]['name'], rows[0]['held']), ('0x30000', None))
+        self.assertIn('no sleep-set flush observed', rows[0]['source'])
+        with contextlib.redirect_stdout(io.StringIO()) as out:
+            debug.trace_report(trace)
+        self.assertIn('cmd-db unavailable', out.getvalue())
+        self.assertIn('no sleep-set flush observed; sleep requests are unknown', out.getvalue())
+
     def test_runtime_accounting_preserves_counts_at_each_entry(self):
         trace = self.trace_fixture([
             ('rpm_usage', '89c000.serial flags-4 cnt-1  dep-0  auto-1 p-0 irq-0 child-1'),

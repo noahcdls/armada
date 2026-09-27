@@ -350,6 +350,7 @@ no equivalent submission was found, or a permanent URL to the upstream submissio
 - `patches/0521-arm64-dts-qcom-sm8750-add-a-pcie-suspend-opp.patch`
   source: armada
   upstream: local
+  notes: The suspend OPP votes 0 on `cpu-pcie`; only the memory path keeps the DDR/LLCC (MC0/SH0) sleep vote that resume needs. CN0 is a keepalive BCM, so the active and wake sets keep their floor without this vote.
 - `patches/0527-arm64-dts-qcom-sm8650-add-a-pcie-suspend-opp.patch`
   source: armada
   upstream: local
