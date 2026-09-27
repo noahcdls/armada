@@ -1,0 +1,61 @@
+#!/bin/bash
+# Power Bluetooth adapters off across suspend when they cannot wake the system.
+# A powered adapter keeps its controller and host UART running for the whole
+# sleep; hci_qca releases them only when the adapter is powered off. Uses
+# BlueZ's Powered property rather than rfkill so a crash while asleep cannot
+# leave a persisted soft block behind.
+set -uo pipefail
+
+run_dir=${ARMADA_RUN_DIR:-/run/armada}
+state_file="$run_dir/bluetooth-powered-off"
+bt_class=${ARMADA_BLUETOOTH_CLASS_DIR:-/sys/class/bluetooth}
+busctl=${ARMADA_BUSCTL:-busctl}
+
+[[ "${2:-}" == suspend ]] || exit 0
+
+set_powered() {
+    local adapter=$1 value=$2
+    shift 2
+    "$busctl" "$@" call org.bluez "/org/bluez/$adapter" \
+        org.freedesktop.DBus.Properties Set ssv org.bluez.Adapter1 Powered b "$value"
+}
+
+adapter_powered() {
+    [[ "$("$busctl" --timeout=2 get-property org.bluez "/org/bluez/$1" \
+        org.bluez.Adapter1 Powered 2>/dev/null)" == "b true" ]]
+}
+
+# A controller that can wake the system (USB adapters, BT-wake UARTs) stays up.
+adapter_may_wake() {
+    local controller=$1/device wake
+    for wake in "$controller/power/wakeup" "$controller/../power/wakeup"; do
+        [[ -r "$wake" && "$(<"$wake")" == enabled ]] && return 0
+    done
+    return 1
+}
+
+if [[ "${1:-}" == pre ]]; then
+    mkdir -p "$run_dir" || exit 0
+    for hci in "$bt_class"/hci*; do
+        adapter="${hci##*/}"
+        [[ "$adapter" =~ ^hci[0-9]+$ ]] || continue
+        adapter_may_wake "$hci" && continue
+        adapter_powered "$adapter" || continue
+        # Record first so a partial power-off is still restored on resume.
+        grep -qx -- "$adapter" "$state_file" 2>/dev/null ||
+            printf '%s\n' "$adapter" >>"$state_file" || continue
+        set_powered "$adapter" false --timeout=5 >/dev/null ||
+            printf 'armada-bluetooth-sleep: failed to power off %s\n' "$adapter" >&2
+    done
+    exit 0
+fi
+
+[[ "${1:-}" == post && -r "$state_file" ]] || exit 0
+while IFS= read -r adapter; do
+    [[ "$adapter" =~ ^hci[0-9]+$ ]] || continue
+    # Firmware download takes ~1.6 s on WCN7860; don't hold up the session thaw.
+    set_powered "$adapter" true --expect-reply=no ||
+        printf 'armada-bluetooth-sleep: failed to restore %s\n' "$adapter" >&2
+done <"$state_file"
+rm -f -- "$state_file"
+exit 0

@@ -248,6 +248,10 @@ no equivalent submission was found, or a permanent URL to the upstream submissio
 - `patches/1006-tty-serial-qcom-geni-mask-non-console-irq-on-suspend.patch`
   source: https://github.com/thorch-os/thorch/blob/2614a262d7de3f31bd47a0c92981461146663847/packages/linux-thorch/patches/0010-tty-serial-qcom-geni-mask-non-console-irq-on-suspend.patch
   upstream: unknown
+- `patches/1008-serial-qcom-geni-add-force-suspend-resume-to-system-sleep-callbacks.patch`
+  source: https://git.kernel.org/torvalds/c/d0cd9c8d0fd59bc7d140f3d60cf02e1d80376dab
+  upstream: https://lore.kernel.org/r/20260702-add_force_suspend_resume_to_system_sleep_callbacks-v2-1-b79e254a7015@oss.qualcomm.com
+  notes: Context refreshed to apply after `1006`. On 7.2 the PM core's prepare-phase runtime-PM reference kept `uart_suspend_port()` from runtime-suspending open non-console ports, so the Bluetooth and RSInput UARTs held their QUP clocks (GPLL0 on the RPMh CXO sleep vote) and ALWAYS-tagged interconnect votes through s2idle.
 - `patches/1007-input-rsinput-drop-the-mcu-supply-across-system-sleep.patch`
   source: armada
   upstream: local
