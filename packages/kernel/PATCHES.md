@@ -517,7 +517,11 @@ no equivalent submission was found, or a permanent URL to the upstream submissio
 - `patches/0533-arm64-dts-qcom-sm8750-reserve-the-vendor-lost-reg-regions.patch`
   source: armada
   upstream: local
-  notes: Matches the stock SunP v2 vendor devicetree, which marks `lost_reg_mem` (0x9b09c000) and `lost_reg_mem2` (0x9eb80000) no-map; upstream hands both to Linux as RAM. Candidate fix for the SM8750 hang when DDR is allowed to collapse in s2idle, not yet verified.
+  notes: Matches the stock SunP v2 vendor devicetree, which marks `lost_reg_mem` (0x9b09c000) and `lost_reg_mem2` (0x9eb80000) no-map; upstream hands both to Linux as RAM. Kept for vendor parity; tested on the Odin 3, it does not fix the s2idle hang when DDR is allowed to collapse.
+- `patches/0534-interconnect-qcom-sm8750-stop-voting-acv-like-the-vendor-kernel.patch`
+  source: armada
+  upstream: local
+  notes: Compared against the CQ8725S vendor kernel's `drivers/interconnect/qcom/sun.c` (https://github.com/AynCQ8725SDev/android_kernel_ayn_cq8725s, lineage-23.2): its ACV BCM is mask-type with no enable bit for any voter, while upstream sets BIT(0) with every DDR vote, including in the wake set. ACV is the only DDR-related BCM setting that differs. Candidate fix for the SM8750 s2idle hang when DDR may collapse; test with `pcie_qcom.d3cold_mem_floor=0`. Not yet verified on hardware.
 - `patches/0049-drm-msm-a8xx-add-adreno-830-catalog.patch`
   source: https://github.com/ROCKNIX/distribution/blob/bcf3b5bc574990b96543484575b06f912153a715/projects/ROCKNIX/devices/SM8750/patches/linux/0049-drm-msm-a8xx-add-adreno-830-catalog.patch
   upstream: unknown

@@ -1,0 +1,70 @@
+From: Armada <noreply@armada.local>
+Subject: [PATCH] interconnect: qcom: sm8750: stop voting ACV like the vendor kernel
+
+Upstream gives the SM8750 ACV BCM an enable_mask of BIT(0), so the
+application processor sets that bit whenever anything votes DDR
+bandwidth, including in the RPMh wake set. The SM8750 vendor kernel
+never does: its ACV BCM is a mask-type BCM with no enable_mask for any
+voter (HLOS, display, camera, PCIe), and HLOS only sets the perf-mode
+bit (0x2) on explicit perf-mode requests.
+
+On the AYN Odin 3 the SoC hangs in s2idle once DDR is allowed to
+collapse. ACV is the only DDR-related vote that differs from the vendor
+kernel: upstream's wake set raises ACV bit 0 as DDR comes back, which
+the vendor never does. Match the vendor: keep ACV a mask-type
+BCM so it is still committed, but with no enable bits, so Linux always
+votes 0. No upstream client uses perf mode, so the perf-mode bit is
+not carried over.
+
+Add QCOM_ICC_BCM_TYPE_MASK so a BCM can use one-hot aggregation without
+an enable_mask; bcm_aggregate() would otherwise send it bandwidth.
+---
+diff --git a/drivers/interconnect/qcom/bcm-voter.c b/drivers/interconnect/qcom/bcm-voter.c
+index a2d437a05..9d74352fb 100644
+--- a/drivers/interconnect/qcom/bcm-voter.c
++++ b/drivers/interconnect/qcom/bcm-voter.c
+@@ -286,7 +286,7 @@ int qcom_icc_bcm_voter_commit(struct bcm_voter *voter)
+ 
+ 	mutex_lock(&voter->lock);
+ 	list_for_each_entry(bcm, &voter->commit_list, list) {
+-		if (bcm->enable_mask)
++		if (bcm->enable_mask || bcm->type == QCOM_ICC_BCM_TYPE_MASK)
+ 			bcm_aggregate_mask(bcm);
+ 		else
+ 			bcm_aggregate(bcm);
+diff --git a/drivers/interconnect/qcom/icc-rpmh.h b/drivers/interconnect/qcom/icc-rpmh.h
+index 09d879140..03b55be2a 100644
+--- a/drivers/interconnect/qcom/icc-rpmh.h
++++ b/drivers/interconnect/qcom/icc-rpmh.h
+@@ -13,6 +13,9 @@
+ #define to_qcom_provider(_provider) \
+ 	container_of(_provider, struct qcom_icc_provider, provider)
+ 
++/* BCM type that always votes its enable_mask, even an empty one */
++#define QCOM_ICC_BCM_TYPE_MASK	1
++
+ /**
+  * struct qcom_icc_provider - Qualcomm specific interconnect provider
+  * @provider: generic interconnect provider
+@@ -110,7 +113,7 @@ struct qcom_icc_node {
+  * struct qcom_icc_bcm - Qualcomm specific hardware accelerator nodes
+  * known as Bus Clock Manager (BCM)
+  * @name: the bcm node name used to fetch BCM data from command db
+- * @type: latency or bandwidth bcm
++ * @type: 0, or QCOM_ICC_BCM_TYPE_MASK for a one-hot BCM without an enable_mask
+  * @addr: address offsets used when voting to RPMH
+  * @vote_x: aggregated threshold values, represents sum_bw when @type is bw bcm
+  * @vote_y: aggregated threshold values, represents peak_bw when @type is bw bcm
+diff --git a/drivers/interconnect/qcom/sm8750.c b/drivers/interconnect/qcom/sm8750.c
+index 1486c0b8f..12cf898cb 100644
+--- a/drivers/interconnect/qcom/sm8750.c
++++ b/drivers/interconnect/qcom/sm8750.c
+@@ -1023,7 +1023,7 @@ static struct qcom_icc_node qns_gemnoc_sf = {
+ 
+ static struct qcom_icc_bcm bcm_acv = {
+ 	.name = "ACV",
+-	.enable_mask = BIT(0),
++	.type = QCOM_ICC_BCM_TYPE_MASK,
+ 	.num_nodes = 1,
+ 	.nodes = { &ebi },
+ };
