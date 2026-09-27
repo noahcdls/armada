@@ -17,17 +17,20 @@ DT defines no suspend OPP.
 
 In D3cold the controller is deinitialised, its clocks and PHY are off
 and the endpoint is in L2/L3, so nothing on the PCIe side can reach
-DDR. The suspend OPP's DDR bandwidth and its CX required-opps would
-otherwise sit in the sleep set and veto the SoC's DDR, CXSD and AOSD
-sleep states for the whole suspend. On the Odin 3, however, dropping
-both leaves the SoC unable to wake from s2idle (it needs a long press
-to restart), so which half is load-bearing is still being bisected.
+DDR. The floor is still needed there, but not for PCIe: on the Odin 3
+(SM8750) the SoC hangs in s2idle, for RTC and power-key wakes alike,
+whenever the application processor leaves no memory-NoC vote in the
+sleep set. A vote on any memory-side path avoids it (the PCIe path, a
+CPU-to-DDR path, or the PCIe NoC into the memory NoC alone), while a CX
+level or a QUP clock vote alone does not. The PCIe memory-path
+bandwidth is what keeps DDR from collapsing into that state.
+
 pcie_qcom.d3cold_mem_floor (writable at runtime) selects what D3cold
-keeps: 0 nothing, 1 the whole suspend OPP (default, the known-good
-behaviour), 2 only its memory-path bandwidth, 3 only its CX level. The
-bandwidth-only floor uses its own
-"pcie-mem" request so it never touches pcie->icc_mem, and resume clears
-it before restoring the OPP.
+keeps: 0 nothing, 1 the whole suspend OPP, 2 only its memory-path
+bandwidth (default), 3 only its CX level. The default drops the suspend
+OPP's CX required-opps, which the hang does not need. The
+bandwidth-only floor uses its own "pcie-mem" request so it never
+touches pcie->icc_mem, and resume clears it before restoring the OPP.
 
 Non-obvious choices:
 - Do not populate pcie->icc_mem as an alternative on OPP platforms:
@@ -83,7 +86,7 @@ this is an independent implementation for Linux 7.2.
  		pcie->use_pm_opp = true;
  	} else {
  		/* Skip ICC init if OPP is supported as it is handled by OPP */
-@@ -2197,6 +2207,83 @@
+@@ -2197,6 +2207,87 @@
  	return ret;
  }
  
@@ -94,11 +97,15 @@ this is an independent implementation for Linux 7.2.
 +	QCOM_PCIE_D3COLD_FLOOR_CX,
 +};
 +
-+/* Any DDR/CX sleep-set vote left in D3cold vetoes the SoC's DDR, CXSD and AOSD states */
-+static unsigned int d3cold_mem_floor = QCOM_PCIE_D3COLD_FLOOR_OPP;
++/*
++ * SM8550 and SM8750 do not come back from s2idle once the memory NoC has
++ * no sleep-set vote and DDR may collapse, so D3cold keeps the memory-path
++ * bandwidth by default. On SM8750 the CX level is not needed for that.
++ */
++static unsigned int d3cold_mem_floor = QCOM_PCIE_D3COLD_FLOOR_BW;
 +module_param(d3cold_mem_floor, uint, 0644);
 +MODULE_PARM_DESC(d3cold_mem_floor,
-+		 "Suspend OPP votes kept while the link is in D3cold: 0 none, 1 whole OPP (default), 2 memory bandwidth only, 3 CX level only");
++		 "Suspend OPP votes kept while the link is in D3cold: 0 none, 1 whole OPP, 2 memory bandwidth only (default), 3 CX level only");
 +
 +static struct dev_pm_opp *qcom_pcie_get_suspend_opp(struct device *dev)
 +{
@@ -167,7 +174,7 @@ this is an independent implementation for Linux 7.2.
  static int qcom_pcie_suspend_noirq(struct device *dev)
  {
  	struct qcom_pcie *pcie;
-@@ -2219,8 +2306,11 @@
+@@ -2219,8 +2310,11 @@
  		if (ret)
  			dev_err(dev, "Failed to disable CPU-PCIe interconnect path: %d\n", ret);
  
@@ -181,7 +188,7 @@ this is an independent implementation for Linux 7.2.
  	} else {
  		/*
  		 * Set minimum bandwidth required to keep data path
-@@ -2248,8 +2338,12 @@
+@@ -2248,8 +2342,12 @@
  				dev_err(dev, "Failed to disable CPU-PCIe interconnect path: %d\n",
  					ret);
  
@@ -196,7 +203,7 @@ this is an independent implementation for Linux 7.2.
  		}
  	}
  	return ret;
-@@ -2266,6 +2360,8 @@
+@@ -2266,6 +2364,8 @@
  
  	if (pcie->pci->suspended) {
  		if (pcie->use_pm_opp) {

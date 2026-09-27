@@ -1,0 +1,39 @@
+From: Armada <noreply@armada.local>
+Subject: [PATCH] arm64: dts: qcom: sm8750: reserve the vendor lost_reg regions
+
+The stock SM8750 (SunP v2) vendor devicetree marks two gaps in the
+firmware carve-outs no-map: lost_reg_mem (0x9b09c000, 16 KiB) after the
+GPU microcode region and lost_reg_mem2 (0x9eb80000, 512 KiB) after the
+CDSP DTB region. Upstream leaves both to Linux, and on the Odin 3 they
+show up as System RAM. Reserve them as the vendor does so Linux never
+writes memory that firmware may own. Every other vendor fixed
+reservation is already covered upstream.
+---
+diff --git a/arch/arm64/boot/dts/qcom/sm8750.dtsi b/arch/arm64/boot/dts/qcom/sm8750.dtsi
+index cccbea252..c60c4c2a8 100644
+--- a/arch/arm64/boot/dts/qcom/sm8750.dtsi
++++ b/arch/arm64/boot/dts/qcom/sm8750.dtsi
+@@ -472,6 +472,11 @@ gpu_micro_code_mem: gpu-micro-code@9b09a000 {
+ 			no-map;
+ 		};
+ 
++		lost_reg_mem: lost-reg@9b09c000 {
++			reg = <0x0 0x9b09c000 0x0 0x4000>;
++			no-map;
++		};
++
+ 		spss_region_mem: spss@9b0a0000  {
+ 			reg = <0x0 0x9b0a0000 0x0 0x1e0000>;
+ 			no-map;
+@@ -519,6 +524,11 @@ q6_cdsp_dtb_mem: q6-cdsp-dtb@9eb00000 {
+ 			no-map;
+ 		};
+ 
++		lost_reg_mem2: lost-reg@9eb80000 {
++			reg = <0x0 0x9eb80000 0x0 0x80000>;
++			no-map;
++		};
++
+ 		soccp_mem: soccp@9ec00000 {
+ 			reg = <0x0 0x9ec00000 0x0 0x180000>;
+ 			no-map;
