@@ -181,8 +181,12 @@ v2_20260420_neil_armstrong_arm64_qcom_sm8650_misc_enhancements.patch
 0531-arm64-dts-qcom-sm8750-set-cpu-interconnect-paths-as-active-only.patch
 0533-arm64-dts-qcom-sm8750-reserve-the-vendor-lost-reg-regions.patch
 0534-interconnect-qcom-sm8750-stop-voting-acv-like-the-vendor-kernel.patch
-0535-arm64-dts-qcom-sm8750-describe-the-soccp-smp2p-and-d3-control.patch
-0536-soc-qcom-add-an-sm8750-soccp-d3-driver.patch
+0535-arm64-dts-qcom-sm8750-describe-the-soc-control-processor.patch
+0536-remoteproc-qcom-q6v5-pas-add-the-sm8750-soc-control-processor.patch
+0537-arm64-dts-qcom-sm8750-describe-the-adsp-sleepstate-smp2p-entry.patch
+0538-soc-qcom-add-an-smp2p-sleepstate-driver.patch
+# DEBUG: drop once the SM8750 s2idle hang is understood
+0539-pmdomain-qcom-rpmhpd-debug-optional-retention-floor-for-mx-and-cx.patch
 0049-drm-msm-a8xx-add-adreno-830-catalog.patch
 0039-wifi-ath12k-add-initial-hardware-definition-for-WCN7.patch
 0040-wifi-ath12k-send-QDSS-config-when-CNSS_QDSS_CFG_MISS.patch

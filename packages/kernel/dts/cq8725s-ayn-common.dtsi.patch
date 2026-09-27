@@ -1,5 +1,5 @@
 From: Armada <noreply@armada.local>
-Subject: [PATCH] arm64: dts: qcom: cq8725s: configure the Odin 3 gamepad and DP audio, fix PCIe WAKE# polarity, park SOCCP in D3
+Subject: [PATCH] arm64: dts: qcom: cq8725s: configure the Odin 3 gamepad and DP audio, fix PCIe WAKE# polarity, describe SoCCP, report sleepstate to the ADSP
 
 --- a/arch/arm64/boot/dts/qcom/cq8725s-ayn-common.dtsi
 +++ b/arch/arm64/boot/dts/qcom/cq8725s-ayn-common.dtsi
@@ -52,16 +52,26 @@ Subject: [PATCH] arm64: dts: qcom: cq8725s: configure the Odin 3 gamepad and DP 
  
  		gamepad-name = "AYN Odin3 Gamepad";
  		gamepad-bus = <0x0003>;
-@@ -1469,3 +1486,12 @@
+@@ -1469,3 +1486,22 @@
  		reg = <0x72 0x4>;
  	};
  };
 +
-+/* The boot firmware leaves SOCCP running; park it in D3 so DDR can collapse */
++/* Linux loads SoCCP on SM8750; auto_boot is off while this is tested */
 +&smp2p_soccp {
 +	status = "okay";
 +};
 +
-+&soccp_sleep {
++&remoteproc_soccp {
++	firmware-name = "qcom/sm8750/ayn/odin3/soccp.mbn";
++	status = "okay";
++};
++
++/* Tell the ADSP when the AP suspends, as the vendor kernel does */
++&smp2p_sleepstate_out {
++	status = "okay";
++};
++
++&smp2p_sleepstate {
 +	status = "okay";
 +};

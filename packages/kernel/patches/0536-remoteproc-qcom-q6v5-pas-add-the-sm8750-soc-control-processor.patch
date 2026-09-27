@@ -1,0 +1,43 @@
+From: Armada <noreply@armada.local>
+Subject: [PATCH] remoteproc: qcom_q6v5_pas: add the SM8750 SoC Control Processor
+
+Add a PAS descriptor for the SM8750 SoC Control Processor (SoCCP),
+using the values of the vendor kernel's sun_soccp_resource: PAS ID 51,
+soccp.mbn, crash reason SMEM item 656 and SMEM host 19, with CX and MX
+as proxy power domains. Unlike Kaanapali, SM8750 boot firmware does not
+start SoCCP, so this is a plain PAS load rather than an early-boot
+attach. auto_boot is off so SoCCP only runs when started through sysfs.
+---
+--- a/drivers/remoteproc/qcom_q6v5_pas.c
++++ b/drivers/remoteproc/qcom_q6v5_pas.c
+@@ -1613,6 +1613,22 @@
+ 	.region_assign_vmid = QCOM_SCM_VMID_MSS_MSA,
+ };
+ 
++/* From the SM8750 vendor kernel; Linux loads SOCCP, the boot firmware does not */
++static const struct qcom_pas_data sm8750_soccp_resource = {
++	.crash_reason_smem = 656,
++	.firmware_name = "soccp.mbn",
++	.pas_id = 51,
++	.auto_boot = false,
++	.proxy_pd_names = (char*[]){
++		"cx",
++		"mx",
++		NULL
++	},
++	.ssr_name = "soccp",
++	.sysmon_name = "soccp",
++	.smem_host_id = 19,
++};
++
+ static const struct qcom_pas_data sm8750_mpss_resource = {
+ 	.crash_reason_smem = 421,
+ 	.firmware_name = "modem.mdt",
+@@ -1712,6 +1728,7 @@
+ 	{ .compatible = "qcom,sm8650-cdsp-pas", .data = &sm8650_cdsp_resource },
+ 	{ .compatible = "qcom,sm8650-mpss-pas", .data = &sm8650_mpss_resource },
+ 	{ .compatible = "qcom,sm8750-mpss-pas", .data = &sm8750_mpss_resource },
++	{ .compatible = "qcom,sm8750-soccp-pas", .data = &sm8750_soccp_resource },
+ 	{ .compatible = "qcom,x1e80100-adsp-pas", .data = &x1e80100_adsp_resource },
+ 	{ .compatible = "qcom,x1e80100-cdsp-pas", .data = &x1e80100_cdsp_resource },
+ 	{ },

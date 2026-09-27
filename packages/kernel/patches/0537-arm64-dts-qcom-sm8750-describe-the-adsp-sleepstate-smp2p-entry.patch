@@ -1,0 +1,32 @@
+From: Armada <noreply@armada.local>
+Subject: [PATCH] arm64: dts: qcom: sm8750: describe the ADSP sleepstate SMP2P entry
+
+The SM8750 vendor devicetree adds a "sleepstate" outbound entry to the
+ADSP SMP2P edge and a qcom,smp2p-sleepstate node that uses bit 12 of it
+to tell the ADSP whether the application processor is awake. Describe
+both, disabled: an enabled entry without the driver would read as the
+AP being asleep. Boards that want the notification enable them.
+---
+--- a/arch/arm64/boot/dts/qcom/sm8750.dtsi
++++ b/arch/arm64/boot/dts/qcom/sm8750.dtsi
+@@ -608,6 +608,20 @@
+ 			interrupt-controller;
+ 			#interrupt-cells = <2>;
+ 		};
++
++		smp2p_sleepstate_out: sleepstate-out {
++			qcom,entry-name = "sleepstate";
++			#qcom,smem-state-cells = <1>;
++			status = "disabled";
++		};
++	};
++
++	/* Bit 12 of the ADSP "sleepstate" entry reports the AP as awake */
++	smp2p_sleepstate: smp2p-sleepstate {
++		compatible = "qcom,smp2p-sleepstate";
++		qcom,smem-states = <&smp2p_sleepstate_out 12>;
++		qcom,smem-state-names = "awake";
++		status = "disabled";
+ 	};
+ 
+ 	smp2p-cdsp {

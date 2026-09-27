@@ -1,0 +1,62 @@
+From: Armada <noreply@armada.local>
+Subject: [PATCH] pmdomain: qcom: rpmhpd: DEBUG: optional retention floor for mx and cx
+
+Debug-only, drop once the SM8750 s2idle hang is understood. rpmhpd votes
+a powered-off domain to level 0, which for mx.lvl and cx.lvl is fully
+off rather than retention; the vendor ARC regulators have a retention
+minimum while enabled. rpmhpd.mx_ret_floor and rpmhpd.cx_ret_floor
+(runtime writable, default off) keep the active and sleep votes of those
+two rails at or above retention, to test whether an off vote on either
+rail is what the SoC cannot come back from.
+---
+--- a/drivers/pmdomain/qcom/rpmhpd.c
++++ b/drivers/pmdomain/qcom/rpmhpd.c
+@@ -956,6 +956,30 @@
+ 		return rpmh_write_async(pd->dev, state, &cmd, 1);
+ }
+ 
++/* DEBUG: vote these rails no lower than retention, even when powered off */
++static bool mx_ret_floor;
++module_param(mx_ret_floor, bool, 0644);
++MODULE_PARM_DESC(mx_ret_floor, "Never vote mx.lvl below retention");
++
++static bool cx_ret_floor;
++module_param(cx_ret_floor, bool, 0644);
++MODULE_PARM_DESC(cx_ret_floor, "Never vote cx.lvl below retention");
++
++static unsigned int rpmhpd_ret_floor(struct rpmhpd *pd, unsigned int corner)
++{
++	unsigned int i;
++
++	if (!(mx_ret_floor && !strcmp(pd->res_name, "mx.lvl")) &&
++	    !(cx_ret_floor && !strcmp(pd->res_name, "cx.lvl")))
++		return corner;
++
++	for (i = 0; i < pd->level_count; i++)
++		if (pd->level[i] >= RPMH_REGULATOR_LEVEL_RETENTION)
++			return max(corner, i);
++
++	return corner;
++}
++
+ static void to_active_sleep(struct rpmhpd *pd, unsigned int corner,
+ 			    unsigned int *active, unsigned int *sleep)
+ {
+@@ -1003,7 +1027,7 @@
+ 				&peer_sleep_corner);
+ 	}
+ 
+-	active_corner = max(this_active_corner, peer_active_corner);
++	active_corner = rpmhpd_ret_floor(pd, max(this_active_corner, peer_active_corner));
+ 
+ 	ret = rpmhpd_send_corner(pd, RPMH_ACTIVE_ONLY_STATE, active_corner,
+ 				 active_corner > pd->active_corner);
+@@ -1020,7 +1044,7 @@
+ 		if (ret)
+ 			return ret;
+ 
+-		sleep_corner = max(this_sleep_corner, peer_sleep_corner);
++		sleep_corner = rpmhpd_ret_floor(pd, max(this_sleep_corner, peer_sleep_corner));
+ 
+ 		return rpmhpd_send_corner(pd, RPMH_SLEEP_STATE, sleep_corner,
+ 					  false);
