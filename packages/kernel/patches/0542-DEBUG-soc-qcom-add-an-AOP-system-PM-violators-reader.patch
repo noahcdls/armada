@@ -1,0 +1,347 @@
+From: Armada <noreply@armada.local>
+Subject: [PATCH] DEBUG: soc: qcom: add an AOP system PM violators reader
+
+The SM8750 AOP can log, per RPMh DRV, which clients kept the SoC out of
+CX power collapse or AOSS sleep. Arm the monitor over QMP with the same
+lpm_mon requests as the vendor sys_pm_vx driver (re-sent at every
+suspend while armed) and decode the log at 0xc320000 with the vendor's
+SM8750 DRV names:
+
+  /sys/kernel/debug/sys_pm_vx/monitor    off | cxpc | aoss
+  /sys/kernel/debug/sys_pm_vx/violators  decoded log
+  /sys/kernel/debug/sys_pm_vx/raw        the 1 KiB log as words
+
+Not for shipping.
+---
+--- a/arch/arm64/boot/dts/qcom/sm8750.dtsi
++++ b/arch/arm64/boot/dts/qcom/sm8750.dtsi
+@@ -3802,6 +3802,13 @@ aoss_qmp: power-management@c300000 {
+ 			#clock-cells = <0>;
+ 		};
+ 
++		/* DEBUG: AOP system PM violators log (vendor "qcom,sys-pm-sun") */
++		sys-pm-vx@c320000 {
++			compatible = "qcom,sm8750-sys-pm-violators";
++			reg = <0x0 0x0c320000 0x0 0x400>;
++			qcom,qmp = <&aoss_qmp>;
++		};
++
+ 		sram@c3f0000 {
+ 			compatible = "qcom,rpmh-stats";
+ 			reg = <0x0 0x0c3f0000 0x0 0x400>;
+--- a/drivers/soc/qcom/Kconfig
++++ b/drivers/soc/qcom/Kconfig
+@@ -4,6 +4,13 @@
+ #
+ menu "Qualcomm SoC drivers"
+ 
++config QCOM_SYS_PM_VX_DEBUG
++	tristate "Qualcomm AOP system PM violators debug reader"
++	depends on QCOM_AOSS_QMP && DEBUG_FS
++	help
++	  Debugfs access to the AOP log of RPMh DRVs that kept an SM8750 SoC
++	  out of CX power collapse or AOSS sleep. Debug only.
++
+ config QCOM_AOSS_QMP
+ 	tristate "Qualcomm AOSS Driver"
+ 	depends on ARCH_QCOM || COMPILE_TEST
+--- a/drivers/soc/qcom/Makefile
++++ b/drivers/soc/qcom/Makefile
+@@ -2,6 +2,7 @@
+ CFLAGS_rpmh-rsc.o := -I$(src)
+ CFLAGS_qcom_aoss.o := -I$(src)
+ obj-$(CONFIG_QCOM_AOSS_QMP) +=	qcom_aoss.o
++obj-$(CONFIG_QCOM_SYS_PM_VX_DEBUG) += qcom_sys_pm_vx.o
+ obj-$(CONFIG_QCOM_GENI_SE) +=	qcom-geni-se.o
+ obj-$(CONFIG_QCOM_COMMAND_DB) += cmd-db.o
+ obj-$(CONFIG_QCOM_GSBI)	+=	qcom_gsbi.o
+--- /dev/null
++++ b/drivers/soc/qcom/qcom_sys_pm_vx.c
+@@ -0,0 +1,287 @@
++// SPDX-License-Identifier: GPL-2.0-only
++/*
++ * Debug reader for the AOP "system PM violators" log on SM8750.
++ *
++ * The AOP records, per RPMh DRV, which clients kept the SoC out of CX power
++ * collapse (or AOSS sleep) while a monitor requested over QMP is armed. The
++ * log layout and DRV names follow the vendor sys_pm_vx driver.
++ */
++
++#include <linux/debugfs.h>
++#include <linux/io.h>
++#include <linux/module.h>
++#include <linux/mutex.h>
++#include <linux/of.h>
++#include <linux/platform_device.h>
++#include <linux/seq_file.h>
++#include <linux/soc/qcom/qcom_aoss.h>
++
++#define VX_MODE_AOSS	0xaa
++#define VX_MODE_CXPC	0xcc
++#define VX_MODE_DDR	0xdd
++
++enum vx_monitor { VX_OFF, VX_CXPC, VX_AOSS };
++
++static const char * const vx_monitor_names[] = {
++	[VX_OFF] = "off", [VX_CXPC] = "cxpc", [VX_AOSS] = "aoss",
++};
++
++/* Same requests the vendor driver sends. */
++static const char * const vx_monitor_msgs[] = {
++	[VX_OFF]  = "{class: lpm_mon, type: cxpc, dur: 1000, flush: 1, log_once: 1}",
++	[VX_CXPC] = "{class: lpm_mon, type: cxpc, dur: 1000, flush: 5, ts_adj: 1}",
++	[VX_AOSS] = "{class: lpm_mon, type: rbsc, dur: 1000, flush: 5, ts_adj: 1}",
++};
++
++/* SM8750 ("sun") DRV order, from the vendor driver. */
++static const char * const vx_cxpc_drvs[] = {
++	"TZ", "L3", "HLOS", "HYP", "SECPROC", "AUDIO", "AUDIO CESTA", "AOP",
++	"DEBUG", "GPU", "DISPLAY", "COMPUTE_DSP", "TME_HW", "TME_SW", "MDM SW",
++	"MDM HW", "MDM Q6 CESTA", "WLAN RF", "WLAN BB", "CAM_IFE0 CESTA",
++	"CAM_IFE1", "CAM_IFE2", "PCI0 CESTA", "MM CESTA", "DDR AUX", "ARC CPRF",
++};
++
++static const char * const vx_aoss_drvs[] = {
++	"APPS", "SP", "AUDIO", "AOP", "DEBUG", "GPU", "DISPLAY", "COMPUTE",
++	"TME", "MODEM", "WLAN RF", "WLAN BB", "CAM", "PCIE", "MM",
++};
++
++struct sys_pm_vx {
++	void __iomem *base;
++	size_t size;
++	struct qmp *qmp;
++	struct dentry *debugfs;
++	struct mutex lock;
++	enum vx_monitor monitor;
++};
++
++static int vx_send(struct sys_pm_vx *vx)
++{
++	return qmp_send(vx->qmp, "%s", vx_monitor_msgs[vx->monitor]);
++}
++
++static bool vx_word(struct sys_pm_vx *vx, size_t *off, u32 *val)
++{
++	if (*off + sizeof(u32) > vx->size)
++		return false;
++	*val = readl_relaxed(vx->base + *off);
++	*off += sizeof(u32);
++	return true;
++}
++
++static int vx_violators_show(struct seq_file *s, void *unused)
++{
++	struct sys_pm_vx *vx = s->private;
++	const char * const *drvs;
++	u32 hdr, flags, ts, val, blocked = 0, rows = 0;
++	unsigned int type, logsize, ndrv, i, j;
++	u8 line[ARRAY_SIZE(vx_cxpc_drvs)];
++	bool in_lpm = false;
++	size_t off = 0;
++
++	if (!vx_word(vx, &off, &hdr) || !hdr || !vx_word(vx, &off, &flags) || !flags) {
++		seq_puts(s, "No log: arm a monitor and suspend first.\n");
++		return 0;
++	}
++
++	type = hdr & 0xff;
++	logsize = (hdr >> 8) & 0xff;
++	switch (type) {
++	case VX_MODE_CXPC:
++	case VX_MODE_DDR:
++		drvs = vx_cxpc_drvs;
++		ndrv = ARRAY_SIZE(vx_cxpc_drvs);
++		break;
++	case VX_MODE_AOSS:
++		drvs = vx_aoss_drvs;
++		ndrv = ARRAY_SIZE(vx_aoss_drvs);
++		break;
++	default:
++		seq_printf(s, "Unknown log type %#x; see the raw file.\n", type);
++		return 0;
++	}
++
++	seq_printf(s, "Mode: %s  duration: %u ms  ts shift: %u  flush: %u  max lines: %u\n",
++		   type == VX_MODE_AOSS ? "AOSS" : type == VX_MODE_DDR ? "DDR" : "CXPC",
++		   flags & 0xffff, (flags >> 16) & 0xff, flags >> 24, logsize);
++	seq_puts(s, "Timestamp|");
++	for (j = 0; j < ndrv; j++)
++		seq_printf(s, "%s|", drvs[j]);
++	seq_putc(s, '\n');
++
++	for (i = 0; i < logsize; i++) {
++		bool any = false;
++
++		if (!vx_word(vx, &off, &ts) || !ts)
++			break;
++		ts <<= (flags >> 16) & 0xff;
++		for (j = 0; j < ndrv; j += 4) {
++			unsigned int k;
++
++			if (!vx_word(vx, &off, &val))
++				goto out;
++			for (k = 0; k < 4 && j + k < ndrv; k++)
++				line[j + k] = val >> (8 * k);
++		}
++		seq_printf(s, "%9x|", ts);
++		for (j = 0; j < ndrv; j++)
++			any |= line[j];
++		/* An all-zero line marks entry into, then exit from, the mode. */
++		if (!any) {
++			seq_puts(s, in_lpm ? "exit\n" : "enter\n");
++			in_lpm = !in_lpm;
++			continue;
++		}
++		if (!rows++)
++			blocked = GENMASK(ndrv - 1, 0);
++		for (j = 0; j < ndrv; j++) {
++			seq_printf(s, "%u|", line[j]);
++			if (!line[j])
++				blocked &= ~BIT(j);
++		}
++		seq_putc(s, '\n');
++	}
++out:
++	seq_puts(s, "Blocking in every logged line:");
++	for (j = 0; j < ndrv; j++)
++		if (blocked & BIT(j))
++			seq_printf(s, " %s", drvs[j]);
++	seq_puts(s, rows ? "\n" : " (no violations logged)\n");
++	return 0;
++}
++DEFINE_SHOW_ATTRIBUTE(vx_violators);
++
++static int vx_raw_show(struct seq_file *s, void *unused)
++{
++	struct sys_pm_vx *vx = s->private;
++	size_t off;
++
++	for (off = 0; off < vx->size; off += 16)
++		seq_printf(s, "%04zx: %08x %08x %08x %08x\n", off,
++			   readl_relaxed(vx->base + off), readl_relaxed(vx->base + off + 4),
++			   readl_relaxed(vx->base + off + 8), readl_relaxed(vx->base + off + 12));
++	return 0;
++}
++DEFINE_SHOW_ATTRIBUTE(vx_raw);
++
++static int vx_monitor_show(struct seq_file *s, void *unused)
++{
++	struct sys_pm_vx *vx = s->private;
++
++	seq_printf(s, "%s\n", vx_monitor_names[vx->monitor]);
++	return 0;
++}
++
++static int vx_monitor_open(struct inode *inode, struct file *file)
++{
++	return single_open(file, vx_monitor_show, inode->i_private);
++}
++
++static ssize_t vx_monitor_write(struct file *file, const char __user *ubuf,
++				size_t count, loff_t *ppos)
++{
++	struct sys_pm_vx *vx = ((struct seq_file *)file->private_data)->private;
++	char buf[8];
++	int mode, ret;
++
++	if (count >= sizeof(buf))
++		return -EINVAL;
++	if (copy_from_user(buf, ubuf, count))
++		return -EFAULT;
++	buf[count] = '\0';
++
++	mode = sysfs_match_string(vx_monitor_names, buf);
++	if (mode < 0)
++		return mode;
++
++	mutex_lock(&vx->lock);
++	vx->monitor = mode;
++	ret = vx_send(vx);
++	mutex_unlock(&vx->lock);
++
++	return ret ?: count;
++}
++
++static const struct file_operations vx_monitor_fops = {
++	.owner = THIS_MODULE,
++	.open = vx_monitor_open,
++	.read = seq_read,
++	.write = vx_monitor_write,
++	.llseek = seq_lseek,
++	.release = single_release,
++};
++
++static int sys_pm_vx_suspend(struct device *dev)
++{
++	struct sys_pm_vx *vx = dev_get_drvdata(dev);
++	int ret = 0;
++
++	/* Like the vendor driver, (re)arm the AOP monitor at every suspend. */
++	mutex_lock(&vx->lock);
++	if (vx->monitor != VX_OFF)
++		ret = vx_send(vx);
++	mutex_unlock(&vx->lock);
++	if (ret)
++		dev_warn(dev, "failed to arm the AOP monitor: %d\n", ret);
++
++	return 0;
++}
++
++static DEFINE_SIMPLE_DEV_PM_OPS(sys_pm_vx_pm_ops, sys_pm_vx_suspend, NULL);
++
++static int sys_pm_vx_probe(struct platform_device *pdev)
++{
++	struct sys_pm_vx *vx;
++	struct resource *res;
++
++	vx = devm_kzalloc(&pdev->dev, sizeof(*vx), GFP_KERNEL);
++	if (!vx)
++		return -ENOMEM;
++
++	vx->base = devm_platform_get_and_ioremap_resource(pdev, 0, &res);
++	if (IS_ERR(vx->base))
++		return PTR_ERR(vx->base);
++	vx->size = resource_size(res);
++
++	vx->qmp = qmp_get(&pdev->dev);
++	if (IS_ERR(vx->qmp))
++		return dev_err_probe(&pdev->dev, PTR_ERR(vx->qmp), "failed to get QMP\n");
++
++	mutex_init(&vx->lock);
++	platform_set_drvdata(pdev, vx);
++
++	vx->debugfs = debugfs_create_dir("sys_pm_vx", NULL);
++	debugfs_create_file("monitor", 0600, vx->debugfs, vx, &vx_monitor_fops);
++	debugfs_create_file("violators", 0400, vx->debugfs, vx, &vx_violators_fops);
++	debugfs_create_file("raw", 0400, vx->debugfs, vx, &vx_raw_fops);
++
++	return 0;
++}
++
++static void sys_pm_vx_remove(struct platform_device *pdev)
++{
++	struct sys_pm_vx *vx = platform_get_drvdata(pdev);
++
++	debugfs_remove_recursive(vx->debugfs);
++	qmp_put(vx->qmp);
++}
++
++static const struct of_device_id sys_pm_vx_of_match[] = {
++	{ .compatible = "qcom,sm8750-sys-pm-violators" },
++	{ }
++};
++MODULE_DEVICE_TABLE(of, sys_pm_vx_of_match);
++
++static struct platform_driver sys_pm_vx_driver = {
++	.probe = sys_pm_vx_probe,
++	.remove = sys_pm_vx_remove,
++	.driver = {
++		.name = "qcom-sys-pm-vx",
++		.of_match_table = sys_pm_vx_of_match,
++		.pm = pm_sleep_ptr(&sys_pm_vx_pm_ops),
++	},
++};
++module_platform_driver(sys_pm_vx_driver);
++
++MODULE_DESCRIPTION("Qualcomm AOP system PM violators debug reader");
++MODULE_LICENSE("GPL");

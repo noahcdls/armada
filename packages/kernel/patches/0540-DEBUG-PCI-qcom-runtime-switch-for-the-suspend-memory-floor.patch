@@ -1,0 +1,33 @@
+From: Armada <noreply@armada.local>
+Subject: [PATCH] DEBUG: PCI: qcom: runtime switch for the suspend memory floor
+
+pcie_qcom.suspend_mem_floor (writable at runtime, default 1) lets a test
+drop the suspend OPP to NULL like upstream, so the RPMh sleep set keeps
+no DDR vote and the s2idle hang reproduces without rebuilding. Change it
+only while the system is awake.
+
+Not for shipping.
+---
+--- a/drivers/pci/controller/dwc/pcie-qcom.c
++++ b/drivers/pci/controller/dwc/pcie-qcom.c
+@@ -2240,6 +2240,11 @@ static int qcom_pcie_probe(struct platform_device *pdev)
+  * during s2idle. Suspend-to-RAM tears the link down and keeps dropping
+  * the OPP.
+  */
++/* DEBUG: 0 drops the floor like upstream, to reproduce the no-vote s2idle hang. */
++static bool suspend_mem_floor = true;
++module_param(suspend_mem_floor, bool, 0644);
++MODULE_PARM_DESC(suspend_mem_floor, "Keep the suspend OPP DDR vote in s2idle (default: true)");
++
+ static int qcom_pcie_set_suspend_opp(struct qcom_pcie *pcie)
+ {
+ 	struct device *dev = pcie->pci->dev;
+@@ -2247,7 +2252,7 @@ static int qcom_pcie_set_suspend_opp(struct qcom_pcie *pcie)
+ 	unsigned long freq;
+ 	int ret;
+ 
+-	if (pm_suspend_target_state == PM_SUSPEND_MEM)
++	if (pm_suspend_target_state == PM_SUSPEND_MEM || !READ_ONCE(suspend_mem_floor))
+ 		return dev_pm_opp_set_opp(dev, NULL);
+ 
+ 	freq = dev_pm_opp_get_suspend_opp_freq(dev);

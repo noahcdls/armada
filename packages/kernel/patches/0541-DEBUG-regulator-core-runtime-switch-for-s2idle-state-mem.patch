@@ -1,0 +1,38 @@
+From: Armada <noreply@armada.local>
+Subject: [PATCH] DEBUG: regulator: core: runtime switch for s2idle state-mem
+
+regulator.s2idle_state_mem (writable at runtime, default 1) turns off
+every regulator-state-mem sleep vote in s2idle, so a no-floor s2idle test
+can run without the PMIC LDO/BOB/SMPS low-power modes that 0523-0526 put
+in the RPMh sleep set. Change it only while the system is awake.
+
+Not for shipping.
+---
+--- a/drivers/regulator/core.c
++++ b/drivers/regulator/core.c
+@@ -562,6 +562,16 @@ static int regulator_mode_constrain(struct regulator_dev *rdev,
+ 	return -EINVAL;
+ }
+ 
++/*
++ * DEBUG: 0 skips every regulator-state-mem sleep vote in s2idle. Change it
++ * only while awake so suspend and resume see the same setting.
++ */
++#undef MODULE_PARAM_PREFIX
++#define MODULE_PARAM_PREFIX "regulator."
++static bool s2idle_state_mem = true;
++module_param(s2idle_state_mem, bool, 0644);
++MODULE_PARM_DESC(s2idle_state_mem, "Apply regulator-state-mem in s2idle (default: true)");
++
+ static inline struct regulator_state *
+ regulator_get_suspend_state(struct regulator_dev *rdev, suspend_state_t state)
+ {
+@@ -577,7 +587,7 @@ regulator_get_suspend_state(struct regulator_dev *rdev, suspend_state_t state)
+ 	 * has no PM_SUSPEND_TO_IDLE devicetree binding).
+ 	 */
+ 	case PM_SUSPEND_TO_IDLE:
+-		if (!rdev->desc->s2idle_uses_state_mem)
++		if (!rdev->desc->s2idle_uses_state_mem || !READ_ONCE(s2idle_state_mem))
+ 			return NULL;
+ 		fallthrough;
+ 	case PM_SUSPEND_MEM:

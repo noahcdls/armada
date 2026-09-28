@@ -730,3 +730,20 @@ no equivalent submission was found, or a permanent URL to the upstream submissio
   source: https://github.com/bylaws/linux/commit/7ae989a43ae7e3cb8007ac21c28dacc24c9d8320
   upstream: unknown
   notes: Rebased patch context for Linux 7.2.3 and Armada's compat-input patch; the unaligned-atomic handler is unchanged.
+
+- `patches/0540-DEBUG-PCI-qcom-runtime-switch-for-the-suspend-memory-floor.patch`
+  source: armada
+  upstream: local
+  notes: DEBUG, not for shipping. `pcie_qcom.suspend_mem_floor=0` drops the `0513` suspend OPP to NULL so the Odin 3 no-floor s2idle hang reproduces without a rebuild.
+- `patches/0541-DEBUG-regulator-core-runtime-switch-for-s2idle-state-mem.patch`
+  source: armada
+  upstream: local
+  notes: DEBUG, not for shipping. `regulator.s2idle_state_mem=0` skips the `0523`–`0526` regulator-state-mem sleep votes, to test the no-floor hang without PMIC low-power modes in the sleep set.
+- `patches/0542-DEBUG-soc-qcom-add-an-AOP-system-PM-violators-reader.patch`
+  source: armada
+  upstream: local
+  notes: DEBUG, not for shipping. Reimplements the reading side of the vendor `sys_pm_vx` driver (AynCQ8725SDev/android_kernel_ayn_cq8725s, lineage-23.2): the same `lpm_mon` QMP requests and SM8750 DRV names, log at 0xc320000 per the stock "SunP v2" DTB.
+- `patches/0543-DEBUG-PM-suspend-resume-breadcrumbs-that-survive-a-warm-reset.patch`
+  source: armada
+  upstream: local
+  notes: DEBUG, not for shipping. Needs `reserve_mem=2M:4096:pmcrumbs`; the Odin 3 long-press is a PMIC warm reset, so the records survive a hang.

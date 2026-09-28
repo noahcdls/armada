@@ -203,3 +203,9 @@ v2_20260420_neil_armstrong_arm64_qcom_sm8650_misc_enhancements.patch
 0529-ASoC-qdsp6-q6apm-fail-the-graph-open-when-the-DSP-rejects-it.patch
 0530-ASoC-qdsp6-release-AudioReach-graphs-across-system-suspend.patch
 0532-hwmon-pwm-fan-optionally-run-the-fan-while-charging-in-s2idle.patch
+
+# ============== DEBUG: Odin 3 no-floor s2idle hang (not for shipping) ==============
+0540-DEBUG-PCI-qcom-runtime-switch-for-the-suspend-memory-floor.patch
+0541-DEBUG-regulator-core-runtime-switch-for-s2idle-state-mem.patch
+0542-DEBUG-soc-qcom-add-an-AOP-system-PM-violators-reader.patch
+0543-DEBUG-PM-suspend-resume-breadcrumbs-that-survive-a-warm-reset.patch
