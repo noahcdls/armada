@@ -204,6 +204,18 @@ v2_20260420_neil_armstrong_arm64_qcom_sm8650_misc_enhancements.patch
 0530-ASoC-qdsp6-release-AudioReach-graphs-across-system-suspend.patch
 0532-hwmon-pwm-fan-optionally-run-the-fan-while-charging-in-s2idle.patch
 
+# ============== LPASS macros: drop HW votes when idle (backport from Linux 7.3) ==============
+0620-ASoC-codecs-lpass-wsa-macro-Switch-to-PM-clock-framework-for-runtime-P.patch
+0621-ASoC-codecs-lpass-va-macro-Switch-to-PM-clock-framework-for-runtime-PM.patch
+0622-ASoC-codecs-lpass-wsa-macro-Use-devm-clk-hw-register-for-MCLK-output.patch
+0623-ASoC-codecs-lpass-rx-macro-Propagate-regcache-sync-errors.patch
+0624-ASoC-codecs-lpass-tx-macro-Propagate-regcache-sync-errors.patch
+0625-ASoC-codecs-lpass-tx-macro-switch-to-PM-clock-framework-for-runtime-PM.patch
+0626-ASoC-codecs-lpass-rx-macro-switch-to-PM-clock-framework-for-runtime-PM.patch
+0627-ASoC-codecs-lpass-tx-rx-macro-check-clk-set-rate-return-value.patch
+0628-ASoC-codecs-lpass-wsa-macro-check-clk-set-rate-return-value.patch
+0629-ASoC-codecs-lpass-va-macro-check-clk-set-rate-return-value.patch
+
 # ============== DEBUG: Odin 3 no-floor s2idle hang (not for shipping) ==============
 0540-DEBUG-PCI-qcom-runtime-switch-for-the-suspend-memory-floor.patch
 0541-DEBUG-regulator-core-runtime-switch-for-s2idle-state-mem.patch

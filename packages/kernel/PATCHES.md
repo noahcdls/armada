@@ -731,6 +731,39 @@ no equivalent submission was found, or a permanent URL to the upstream submissio
   upstream: unknown
   notes: Rebased patch context for Linux 7.2.3 and Armada's compat-input patch; the unaligned-atomic handler is unchanged.
 
+- `patches/0620-ASoC-codecs-lpass-wsa-macro-Switch-to-PM-clock-framework-for-runtime-P.patch`
+  source: https://git.kernel.org/torvalds/c/cd054a6e272c
+  upstream: https://git.kernel.org/torvalds/c/cd054a6e272c
+  notes: Qualcomm "xo-sd-codec" series (Linux 7.3): the LPASS macros manage their macro/dcodec (LPASS_HW_MACRO/LPASS_HW_DCODEC q6prm votes), mclk, npl and fsgen clocks through the PM clock framework with a 100 ms autosuspend, so the votes that kept the ADSP holding LPASS power are released when the codec is idle.
+- `patches/0621-ASoC-codecs-lpass-va-macro-Switch-to-PM-clock-framework-for-runtime-PM.patch`
+  source: https://git.kernel.org/torvalds/c/eb667d0fbdd3
+  upstream: https://git.kernel.org/torvalds/c/eb667d0fbdd3
+- `patches/0622-ASoC-codecs-lpass-wsa-macro-Use-devm-clk-hw-register-for-MCLK-output.patch`
+  source: https://git.kernel.org/torvalds/c/541735571578
+  upstream: https://git.kernel.org/torvalds/c/541735571578
+- `patches/0623-ASoC-codecs-lpass-rx-macro-Propagate-regcache-sync-errors.patch`
+  source: https://git.kernel.org/torvalds/c/e38cbb75248a
+  upstream: https://git.kernel.org/torvalds/c/e38cbb75248a
+- `patches/0624-ASoC-codecs-lpass-tx-macro-Propagate-regcache-sync-errors.patch`
+  source: https://git.kernel.org/torvalds/c/ea70ad6ac288
+  upstream: https://git.kernel.org/torvalds/c/ea70ad6ac288
+- `patches/0625-ASoC-codecs-lpass-tx-macro-switch-to-PM-clock-framework-for-runtime-PM.patch`
+  source: https://git.kernel.org/torvalds/c/b9b23e72abef
+  upstream: https://git.kernel.org/torvalds/c/b9b23e72abef
+  notes: Conflicts with 7.2.6 resolved to the v7.3-rc4 `swclk_gate_enable()` and `tx_macro_runtime_resume()`.
+- `patches/0626-ASoC-codecs-lpass-rx-macro-switch-to-PM-clock-framework-for-runtime-PM.patch`
+  source: https://git.kernel.org/torvalds/c/b05482e7ce1b
+  upstream: https://git.kernel.org/torvalds/c/b05482e7ce1b
+  notes: Conflicts resolved to v7.3-rc4 around Armada's `0072`. `swclk_gate_enable()` drops its runtime PM reference with `pm_runtime_put_autosuspend()` when `rx_macro_mclk_enable()` fails, like the TX macro, rather than disabling an mclk it no longer enables as v7.3-rc4 still does.
+- `patches/0627-ASoC-codecs-lpass-tx-rx-macro-check-clk-set-rate-return-value.patch`
+  source: https://git.kernel.org/torvalds/c/b8ca90fafe6a
+  upstream: https://git.kernel.org/torvalds/c/b8ca90fafe6a
+- `patches/0628-ASoC-codecs-lpass-wsa-macro-check-clk-set-rate-return-value.patch`
+  source: https://git.kernel.org/torvalds/c/6173e18dd47c
+  upstream: https://git.kernel.org/torvalds/c/6173e18dd47c
+- `patches/0629-ASoC-codecs-lpass-va-macro-check-clk-set-rate-return-value.patch`
+  source: https://git.kernel.org/torvalds/c/4fddda16f939
+  upstream: https://git.kernel.org/torvalds/c/4fddda16f939
 - `patches/0540-DEBUG-PCI-qcom-runtime-switch-for-the-suspend-memory-floor.patch`
   source: armada
   upstream: local
