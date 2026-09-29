@@ -764,6 +764,10 @@ no equivalent submission was found, or a permanent URL to the upstream submissio
 - `patches/0629-ASoC-codecs-lpass-va-macro-check-clk-set-rate-return-value.patch`
   source: https://git.kernel.org/torvalds/c/4fddda16f939
   upstream: https://git.kernel.org/torvalds/c/4fddda16f939
+- `patches/0630-ASoC-soundwire-power-the-WCD939x-audio-chain-down-across-system-sleep.patch`
+  source: armada
+  upstream: local
+  notes: `pm_runtime_force_suspend()`/`pm_runtime_force_resume()` as system-sleep callbacks for the WCD939x SoundWire devices, the Qualcomm SoundWire controller and the LPASS macros, so `0603`'s runtime-PM forbid no longer keeps the LPASS HW votes (and the ADSP's CX vote) held through s2idle. Audio playback and headset detection after resume still need verifying on hardware.
 - `patches/0540-DEBUG-PCI-qcom-runtime-switch-for-the-suspend-memory-floor.patch`
   source: armada
   upstream: local
