@@ -1,0 +1,383 @@
+From: Armada <noreply@armada.local>
+Subject: [PATCH] DEBUG: PM: pm_crumbs: store breadcrumbs in firmware-reserved memory
+
+The reserve_mem store from 0543 lands at the top of RAM, and the Odin 3
+bootloader overwrites it on every reset (long press, reboot, and warm
+reboot alike), so a hung s2idle attempt still leaves nothing behind.
+
+Add stores for reserved-memory nodes compatible with "armada,pm-crumbs"
+and write every record to every store. On SM8750 carve 2 MiB from the
+tail of the QDSS trace buffer and of the modem (MPSS) region: both are
+reserved in the firmware memory map and unused on the modem-less Odin 3,
+so the bootloader should not reuse them. One reset shows which store
+survived.
+
+Not for shipping.
+---
+--- a/arch/arm64/boot/dts/qcom/sm8750.dtsi
++++ b/arch/arm64/boot/dts/qcom/sm8750.dtsi
+@@ -433,7 +433,15 @@ tz_stat_mem: tz-stat@82700000 {
+ 		};
+ 
+ 		qdss_mem: qdss@82800000 {
+-			reg = <0x0 0x82800000 0x0 0x2000000>;
++			/* DEBUG: last 2 MiB carved out for pm-crumbs@84600000 */
++			reg = <0x0 0x82800000 0x0 0x1e00000>;
++			no-map;
++		};
++
++		/* DEBUG: suspend/resume breadcrumbs, inside firmware-reserved QDSS */
++		pm-crumbs@84600000 {
++			compatible = "armada,pm-crumbs";
++			reg = <0x0 0x84600000 0x0 0x200000>;
+ 			no-map;
+ 		};
+ 
+@@ -448,7 +456,15 @@ dsm_partition_2_mem: dsm-partition-2@89300000 {
+ 		};
+ 
+ 		mpss_mem: mpss@8ba00000 {
+-			reg = <0x0 0x8ba00000 0x0 0xf600000>;
++			/* DEBUG: last 2 MiB carved out for pm-crumbs@9ae00000 */
++			reg = <0x0 0x8ba00000 0x0 0xf400000>;
++			no-map;
++		};
++
++		/* DEBUG: suspend/resume breadcrumbs, inside firmware-reserved MPSS */
++		pm-crumbs@9ae00000 {
++			compatible = "armada,pm-crumbs";
++			reg = <0x0 0x9ae00000 0x0 0x200000>;
+ 			no-map;
+ 		};
+ 
+--- a/kernel/power/Kconfig
++++ b/kernel/power/Kconfig
+@@ -260,13 +260,13 @@ config PM_SLEEP_DEBUG
+ 
+ config PM_CRUMBS
+ 	bool "Suspend/resume breadcrumbs that survive a warm reset"
+-	depends on PM_SLEEP && TRACEPOINTS && ARM_ARCH_TIMER && DEBUG_FS
++	depends on PM_SLEEP && TRACEPOINTS && ARM_ARCH_TIMER && DEBUG_FS && OF
+ 	help
+-	  Record suspend_resume and device PM callback tracepoints into the
+-	  reserve_mem region named "pmcrumbs" (reserve_mem=2M:4096:pmcrumbs),
+-	  mapped write-combine so the records survive a warm reset, and show
+-	  the previous boot's records in /sys/kernel/debug/pm_crumbs_last.
+-	  Debug only.
++	  Record suspend_resume and device PM callback tracepoints into every
++	  "armada,pm-crumbs" reserved-memory node and the reserve_mem region
++	  named "pmcrumbs", mapped write-combine so the records survive a warm
++	  reset, and show the previous boot's records in
++	  /sys/kernel/debug/pm_crumbs_last. Debug only.
+ 
+ config DPM_WATCHDOG
+ 	bool "Device suspend/resume watchdog"
+--- a/kernel/power/pm_crumbs.c
++++ b/kernel/power/pm_crumbs.c
+@@ -3,20 +3,26 @@
+  * Suspend/resume breadcrumbs that survive a warm reset.
+  *
+  * A hung s2idle attempt leaves nothing in the journal. This records the
+- * suspend_resume and device PM callback tracepoints into a reserve_mem
+- * region mapped write-combine, so every record reaches DRAM without depending
+- * on CPU caches, and prints the previous boot's records from debugfs.
++ * suspend_resume and device PM callback tracepoints into one or more stores
++ * mapped write-combine, so every record reaches DRAM without depending on
++ * CPU caches, and prints the previous boot's records from debugfs.
+  *
+- * Enable with the kernel argument reserve_mem=2M:4096:pmcrumbs.
++ * Stores are reserved-memory nodes compatible with "armada,pm-crumbs", plus
++ * an optional reserve_mem region named "pmcrumbs". Every record goes to every
++ * store, so one reset shows which locations the bootloader leaves alone.
+  */
+ 
+ #include <linux/atomic.h>
+ #include <linux/debugfs.h>
+ #include <linux/device.h>
+ #include <linux/init.h>
++#include <linux/io.h>
+ #include <linux/mm.h>
++#include <linux/of.h>
++#include <linux/of_address.h>
+ #include <linux/random.h>
+ #include <linux/seq_file.h>
++#include <linux/slab.h>
+ #include <linux/sort.h>
+ #include <linux/vmalloc.h>
+ #include <clocksource/arm_arch_timer.h>
+@@ -25,6 +31,7 @@
+ #define CRUMB_MAGIC	0x424d5243	/* "CRMB" */
+ #define CRUMB_MEM_NAME	"pmcrumbs"
+ #define CRUMB_NAME_LEN	48
++#define CRUMB_STORES	4
+ 
+ enum crumb_type { CRUMB_BOOT = 1, CRUMB_BEGIN, CRUMB_END, CRUMB_CB_START, CRUMB_CB_END };
+ 
+@@ -45,28 +52,42 @@ struct crumb_header {
+ 	u8 pad[sizeof(struct crumb) - 16];
+ };
+ 
+-static struct crumb_header *crumb_hdr;
+-static struct crumb *crumbs;
+-static atomic_t crumb_seq;
++struct crumb_store {
++	const char *name;
++	phys_addr_t base;
++	struct crumb_header *hdr;
++	struct crumb *recs;
++	u32 capacity;
++	/* The previous boot's records, sorted by seq. */
++	struct crumb *last;
++	u32 last_count, last_cntfrq;
++};
+ 
+-/* The previous boot's records, sorted by seq. */
+-static struct crumb *last_crumbs;
+-static u32 last_count, last_cntfrq;
++static struct crumb_store crumb_stores[CRUMB_STORES];
++static unsigned int crumb_nstores;
++static atomic_t crumb_seq;
+ 
+ static void crumb_add(u8 type, s16 val, const char *a, const char *b)
+ {
+ 	u32 seq = atomic_inc_return(&crumb_seq);
+-	struct crumb *c = &crumbs[(seq - 1) % crumb_hdr->capacity];
+-
+-	c->seq = 0;
+-	c->cycles = arch_timer_read_counter();
+-	c->type = type;
+-	c->cpu = raw_smp_processor_id();
+-	c->val = val;
+-	snprintf(c->name, sizeof(c->name), "%s%s%s", a, b ? " " : "", b ?: "");
+-	/* Publish the slot last, and push the record out before a possible hang. */
+-	wmb();
+-	c->seq = seq;
++	u64 cycles = arch_timer_read_counter();
++	unsigned int i;
++
++	for (i = 0; i < crumb_nstores; i++) {
++		struct crumb_store *st = &crumb_stores[i];
++		struct crumb *c = &st->recs[(seq - 1) % st->capacity];
++
++		c->seq = 0;
++		c->cycles = cycles;
++		c->type = type;
++		c->cpu = raw_smp_processor_id();
++		c->val = val;
++		snprintf(c->name, sizeof(c->name), "%s%s%s", a, b ? " " : "", b ?: "");
++		/* Publish the slot last. */
++		wmb();
++		c->seq = seq;
++	}
++	/* Push the records out before a possible hang. */
+ 	wmb();
+ }
+ 
+@@ -104,28 +125,28 @@ static bool crumb_same_device(const struct crumb *a, const struct crumb *b)
+ 	return n == strcspn(b->name, " ") && !strncmp(a->name, b->name, n);
+ }
+ 
+-static int crumbs_last_show(struct seq_file *s, void *unused)
++static void crumbs_show_store(struct seq_file *s, const struct crumb_store *st)
+ {
+-	u64 first, freq = last_cntfrq ?: 19200000;
++	u64 first, freq = st->last_cntfrq ?: 19200000;
+ 	u32 i, j, shown = 0;
+ 
+-	if (!last_count) {
+-		seq_puts(s, "No records from the previous boot.\n");
+-		return 0;
+-	}
++	seq_printf(s, "== store %s at %pa: %u records from the previous boot\n",
++		   st->name, &st->base, st->last_count);
++	if (!st->last_count)
++		return;
+ 
+ 	/* A callback that started but never ended is where the kernel stopped. */
+ 	seq_puts(s, "Callbacks started without an end (most recent first):\n");
+-	for (i = last_count; i-- > 0 && shown < 8;) {
+-		if (last_crumbs[i].type != CRUMB_CB_START)
++	for (i = st->last_count; i-- > 0 && shown < 8;) {
++		if (st->last[i].type != CRUMB_CB_START)
+ 			continue;
+-		for (j = i + 1; j < last_count; j++)
+-			if (last_crumbs[j].type == CRUMB_CB_END &&
+-			    crumb_same_device(&last_crumbs[i], &last_crumbs[j]))
++		for (j = i + 1; j < st->last_count; j++)
++			if (st->last[j].type == CRUMB_CB_END &&
++			    crumb_same_device(&st->last[i], &st->last[j]))
+ 				break;
+-		if (j == last_count) {
+-			seq_printf(s, "  seq %u cpu%u %s event %d\n", last_crumbs[i].seq,
+-				   last_crumbs[i].cpu, last_crumbs[i].name, last_crumbs[i].val);
++		if (j == st->last_count) {
++			seq_printf(s, "  seq %u cpu%u %s event %d\n", st->last[i].seq,
++				   st->last[i].cpu, st->last[i].name, st->last[i].val);
+ 			shown++;
+ 		}
+ 	}
+@@ -133,14 +154,24 @@ static int crumbs_last_show(struct seq_file *s, void *unused)
+ 		seq_puts(s, "  none\n");
+ 
+ 	seq_puts(s, "Records (seconds from the first record, arch counter):\n");
+-	first = last_crumbs[0].cycles;
+-	for (i = 0; i < last_count; i++) {
+-		const struct crumb *c = &last_crumbs[i];
++	first = st->last[0].cycles;
++	for (i = 0; i < st->last_count; i++) {
++		const struct crumb *c = &st->last[i];
+ 		u64 us = div64_u64((c->cycles - first) * 1000000, freq);
+ 
+ 		seq_printf(s, "%6u cpu%u %6llu.%06llu %-8s %s %d\n", c->seq, c->cpu,
+ 			   us / 1000000, us % 1000000, crumb_type_name(c->type), c->name, c->val);
+ 	}
++}
++
++static int crumbs_last_show(struct seq_file *s, void *unused)
++{
++	unsigned int i;
++
++	if (!crumb_nstores)
++		seq_puts(s, "No breadcrumb stores are configured.\n");
++	for (i = 0; i < crumb_nstores; i++)
++		crumbs_show_store(s, &crumb_stores[i]);
+ 	return 0;
+ }
+ DEFINE_SHOW_ATTRIBUTE(crumbs_last);
+@@ -152,72 +183,94 @@ static int crumb_cmp(const void *a, const void *b)
+ 	return x < y ? -1 : x > y;
+ }
+ 
+-/* Keep the previous boot's records for debugfs before the region is reused. */
+-static void __init crumbs_save_last(u32 capacity)
++/* Keep a store's previous-boot records, then reset it for this boot. */
++static void __init crumbs_init_store(struct crumb_store *st, void *vaddr, size_t size)
+ {
+ 	u32 i, n = 0;
+ 
+-	if (crumb_hdr->magic != CRUMB_MAGIC || crumb_hdr->capacity != capacity)
+-		return;
+-
+-	last_crumbs = vmalloc_array(capacity, sizeof(*last_crumbs));
+-	if (!last_crumbs)
+-		return;
+-	for (i = 0; i < capacity; i++) {
+-		if (!crumbs[i].seq)
+-			continue;
+-		last_crumbs[n] = crumbs[i];
+-		last_crumbs[n++].name[CRUMB_NAME_LEN - 1] = '\0';
++	st->hdr = vaddr;
++	st->recs = vaddr + sizeof(*st->hdr);
++	st->capacity = (size - sizeof(*st->hdr)) / sizeof(*st->recs);
++
++	if (st->hdr->magic == CRUMB_MAGIC && st->hdr->capacity == st->capacity) {
++		st->last = vmalloc_array(st->capacity, sizeof(*st->last));
++		for (i = 0; st->last && i < st->capacity; i++) {
++			if (!st->recs[i].seq)
++				continue;
++			st->last[n] = st->recs[i];
++			st->last[n++].name[CRUMB_NAME_LEN - 1] = '\0';
++		}
++		sort(st->last, n, sizeof(*st->last), crumb_cmp, NULL);
++		st->last_cntfrq = st->hdr->cntfrq;
++		st->last_count = n;
+ 	}
+-	sort(last_crumbs, n, sizeof(*last_crumbs), crumb_cmp, NULL);
+-	last_cntfrq = crumb_hdr->cntfrq;
+-	last_count = n;
++
++	memset_io((void __iomem *)st->recs, 0, st->capacity * sizeof(*st->recs));
++	st->hdr->capacity = st->capacity;
++	st->hdr->cntfrq = arch_timer_get_rate();
++	st->hdr->boot = get_random_u32();
++	st->hdr->magic = CRUMB_MAGIC;
++	wmb();
++	pr_info("pm_crumbs: store %s at %pa: %u records, %u from the previous boot\n",
++		st->name, &st->base, st->capacity, st->last_count);
+ }
+ 
+-static int __init pm_crumbs_init(void)
++/* reserve_mem regions are System RAM: alias them write-combine like ramoops. */
++static void *__init crumbs_vmap_ram(phys_addr_t start, phys_addr_t size)
+ {
+-	phys_addr_t start, size;
++	unsigned int i, npages = size >> PAGE_SHIFT;
+ 	struct page **pages;
+-	unsigned int i, npages;
+-	u32 capacity;
+ 	void *vaddr;
+ 
+-	if (!reserve_mem_find_by_name(CRUMB_MEM_NAME, &start, &size))
+-		return 0;
+-
+-	npages = size >> PAGE_SHIFT;
+ 	pages = kmalloc_array(npages, sizeof(*pages), GFP_KERNEL);
+ 	if (!pages)
+-		return -ENOMEM;
++		return NULL;
+ 	for (i = 0; i < npages; i++)
+ 		pages[i] = pfn_to_page((start >> PAGE_SHIFT) + i);
+-	/* Same aliasing as ramoops: write-combine, so records bypass the caches. */
+ 	vaddr = vmap(pages, npages, VM_MAP | VM_IOREMAP, pgprot_writecombine(PAGE_KERNEL));
+ 	kfree(pages);
+-	if (!vaddr)
+-		return -ENOMEM;
++	return vaddr;
++}
+ 
+-	crumb_hdr = vaddr;
+-	crumbs = vaddr + sizeof(*crumb_hdr);
+-	capacity = (size - sizeof(*crumb_hdr)) / sizeof(*crumbs);
++static void __init crumbs_add_store(const char *name, phys_addr_t base, void *vaddr,
++				    size_t size)
++{
++	struct crumb_store *st;
+ 
+-	crumbs_save_last(capacity);
++	if (!vaddr || size < 2 * sizeof(struct crumb) || crumb_nstores == CRUMB_STORES)
++		return;
++	st = &crumb_stores[crumb_nstores++];
++	st->name = name;
++	st->base = base;
++	crumbs_init_store(st, vaddr, size);
++}
+ 
+-	memset_io((void __iomem *)crumbs, 0, capacity * sizeof(*crumbs));
+-	crumb_hdr->capacity = capacity;
+-	crumb_hdr->cntfrq = arch_timer_get_rate();
+-	crumb_hdr->boot = get_random_u32();
+-	crumb_hdr->magic = CRUMB_MAGIC;
+-	wmb();
+-	crumb_add(CRUMB_BOOT, 0, "boot", NULL);
++static int __init pm_crumbs_init(void)
++{
++	phys_addr_t start, size;
++	struct device_node *np;
++	struct resource res;
++
++	/* no-map reserved-memory: not System RAM, so a plain WC mapping. */
++	for_each_compatible_node(np, NULL, "armada,pm-crumbs") {
++		if (of_address_to_resource(np, 0, &res))
++			continue;
++		crumbs_add_store(kstrdup_const(np->full_name, GFP_KERNEL), res.start,
++				 memremap(res.start, resource_size(&res), MEMREMAP_WC),
++				 resource_size(&res));
++	}
+ 
++	if (reserve_mem_find_by_name(CRUMB_MEM_NAME, &start, &size))
++		crumbs_add_store(CRUMB_MEM_NAME, start, crumbs_vmap_ram(start, size), size);
++
++	if (!crumb_nstores)
++		return 0;
++
++	crumb_add(CRUMB_BOOT, 0, "boot", NULL);
+ 	WARN_ON(register_trace_suspend_resume(crumb_suspend_resume, NULL));
+ 	WARN_ON(register_trace_device_pm_callback_start(crumb_cb_start, NULL));
+ 	WARN_ON(register_trace_device_pm_callback_end(crumb_cb_end, NULL));
+-
+ 	debugfs_create_file("pm_crumbs_last", 0400, NULL, NULL, &crumbs_last_fops);
+-	pr_info("pm_crumbs: %u records at %pa, %u from the previous boot\n",
+-		capacity, &start, last_count);
+ 	return 0;
+ }
+ late_initcall(pm_crumbs_init);

@@ -768,6 +768,10 @@ no equivalent submission was found, or a permanent URL to the upstream submissio
   source: armada
   upstream: local
   notes: `pm_runtime_force_suspend()`/`pm_runtime_force_resume()` as system-sleep callbacks for the WCD939x SoundWire devices, the Qualcomm SoundWire controller and the LPASS macros, so `0603`'s runtime-PM forbid no longer keeps the LPASS HW votes (and the ADSP's CX vote) held through s2idle. Audio playback and headset detection after resume still need verifying on hardware.
+- `patches/0631-pinctrl-qcom-sm8650-lpass-lpi-suspend-across-system-sleep.patch`
+  source: armada
+  upstream: local
+  notes: Companion to `0630`: the LPI pin controller is resumed by the SoundWire/macro sleep pin-state changes during system suspend and otherwise keeps the last LPASS_HW_MACRO/LPASS_HW_DCODEC reference through s2idle. Verified by trace on the Odin 3: with `0630` alone the macros release their references (count 4 to 1) but the vote never reaches zero.
 - `patches/0540-DEBUG-PCI-qcom-runtime-switch-for-the-suspend-memory-floor.patch`
   source: armada
   upstream: local
@@ -784,3 +788,7 @@ no equivalent submission was found, or a permanent URL to the upstream submissio
   source: armada
   upstream: local
   notes: DEBUG, not for shipping. Needs `reserve_mem=2M:4096:pmcrumbs`; the Odin 3 long-press is a PMIC warm reset, so the records survive a hang.
+- `patches/0544-DEBUG-PM-pm_crumbs-store-breadcrumbs-in-firmware-reserved-memory.patch`
+  source: armada
+  upstream: local
+  notes: DEBUG, not for shipping. The `0543` reserve_mem store at the top of RAM does not survive any reset on the Odin 3. Adds `armada,pm-crumbs` reserved-memory stores carved from the tails of the SM8750 QDSS and MPSS regions (both firmware-reserved and unused without a modem); every record goes to every store.

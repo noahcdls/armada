@@ -216,9 +216,11 @@ v2_20260420_neil_armstrong_arm64_qcom_sm8650_misc_enhancements.patch
 0628-ASoC-codecs-lpass-wsa-macro-check-clk-set-rate-return-value.patch
 0629-ASoC-codecs-lpass-va-macro-check-clk-set-rate-return-value.patch
 0630-ASoC-soundwire-power-the-WCD939x-audio-chain-down-across-system-sleep.patch
+0631-pinctrl-qcom-sm8650-lpass-lpi-suspend-across-system-sleep.patch
 
 # ============== DEBUG: Odin 3 no-floor s2idle hang (not for shipping) ==============
 0540-DEBUG-PCI-qcom-runtime-switch-for-the-suspend-memory-floor.patch
 0541-DEBUG-regulator-core-runtime-switch-for-s2idle-state-mem.patch
 0542-DEBUG-soc-qcom-add-an-AOP-system-PM-violators-reader.patch
 0543-DEBUG-PM-suspend-resume-breadcrumbs-that-survive-a-warm-reset.patch
+0544-DEBUG-PM-pm_crumbs-store-breadcrumbs-in-firmware-reserved-memory.patch

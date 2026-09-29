@@ -1,0 +1,27 @@
+From: Armada <noreply@armada.local>
+Subject: [PATCH] pinctrl: qcom: sm8650-lpass-lpi: suspend across system sleep
+
+The LPI pin controller holds the LPASS_HW_MACRO/LPASS_HW_DCODEC votes
+while it is runtime active, and it is resumed whenever a pin state
+changes. The SoundWire links and the LPASS macros select their sleep
+pin states during system suspend, which resumes it after the PM core has
+already blocked runtime suspend, so it stays active - and keeps both
+votes - for the whole sleep. The ADSP then keeps its CX collapse vote.
+On the Odin 3 (SM8750) the AOP reported the AUDIO DRV blocking CX
+collapse through every s2idle even with 0630 in place: the macros
+dropped their references, but this device kept the last one.
+
+Force it into runtime suspend for system sleep. It supplies both
+SoundWire links, so device links order it after them on suspend and
+before them on resume.
+---
+--- a/drivers/pinctrl/qcom/pinctrl-sm8650-lpass-lpi.c
++++ b/drivers/pinctrl/qcom/pinctrl-sm8650-lpass-lpi.c
+@@ -220,6 +220,7 @@ static const struct of_device_id lpi_pinctrl_of_match[] = {
+ MODULE_DEVICE_TABLE(of, lpi_pinctrl_of_match);
+ 
+ static const struct dev_pm_ops lpi_pinctrl_pm_ops = {
++	SYSTEM_SLEEP_PM_OPS(pm_runtime_force_suspend, pm_runtime_force_resume)
+ 	RUNTIME_PM_OPS(pm_clk_suspend, pm_clk_resume, NULL)
+ };
+ 
