@@ -518,6 +518,24 @@ no equivalent submission was found, or a permanent URL to the upstream submissio
   source: https://github.com/ROCKNIX/distribution/blob/b1e9d07b251c5a013d303a518106c547db001b74/projects/ROCKNIX/devices/SM8750/patches/linux/0075-arm64-dts-qcom-sm8750-add-CPU-thermal-cooling.patch
   upstream: unknown
   notes: Linux 7.2 supplies the CPU cooling-cell properties; Armada retains the missing passive trips and cooling maps.
+- `patches/0540-dt-bindings-clock-qcom-sm8750-gcc-add-CX-power-domain.patch`
+  source: https://lore.kernel.org/r/20260924-qcom-tie-cx-to-gcc-v5-9-38732033e5b5@oss.qualcomm.com
+  upstream: https://lore.kernel.org/r/20260924-qcom-tie-cx-to-gcc-v5-9-38732033e5b5@oss.qualcomm.com
+- `patches/0541-clk-qcom-gcc-sm8750-tie-the-CX-power-domain-to-controller.patch`
+  source: https://lore.kernel.org/r/20260924-qcom-tie-cx-to-gcc-v5-26-38732033e5b5@oss.qualcomm.com
+  upstream: https://lore.kernel.org/r/20260924-qcom-tie-cx-to-gcc-v5-26-38732033e5b5@oss.qualcomm.com
+- `patches/0542-arm64-dts-qcom-sm8750-add-GCC-CX-power-domain.patch`
+  source: https://lore.kernel.org/r/20260924-qcom-tie-cx-to-gcc-v5-41-38732033e5b5@oss.qualcomm.com
+  upstream: https://lore.kernel.org/r/20260924-qcom-tie-cx-to-gcc-v5-41-38732033e5b5@oss.qualcomm.com
+- `patches/0543-arm64-dts-qcom-sm8750-add-t-power-on-us-property-for-PCIe-root-port.patch`
+  source: https://lore.kernel.org/r/20260911-t_pwr_on-v1-7-c9eee197d082@oss.qualcomm.com
+  upstream: https://lore.kernel.org/r/20260911-t_pwr_on-v1-7-c9eee197d082@oss.qualcomm.com
+- `patches/0544-dt-bindings-clock-qcom-sm8450-videocc-fix-clock-inputs-for-Glymur.patch`
+  source: https://lore.kernel.org/r/20260924161152.1162301-2-shengchao.guo@oss.qualcomm.com
+  upstream: https://lore.kernel.org/r/20260924161152.1162301-2-shengchao.guo@oss.qualcomm.com
+- `patches/0545-arm64-dts-qcom-sm8750-fix-videocc-clock-inputs.patch`
+  source: https://lore.kernel.org/r/20260924161152.1162301-4-shengchao.guo@oss.qualcomm.com
+  upstream: https://lore.kernel.org/r/20260924161152.1162301-4-shengchao.guo@oss.qualcomm.com
 - `patches/0049-drm-msm-a8xx-add-adreno-830-catalog.patch`
   source: https://github.com/ROCKNIX/distribution/blob/bcf3b5bc574990b96543484575b06f912153a715/projects/ROCKNIX/devices/SM8750/patches/linux/0049-drm-msm-a8xx-add-adreno-830-catalog.patch
   upstream: unknown

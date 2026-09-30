@@ -181,6 +181,12 @@ v2_20260420_neil_armstrong_arm64_qcom_sm8650_misc_enhancements.patch
 0038a-arm64-dts-qcom-sm8750-map-A8xx-RSCC-registers.patch
 0035-arm64-dts-qcom-sm8750-set-CPU-capacity-dmips-mhz.patch
 0037-arm64-dts-qcom-sm8750-add-CPU-thermal-cooling.patch
+0540-dt-bindings-clock-qcom-sm8750-gcc-add-CX-power-domain.patch
+0541-clk-qcom-gcc-sm8750-tie-the-CX-power-domain-to-controller.patch
+0542-arm64-dts-qcom-sm8750-add-GCC-CX-power-domain.patch
+0543-arm64-dts-qcom-sm8750-add-t-power-on-us-property-for-PCIe-root-port.patch
+0544-dt-bindings-clock-qcom-sm8450-videocc-fix-clock-inputs-for-Glymur.patch
+0545-arm64-dts-qcom-sm8750-fix-videocc-clock-inputs.patch
 0049-drm-msm-a8xx-add-adreno-830-catalog.patch
 0039-wifi-ath12k-add-initial-hardware-definition-for-WCN7.patch
 0040-wifi-ath12k-send-QDSS-config-when-CNSS_QDSS_CFG_MISS.patch

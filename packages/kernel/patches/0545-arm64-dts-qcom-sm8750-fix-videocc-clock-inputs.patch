@@ -1,0 +1,42 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Shawn Guo <shengchao.guo@oss.qualcomm.com>
+Date: Fri, 25 Sep 2026 00:11:52 +0800
+Subject: [PATCH 3/3] arm64: dts: qcom: sm8750: Fix videocc clock inputs
+
+The videocc node passes GCC_VIDEO_AHB_CLK as its second input and stops
+there. videocc-sm8750.c declares its DT inputs as DT_BI_TCXO,
+DT_BI_TCXO_AO and DT_SLEEP_CLK, so the second input is the always-on
+board XO rather than an AHB clock, and the sleep clock is missing
+entirely.
+
+The missing third input leaves video_cc_sleep_clk_src unable to resolve
+its parent, so it registers as an orphan clock and cannot be rated.
+The AHB phandle in the always-on XO slot is not resolved by the driver
+today, but it implies a parent relationship the hardware does not have.
+
+Pass bi_tcxo_ao_div2 and the board sleep clock instead.
+
+Fixes: c0d11ff90475 ("arm64: dts: qcom: sm8750: Add Iris VPU v3.5")
+Assisted-by: LLM
+Signed-off-by: Shawn Guo <shengchao.guo@oss.qualcomm.com>
+---
+ arch/arm64/boot/dts/qcom/sm8750.dtsi | 3 ++-
+ 1 file changed, 2 insertions(+), 1 deletion(-)
+
+diff --git a/arch/arm64/boot/dts/qcom/sm8750.dtsi b/arch/arm64/boot/dts/qcom/sm8750.dtsi
+index 28cf22da854d..e092222fd8cf 100644
+--- a/arch/arm64/boot/dts/qcom/sm8750.dtsi
++++ b/arch/arm64/boot/dts/qcom/sm8750.dtsi
+@@ -3117,7 +3117,8 @@ videocc: clock-controller@aaf0000 {
+ 			compatible = "qcom,sm8750-videocc";
+ 			reg = <0x0 0x0aaf0000 0x0 0x10000>;
+ 			clocks = <&bi_tcxo_div2>,
+-				 <&gcc GCC_VIDEO_AHB_CLK>;
++				 <&bi_tcxo_ao_div2>,
++				 <&sleep_clk>;
+ 			power-domains = <&rpmhpd RPMHPD_MMCX>,
+ 					<&rpmhpd RPMHPD_MXC>;
+ 			required-opps = <&rpmhpd_opp_low_svs>,
+-- 
+2.43.0
+
