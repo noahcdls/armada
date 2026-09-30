@@ -1,0 +1,63 @@
+From: Armada <noreply@armada.local>
+Subject: [PATCH] DEBUG: interconnect: qcom: bcm-voter: send MC0/SH0 zero sleep votes as valid
+
+The vendor DDR/LLCC fast-path driver (dcvs_fp) programs the APPS RSC with
+explicit MC0 and SH0 sleep votes: BCM_TCS_CMD(commit=1, valid=1, 0, 0),
+with a wake vote of 1. This driver encodes a zero vote with valid=0, which
+is the only difference found between the vendor and mainline RPMh bus vote
+programming for DDR.
+
+icc_bcm_voter.sleep_valid_zero (writable at runtime, default 0) sends the
+MC0 and SH0 zero sleep votes as valid commands, to test whether the
+no-floor s2idle hang on the Odin 3 depends on that encoding. It takes
+effect at the next interconnect commit; suspend makes several before the
+final sleep-set flush.
+
+Not for shipping.
+---
+--- a/drivers/interconnect/qcom/bcm-voter.c
++++ b/drivers/interconnect/qcom/bcm-voter.c
+@@ -124,8 +124,23 @@ static void bcm_aggregate(struct qcom_icc_bcm *bcm)
+ 	}
+ }
+ 
++/*
++ * DEBUG: the vendor DDR/LLCC fast-path driver (dcvs_fp) programs the MC0 and
++ * SH0 sleep votes as valid zero-bandwidth commands, where this driver marks a
++ * zero vote invalid. Writable at runtime; takes effect at the next commit.
++ */
++static bool sleep_valid_zero;
++module_param(sleep_valid_zero, bool, 0644);
++MODULE_PARM_DESC(sleep_valid_zero, "Send MC0/SH0 zero sleep votes as valid commands (default: false)");
++
++static bool bcm_sleep_valid_zero(const struct qcom_icc_bcm *bcm, int bucket)
++{
++	return bucket == QCOM_ICC_BUCKET_SLEEP && READ_ONCE(sleep_valid_zero) &&
++	       (!strcmp(bcm->name, "MC0") || !strcmp(bcm->name, "SH0"));
++}
++
+ static inline void tcs_cmd_gen(struct tcs_cmd *cmd, u64 vote_x, u64 vote_y,
+-			       u32 addr, bool commit, bool wait)
++			       u32 addr, bool commit, bool wait, bool valid_zero)
+ {
+ 	bool valid = true;
+ 
+@@ -134,7 +149,7 @@ static inline void tcs_cmd_gen(struct tcs_cmd *cmd, u64 vote_x, u64 vote_y,
+ 
+ 	memset(cmd, 0, sizeof(*cmd));
+ 
+-	if (vote_x == 0 && vote_y == 0)
++	if (vote_x == 0 && vote_y == 0 && !valid_zero)
+ 		valid = false;
+ 
+ 	if (vote_x > BCM_TCS_CMD_VOTE_MASK)
+@@ -176,7 +191,8 @@ static void tcs_list_gen(struct bcm_voter *voter, int bucket,
+ 		wait = commit && (voter->tcs_wait & BIT(bucket));
+ 
+ 		tcs_cmd_gen(&tcs_list[idx], bcm->vote_x[bucket],
+-			    bcm->vote_y[bucket], bcm->addr, commit, wait);
++			    bcm->vote_y[bucket], bcm->addr, commit, wait,
++			    bcm_sleep_valid_zero(bcm, bucket));
+ 		idx++;
+ 		n[batch]++;
+ 		/*

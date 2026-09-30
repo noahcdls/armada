@@ -792,3 +792,7 @@ no equivalent submission was found, or a permanent URL to the upstream submissio
   source: armada
   upstream: local
   notes: DEBUG, not for shipping. The `0543` reserve_mem store at the top of RAM does not survive any reset on the Odin 3. Adds `armada,pm-crumbs` reserved-memory stores carved from the tails of the SM8750 QDSS and MPSS regions (both firmware-reserved and unused without a modem); every record goes to every store.
+- `patches/0545-DEBUG-interconnect-qcom-bcm-voter-send-MC0-SH0-zero-sleep-votes-as-valid.patch`
+  source: armada
+  upstream: local
+  notes: DEBUG, not for shipping. `icc_bcm_voter.sleep_valid_zero=1` encodes the MC0/SH0 zero sleep votes as valid commands like the vendor `dcvs_fp` driver (AynCQ8725SDev/android_kernel_ayn_cq8725s, lineage-23.2, `drivers/soc/qcom/dcvs/dcvs_fp.c`), to test the no-floor s2idle hang against that encoding.

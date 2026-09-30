@@ -224,3 +224,4 @@ v2_20260420_neil_armstrong_arm64_qcom_sm8650_misc_enhancements.patch
 0542-DEBUG-soc-qcom-add-an-AOP-system-PM-violators-reader.patch
 0543-DEBUG-PM-suspend-resume-breadcrumbs-that-survive-a-warm-reset.patch
 0544-DEBUG-PM-pm_crumbs-store-breadcrumbs-in-firmware-reserved-memory.patch
+0545-DEBUG-interconnect-qcom-bcm-voter-send-MC0-SH0-zero-sleep-votes-as-valid.patch
