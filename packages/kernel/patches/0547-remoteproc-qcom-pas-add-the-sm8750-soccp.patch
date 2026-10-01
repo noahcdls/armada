@@ -1,0 +1,52 @@
+From: Armada <noreply@armada.local>
+Subject: [PATCH] remoteproc: qcom: pas: add the SM8750 SoCCP
+
+The SM8750 bootloader leaves an early SoCCP image running that does not
+speak SMP2P, so it never reaches D3 and holds no DDR vote. The vendor
+kernel reloads soccp.mbn through PAS (id 51) at boot, after which the
+SoCCP parks itself in D3.
+
+Add the SM8750 SoCCP with the vendor's PAS id and crash-reason SMEM item
+and the CX/MX proxy domains used for the Kaanapali SoCCP. It is not
+auto-booted: the reload resets a running SoCCP through TZ, so it is
+started by hand while that is validated.
+---
+diff --git a/drivers/remoteproc/qcom_q6v5_pas.c b/drivers/remoteproc/qcom_q6v5_pas.c
+index cb3e51d6f..ad784aeaa 100644
+--- a/drivers/remoteproc/qcom_q6v5_pas.c
++++ b/drivers/remoteproc/qcom_q6v5_pas.c
+@@ -1637,6 +1637,26 @@ static const struct qcom_pas_data sm8750_mpss_resource = {
+ 	.region_assign_vmid = QCOM_SCM_VMID_MSS_MSA,
+ };
+ 
++/*
++ * The bootloader leaves an early SoCCP image running that does not speak
++ * SMP2P; the vendor kernel reloads soccp.mbn, which then parks itself in
++ * D3. Not auto-booted: the reload resets a running SoCCP through TZ, so it
++ * is started by hand while that is being validated.
++ */
++static const struct qcom_pas_data sm8750_soccp_resource = {
++	.crash_reason_smem = 656,
++	.firmware_name = "soccp.mbn",
++	.pas_id = 51,
++	.proxy_pd_names = (char*[]){
++		"cx",
++		"mx",
++		NULL
++	},
++	.ssr_name = "soccp",
++	.sysmon_name = "soccp",
++	.auto_boot = false,
++};
++
+ static const struct of_device_id qcom_pas_of_match[] = {
+ 	{ .compatible = "qcom,eliza-adsp-pas", .data = &sm8550_adsp_resource },
+ 	{ .compatible = "qcom,milos-adsp-pas", .data = &sm8550_adsp_resource },
+@@ -1712,6 +1732,7 @@ static const struct of_device_id qcom_pas_of_match[] = {
+ 	{ .compatible = "qcom,sm8650-cdsp-pas", .data = &sm8650_cdsp_resource },
+ 	{ .compatible = "qcom,sm8650-mpss-pas", .data = &sm8650_mpss_resource },
+ 	{ .compatible = "qcom,sm8750-mpss-pas", .data = &sm8750_mpss_resource },
++	{ .compatible = "qcom,sm8750-soccp-pas", .data = &sm8750_soccp_resource },
+ 	{ .compatible = "qcom,x1e80100-adsp-pas", .data = &x1e80100_adsp_resource },
+ 	{ .compatible = "qcom,x1e80100-cdsp-pas", .data = &x1e80100_cdsp_resource },
+ 	{ },

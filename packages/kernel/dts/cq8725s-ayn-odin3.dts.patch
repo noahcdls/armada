@@ -1,5 +1,5 @@
 From: Armada <noreply@armada.local>
-Subject: [PATCH] arm64: dts: qcom: odin3: enable DPU dithering, park the SoCCP, reserve the vendor lost regions
+Subject: [PATCH] arm64: dts: qcom: odin3: enable DPU dithering, describe the SoCCP, reserve the vendor lost regions
 
 --- a/arch/arm64/boot/dts/qcom/cq8725s-ayn-odin3.dts
 +++ b/arch/arm64/boot/dts/qcom/cq8725s-ayn-odin3.dts
@@ -13,7 +13,7 @@ Subject: [PATCH] arm64: dts: qcom: odin3: enable DPU dithering, park the SoCCP, 
  	reset-gpios = <&tlmm 98 GPIO_ACTIVE_LOW>;
  
  	vddio-supply = <&vreg_l12b_1p8>;
-@@ -350,3 +353,55 @@
+@@ -350,3 +353,91 @@
  		};
  	};
  };
@@ -55,6 +55,42 @@ Subject: [PATCH] arm64: dts: qcom: odin3: enable DPU dithering, park the SoCCP, 
 +			interrupt-controller;
 +			#interrupt-cells = <2>;
 +		};
++	};
++
++	/*
++	 * The vendor kernel reloads soccp.mbn (PAS 51) at boot; the image the
++	 * bootloader leaves running ignores SMP2P. Started by hand for now.
++	 */
++	remoteproc_soccp: remoteproc-soccp {
++		compatible = "qcom,sm8750-soccp-pas";
++
++		interrupts-extended = <&intc GIC_SPI 167 IRQ_TYPE_EDGE_RISING>,
++				      <&soccp_smp2p_in 0 IRQ_TYPE_EDGE_RISING>,
++				      <&soccp_smp2p_in 1 IRQ_TYPE_EDGE_RISING>,
++				      <&soccp_smp2p_in 2 IRQ_TYPE_EDGE_RISING>,
++				      <&soccp_smp2p_in 3 IRQ_TYPE_EDGE_RISING>;
++		interrupt-names = "wdog",
++				  "fatal",
++				  "ready",
++				  "handover",
++				  "stop-ack";
++
++		clocks = <&rpmhcc RPMH_CXO_CLK>;
++		clock-names = "xo";
++
++		power-domains = <&rpmhpd RPMHPD_CX>,
++				<&rpmhpd RPMHPD_MX>;
++		power-domain-names = "cx",
++				     "mx";
++
++		interconnects = <&aggre2_noc MASTER_SOCCP_AGGR_NOC QCOM_ICC_TAG_ALWAYS
++				 &mc_virt SLAVE_EBI1 QCOM_ICC_TAG_ALWAYS>;
++
++		memory-region = <&soccp_mem>;
++		firmware-name = "qcom/sm8750/ayn/odin3/soccp.mbn";
++
++		qcom,smem-states = <&soccp_smp2p_out 0>;
++		qcom,smem-state-names = "stop";
 +	};
 +
 +	/* The bootloader leaves the SoCCP in D0; park it in D3 like the vendor kernel */

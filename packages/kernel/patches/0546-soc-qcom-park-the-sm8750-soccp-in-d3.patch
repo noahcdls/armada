@@ -1,17 +1,18 @@
 From: Armada <noreply@armada.local>
-Subject: [PATCH] soc: qcom: park the SM8750 SoCCP in D3
+Subject: [PATCH] soc: qcom: report and drive the SM8750 SoCCP D state
 
 The bootloader leaves the SM8750 SoC Control Processor in D0 (TCSR
 0x1fda000 reads 0x2) and mainline has no driver for it, so it keeps
-running with no DDR vote held on its behalf. The vendor kernel keeps it
-in D3 and, when it wakes it, votes 1200 kBps of DDR first. When the last
-other DDR vote drops in s2idle, DDR can collapse under a running SoCCP.
+running with no DDR vote held on its behalf. The vendor kernel reloads
+soccp.mbn, which parks itself in D3, and when it wakes it votes 1200
+kBps of DDR first. When the last other DDR vote drops in s2idle, DDR
+can collapse under a running SoCCP.
 
-Request D3 at probe over the SoCCP SMP2P "sleep" bit and confirm it in
-TCSR, retrying for ten seconds in case the SoCCP services SMP2P late.
-The D state is exposed in sysfs ("state") for suspend testing:
-"sleep", "wake" (vote DDR first, like the vendor driver), and
-"wake-novote" (the state mainline leaves it in).
+Report the D state at probe and at every suspend, and drive it from
+sysfs ("state"): "sleep", "wake" (vote DDR first, like the vendor
+driver) and "wake-novote" (the state the bootloader leaves it in). The
+image the bootloader starts ignores SMP2P, so this only takes effect
+once the SoCCP is reloaded through remoteproc.
 
 The protocol follows the vendor rproc_set_state() in qcom_q6v5_pas.c:
 bits 9 (sleep) and 10 (wakeup) of the master-kernel entry, with the
@@ -52,19 +53,19 @@ index b7f1d2a57..1cbd404d0 100644
  obj-$(CONFIG_QCOM_LLCC) += llcc-qcom.o
 diff --git a/drivers/soc/qcom/qcom_soccp_dstate.c b/drivers/soc/qcom/qcom_soccp_dstate.c
 new file mode 100644
-index 000000000..74b234a36
+index 000000000..2e84a80e5
 --- /dev/null
 +++ b/drivers/soc/qcom/qcom_soccp_dstate.c
-@@ -0,0 +1,272 @@
+@@ -0,0 +1,233 @@
 +// SPDX-License-Identifier: GPL-2.0-only
 +/*
 + * Park the SM8750 SoCCP in D3 (dormant).
 + *
 + * The bootloader leaves the SoC Control Processor running (D0), and mainline
 + * has no driver for it, so it stays in D0 with no DDR vote held on its
-+ * behalf. The vendor kernel keeps it in D3 and wakes it on demand, voting
-+ * DDR while it is in D0. This driver requests D3 at probe over the SoCCP
-+ * SMP2P "sleep" bit and exposes the D state in sysfs for testing.
++ * behalf. The vendor kernel reloads its firmware, which then parks itself
++ * in D3, and wakes it on demand, voting DDR while it is in D0. This driver
++ * reports the D state and drives the SMP2P sleep/wakeup bits from sysfs.
 + *
 + * The protocol follows the vendor rproc_set_state(): bits 9 (sleep) and 10
 + * (wakeup) of the master-kernel SMP2P entry request a transition, and the
@@ -81,7 +82,6 @@ index 000000000..74b234a36
 +#include <linux/platform_device.h>
 +#include <linux/soc/qcom/smem_state.h>
 +#include <linux/sysfs.h>
-+#include <linux/workqueue.h>
 +
 +#define SOCCP_STATE_MASK	(BIT(9) | BIT(10))
 +#define SOCCP_D0		BIT(1)
@@ -90,7 +90,6 @@ index 000000000..74b234a36
 +
 +#define SOCCP_POLL_US		200
 +#define SOCCP_TIMEOUT_US	100000
-+#define SOCCP_RETRIES		10
 +
 +/* Vendor rproc-ddr-lowsvs-icc-bw for the SoCCP, in kBps */
 +#define SOCCP_DDR_KBPS		1200
@@ -103,9 +102,7 @@ index 000000000..74b234a36
 +	unsigned int sleep_bit;
 +	unsigned int wake_bit;
 +	struct icc_path *ddr;
-+	struct delayed_work park_work;
 +	struct mutex lock;
-+	unsigned int attempts;
 +};
 +
 +static const char *soccp_state_name(u32 val)
@@ -177,29 +174,6 @@ index 000000000..74b234a36
 +	return ret;
 +}
 +
-+/* The SoCCP may not service SMP2P right away, so retry the boot-time park */
-+static void soccp_park_work(struct work_struct *work)
-+{
-+	struct soccp_dstate *sd = container_of(to_delayed_work(work),
-+					       struct soccp_dstate, park_work);
-+	int ret;
-+
-+	mutex_lock(&sd->lock);
-+	ret = soccp_sleep(sd);
-+	mutex_unlock(&sd->lock);
-+
-+	if (!ret) {
-+		dev_info(sd->dev, "parked in D3 (attempt %u)\n", sd->attempts + 1);
-+		return;
-+	}
-+
-+	if (++sd->attempts < SOCCP_RETRIES)
-+		schedule_delayed_work(&sd->park_work, HZ);
-+	else
-+		dev_err(sd->dev, "giving up on D3, left in %s\n",
-+			soccp_state_name(readl(sd->tcsr)));
-+}
-+
 +static ssize_t state_show(struct device *dev, struct device_attribute *attr,
 +			  char *buf)
 +{
@@ -219,8 +193,6 @@ index 000000000..74b234a36
 +{
 +	struct soccp_dstate *sd = dev_get_drvdata(dev);
 +	int ret;
-+
-+	cancel_delayed_work_sync(&sd->park_work);
 +
 +	mutex_lock(&sd->lock);
 +	if (sysfs_streq(buf, "sleep"))
@@ -255,7 +227,6 @@ index 000000000..74b234a36
 +
 +	sd->dev = dev;
 +	mutex_init(&sd->lock);
-+	INIT_DELAYED_WORK(&sd->park_work, soccp_park_work);
 +
 +	/* The register sits in the shared TCSR block; map it without claiming it */
 +	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
@@ -284,16 +255,8 @@ index 000000000..74b234a36
 +
 +	dev_info(dev, "found in %s (tcsr=%#x)\n",
 +		 soccp_state_name(readl(sd->tcsr)), readl(sd->tcsr));
-+	schedule_delayed_work(&sd->park_work, 0);
 +
 +	return 0;
-+}
-+
-+static void soccp_dstate_remove(struct platform_device *pdev)
-+{
-+	struct soccp_dstate *sd = platform_get_drvdata(pdev);
-+
-+	cancel_delayed_work_sync(&sd->park_work);
 +}
 +
 +/* Log the state each suspend so a hang can be matched against it */
@@ -316,7 +279,6 @@ index 000000000..74b234a36
 +
 +static struct platform_driver soccp_dstate_driver = {
 +	.probe = soccp_dstate_probe,
-+	.remove = soccp_dstate_remove,
 +	.driver = {
 +		.name = "qcom-soccp-dstate",
 +		.of_match_table = soccp_dstate_of_match,

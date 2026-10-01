@@ -539,7 +539,11 @@ no equivalent submission was found, or a permanent URL to the upstream submissio
 - `patches/0546-soc-qcom-park-the-sm8750-soccp-in-d3.patch`
   source: Armada; protocol from the vendor rproc_set_state() in qcom_q6v5_pas.c (https://github.com/OnePlusOSS/android_kernel_oneplus_sm8750)
   upstream: none
-  notes: s2idle test. Mainline leaves the bootloader-started SoCCP in D0 with no DDR vote; the vendor kernel keeps it in D3. Paired with the SoCCP SMP2P and soccp-dstate nodes in dts/cq8725s-ayn-odin3.dts.patch.
+  notes: s2idle test. Mainline leaves the bootloader-started SoCCP in D0 with no DDR vote; the vendor kernel reloads it and keeps it in D3. Reports and drives the D state; paired with the SoCCP SMP2P and soccp-dstate nodes in dts/cq8725s-ayn-odin3.dts.patch.
+- `patches/0547-remoteproc-qcom-pas-add-the-sm8750-soccp.patch`
+  source: Armada; PAS id and SMEM item from the vendor sun_soccp_resource (https://github.com/OnePlusOSS/android_kernel_oneplus_sm8750), domains from the upstream Kaanapali SoCCP
+  upstream: none
+  notes: s2idle test. Not auto-booted; firmware is soccp.mbn from the stock modem partition.
 - `patches/0049-drm-msm-a8xx-add-adreno-830-catalog.patch`
   source: https://github.com/ROCKNIX/distribution/blob/bcf3b5bc574990b96543484575b06f912153a715/projects/ROCKNIX/devices/SM8750/patches/linux/0049-drm-msm-a8xx-add-adreno-830-catalog.patch
   upstream: unknown
