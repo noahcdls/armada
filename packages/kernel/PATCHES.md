@@ -548,6 +548,10 @@ no equivalent submission was found, or a permanent URL to the upstream submissio
   source: Armada
   upstream: none (upstream deliberately compiles the write side out)
   notes: s2idle test only. Enables /sys/kernel/debug/interconnect/test_client votes to find which sleep-set BCM vote avoids the hang; drop before merging.
+- `patches/0549-interconnect-qcom-sm8750-never-vote-acv-from-hlos.patch`
+  source: Armada; ACV definition from the vendor sun.c (https://github.com/OnePlusOSS/android_kernel_oneplus_sm8750)
+  upstream: none
+  notes: s2idle fix candidate. HLOS asserting ACV BIT(0) awake and dropping it in the sleep set hangs s2idle unless another HLOS DDR vote is held; the vendor never votes ACV from HLOS.
 - `patches/0049-drm-msm-a8xx-add-adreno-830-catalog.patch`
   source: https://github.com/ROCKNIX/distribution/blob/bcf3b5bc574990b96543484575b06f912153a715/projects/ROCKNIX/devices/SM8750/patches/linux/0049-drm-msm-a8xx-add-adreno-830-catalog.patch
   upstream: unknown
