@@ -544,6 +544,10 @@ no equivalent submission was found, or a permanent URL to the upstream submissio
   source: Armada; PAS id and SMEM item from the vendor sun_soccp_resource (https://github.com/OnePlusOSS/android_kernel_oneplus_sm8750), domains from the upstream Kaanapali SoCCP
   upstream: none
   notes: s2idle test. Not auto-booted; firmware is soccp.mbn from the stock modem partition.
+- `patches/0548-interconnect-debugfs-client-allow-writes-for-s2idle-testing.patch`
+  source: Armada
+  upstream: none (upstream deliberately compiles the write side out)
+  notes: s2idle test only. Enables /sys/kernel/debug/interconnect/test_client votes to find which sleep-set BCM vote avoids the hang; drop before merging.
 - `patches/0049-drm-msm-a8xx-add-adreno-830-catalog.patch`
   source: https://github.com/ROCKNIX/distribution/blob/bcf3b5bc574990b96543484575b06f912153a715/projects/ROCKNIX/devices/SM8750/patches/linux/0049-drm-msm-a8xx-add-adreno-830-catalog.patch
   upstream: unknown
