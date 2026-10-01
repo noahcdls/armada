@@ -536,6 +536,10 @@ no equivalent submission was found, or a permanent URL to the upstream submissio
 - `patches/0545-arm64-dts-qcom-sm8750-fix-videocc-clock-inputs.patch`
   source: https://lore.kernel.org/r/20260924161152.1162301-4-shengchao.guo@oss.qualcomm.com
   upstream: https://lore.kernel.org/r/20260924161152.1162301-4-shengchao.guo@oss.qualcomm.com
+- `patches/0546-soc-qcom-park-the-sm8750-soccp-in-d3.patch`
+  source: Armada; protocol from the vendor rproc_set_state() in qcom_q6v5_pas.c (https://github.com/OnePlusOSS/android_kernel_oneplus_sm8750)
+  upstream: none
+  notes: s2idle test. Mainline leaves the bootloader-started SoCCP in D0 with no DDR vote; the vendor kernel keeps it in D3. Paired with the SoCCP SMP2P and soccp-dstate nodes in dts/cq8725s-ayn-odin3.dts.patch.
 - `patches/0049-drm-msm-a8xx-add-adreno-830-catalog.patch`
   source: https://github.com/ROCKNIX/distribution/blob/bcf3b5bc574990b96543484575b06f912153a715/projects/ROCKNIX/devices/SM8750/patches/linux/0049-drm-msm-a8xx-add-adreno-830-catalog.patch
   upstream: unknown
