@@ -536,22 +536,14 @@ no equivalent submission was found, or a permanent URL to the upstream submissio
 - `patches/0545-arm64-dts-qcom-sm8750-fix-videocc-clock-inputs.patch`
   source: https://lore.kernel.org/r/20260924161152.1162301-4-shengchao.guo@oss.qualcomm.com
   upstream: https://lore.kernel.org/r/20260924161152.1162301-4-shengchao.guo@oss.qualcomm.com
-- `patches/0546-soc-qcom-park-the-sm8750-soccp-in-d3.patch`
-  source: Armada; protocol from the vendor rproc_set_state() in qcom_q6v5_pas.c (https://github.com/OnePlusOSS/android_kernel_oneplus_sm8750)
-  upstream: none
-  notes: s2idle test. Mainline leaves the bootloader-started SoCCP in D0 with no DDR vote; the vendor kernel reloads it and keeps it in D3. Reports and drives the D state; paired with the SoCCP SMP2P and soccp-dstate nodes in dts/cq8725s-ayn-odin3.dts.patch.
-- `patches/0547-remoteproc-qcom-pas-add-the-sm8750-soccp.patch`
-  source: Armada; PAS id and SMEM item from the vendor sun_soccp_resource (https://github.com/OnePlusOSS/android_kernel_oneplus_sm8750), domains from the upstream Kaanapali SoCCP
-  upstream: none
-  notes: s2idle test. Not auto-booted; firmware is soccp.mbn from the stock modem partition.
 - `patches/0548-interconnect-debugfs-client-allow-writes-for-s2idle-testing.patch`
   source: Armada
   upstream: none (upstream deliberately compiles the write side out)
   notes: s2idle test only. Enables /sys/kernel/debug/interconnect/test_client votes to find which sleep-set BCM vote avoids the hang; drop before merging.
-- `patches/0549-interconnect-qcom-sm8750-never-vote-acv-from-hlos.patch`
-  source: Armada; ACV definition from the vendor sun.c (https://github.com/OnePlusOSS/android_kernel_oneplus_sm8750)
+- `patches/0549-interconnect-qcom-sm8750-keep-mc0-in-the-sleep-set.patch`
+  source: Armada
   upstream: none
-  notes: s2idle fix candidate. HLOS asserting ACV BIT(0) awake and dropping it in the sleep set hangs s2idle unless another HLOS DDR vote is held; the vendor never votes ACV from HLOS.
+  notes: s2idle fix. HLOS dropping MC0 to 0 in the sleep set hangs s2idle while the DSPs run; one unit avoids it. Replaces the SM8750 PCIe suspend OPP floor (0521).
 - `patches/0049-drm-msm-a8xx-add-adreno-830-catalog.patch`
   source: https://github.com/ROCKNIX/distribution/blob/bcf3b5bc574990b96543484575b06f912153a715/projects/ROCKNIX/devices/SM8750/patches/linux/0049-drm-msm-a8xx-add-adreno-830-catalog.patch
   upstream: unknown

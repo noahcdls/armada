@@ -187,10 +187,8 @@ v2_20260420_neil_armstrong_arm64_qcom_sm8650_misc_enhancements.patch
 0543-arm64-dts-qcom-sm8750-add-t-power-on-us-property-for-PCIe-root-port.patch
 0544-dt-bindings-clock-qcom-sm8450-videocc-fix-clock-inputs-for-Glymur.patch
 0545-arm64-dts-qcom-sm8750-fix-videocc-clock-inputs.patch
-0546-soc-qcom-park-the-sm8750-soccp-in-d3.patch
-0547-remoteproc-qcom-pas-add-the-sm8750-soccp.patch
 0548-interconnect-debugfs-client-allow-writes-for-s2idle-testing.patch
-0549-interconnect-qcom-sm8750-never-vote-acv-from-hlos.patch
+0549-interconnect-qcom-sm8750-keep-mc0-in-the-sleep-set.patch
 0049-drm-msm-a8xx-add-adreno-830-catalog.patch
 0039-wifi-ath12k-add-initial-hardware-definition-for-WCN7.patch
 0040-wifi-ath12k-send-QDSS-config-when-CNSS_QDSS_CFG_MISS.patch
