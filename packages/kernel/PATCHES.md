@@ -560,6 +560,10 @@ no equivalent submission was found, or a permanent URL to the upstream submissio
   source: https://ratatoskr.run/linux-arm-msm/2026/07/17196799/t (ported on top of 1006)
   upstream: under review
   notes: The open gamepad UART otherwise keeps QUP2/SH1/CN0/CN1 votes in the RPMh sleep set through s2idle.
+- `patches/0554-drm-msm-dsi-phy-unprepare-the-ahb-clock-on-runtime-suspend.patch`
+  source: Armada
+  upstream: none
+  notes: pm_clk keeps disp_cc_mdss_ahb_clk (and so bi_tcxo/XO) prepared through s2idle; explicit runtime PM unprepares it. Last HLOS XO holder before CXSD on Odin 3.
 - `patches/0049-drm-msm-a8xx-add-adreno-830-catalog.patch`
   source: https://github.com/ROCKNIX/distribution/blob/bcf3b5bc574990b96543484575b06f912153a715/projects/ROCKNIX/devices/SM8750/patches/linux/0049-drm-msm-a8xx-add-adreno-830-catalog.patch
   upstream: unknown
