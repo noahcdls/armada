@@ -544,6 +544,14 @@ no equivalent submission was found, or a permanent URL to the upstream submissio
   source: Armada
   upstream: none
   notes: s2idle fix. HLOS dropping MC0 to 0 in the sleep set hangs s2idle while the DSPs run; one unit avoids it. Replaces the SM8750 PCIe suspend OPP floor (0521).
+- `patches/0550-soc-qcom-add-an-smp2p-sleep-state-notifier.patch`
+  source: Armada; port of the vendor smp2p_sleepstate driver (https://github.com/OnePlusOSS/android_kernel_oneplus_sm8750)
+  upstream: none
+  notes: Tells the ADSP when HLOS suspends; paired with the sleepstate SMP2P entries in dts/cq8725s-ayn-odin3.dts.patch. Testing whether it makes the MC0 keepalive unnecessary.
+- `patches/0551-interconnect-qcom-bcm-voter-switch-keepalive-sleep-at-runtime.patch`
+  source: Armada
+  upstream: none
+  notes: s2idle test only. icc_bcm_voter.sleep_keepalive turns the 0549 MC0 keepalive off at runtime; drop before merging.
 - `patches/0049-drm-msm-a8xx-add-adreno-830-catalog.patch`
   source: https://github.com/ROCKNIX/distribution/blob/bcf3b5bc574990b96543484575b06f912153a715/projects/ROCKNIX/devices/SM8750/patches/linux/0049-drm-msm-a8xx-add-adreno-830-catalog.patch
   upstream: unknown

@@ -1,0 +1,192 @@
+From: Armada <noreply@armada.local>
+Subject: [PATCH] soc: qcom: add an SMP2P sleep state notifier
+
+The vendor kernel tells the ADSP over SMP2P when HLOS suspends: bit 12 of
+the "sleepstate" entry on the ADSP edge is cleared on PM_SUSPEND_PREPARE
+and set on PM_POST_SUSPEND, and a "sleepstate_see" interrupt from the
+ADSP sensor framework holds a short wakeup source. Mainline never sends
+it, so the ADSP always sees HLOS as awake.
+
+On the AYN Odin 3, s2idle hangs unless HLOS keeps an MC0 vote in the
+sleep set while the DSPs run. Add the notifier to test whether the DSPs
+only lean on that vote because they never learn HLOS is asleep. The
+"enable" parameter switches it at runtime for A/B testing.
+
+Ported from the vendor smp2p_sleepstate driver
+(https://github.com/OnePlusOSS/android_kernel_oneplus_sm8750).
+---
+diff --git a/drivers/soc/qcom/Kconfig b/drivers/soc/qcom/Kconfig
+index 2caadbbcf..7f7293c5e 100644
+--- a/drivers/soc/qcom/Kconfig
++++ b/drivers/soc/qcom/Kconfig
+@@ -209,6 +209,15 @@ config QCOM_SMP2P
+ 	  Say yes here to support the Qualcomm Shared Memory Point to Point
+ 	  protocol.
+ 
++config QCOM_SMP2P_SLEEPSTATE
++	tristate "Qualcomm SMP2P HLOS sleep state notification"
++	depends on QCOM_SMP2P
++	depends on PM_SLEEP
++	help
++	  Tells a remote processor over an SMP2P "sleepstate" entry when
++	  HLOS suspends and resumes, as the vendor kernel does for the ADSP
++	  sensor framework.
++
+ config QCOM_SMSM
+ 	tristate "Qualcomm Shared Memory State Machine"
+ 	depends on MAILBOX
+diff --git a/drivers/soc/qcom/Makefile b/drivers/soc/qcom/Makefile
+index b7f1d2a57..cb2e7b4e3 100644
+--- a/drivers/soc/qcom/Makefile
++++ b/drivers/soc/qcom/Makefile
+@@ -27,6 +27,7 @@ obj-$(CONFIG_QCOM_SMEM) +=	smem.o
+ obj-$(CONFIG_QCOM_SMEM_STATE) += smem_state.o
+ CFLAGS_smp2p.o := -I$(src)
+ obj-$(CONFIG_QCOM_SMP2P)	+= smp2p.o
++obj-$(CONFIG_QCOM_SMP2P_SLEEPSTATE)	+= qcom_smp2p_sleepstate.o
+ obj-$(CONFIG_QCOM_SMSM)	+= smsm.o
+ obj-$(CONFIG_QCOM_SOCINFO)	+= socinfo.o
+ obj-$(CONFIG_QCOM_SPM)		+= spm.o
+diff --git a/drivers/soc/qcom/qcom_smp2p_sleepstate.c b/drivers/soc/qcom/qcom_smp2p_sleepstate.c
+new file mode 100644
+index 000000000..d9b527a57
+--- /dev/null
++++ b/drivers/soc/qcom/qcom_smp2p_sleepstate.c
+@@ -0,0 +1,137 @@
++// SPDX-License-Identifier: GPL-2.0-only
++/*
++ * Tell a remote processor over SMP2P whether HLOS is awake.
++ *
++ * Port of the vendor smp2p_sleepstate driver: bit 12 of the "sleepstate"
++ * entry is cleared on PM_SUSPEND_PREPARE and set again on PM_POST_SUSPEND,
++ * so the ADSP sensor framework knows when HLOS is suspended. Mainline never
++ * sends it, so the remote always sees HLOS as awake. An inbound
++ * "sleepstate_see" interrupt from the remote holds a short wakeup source.
++ */
++
++#include <linux/bits.h>
++#include <linux/interrupt.h>
++#include <linux/module.h>
++#include <linux/of.h>
++#include <linux/platform_device.h>
++#include <linux/pm_wakeup.h>
++#include <linux/soc/qcom/smem_state.h>
++#include <linux/suspend.h>
++
++#define SLEEPSTATE_AWAKE	BIT(12)
++#define SLEEPSTATE_WAKE_MS	200
++
++/* Runtime switch for A/B suspend testing; when off HLOS always reports awake */
++static bool enable = true;
++module_param(enable, bool, 0644);
++MODULE_PARM_DESC(enable, "Report HLOS suspend to the remote processor");
++
++struct smp2p_sleepstate {
++	struct device *dev;
++	struct qcom_smem_state *state;
++	struct wakeup_source *ws;
++	struct notifier_block pm_nb;
++};
++
++static int smp2p_sleepstate_pm_notifier(struct notifier_block *nb,
++					unsigned long event, void *unused)
++{
++	struct smp2p_sleepstate *ss = container_of(nb, struct smp2p_sleepstate, pm_nb);
++
++	switch (event) {
++	case PM_SUSPEND_PREPARE:
++		if (enable)
++			qcom_smem_state_update_bits(ss->state, SLEEPSTATE_AWAKE, 0);
++		break;
++	case PM_POST_SUSPEND:
++		qcom_smem_state_update_bits(ss->state, SLEEPSTATE_AWAKE,
++					    SLEEPSTATE_AWAKE);
++		break;
++	}
++
++	return NOTIFY_DONE;
++}
++
++static irqreturn_t smp2p_sleepstate_irq(int irq, void *data)
++{
++	struct smp2p_sleepstate *ss = data;
++
++	__pm_wakeup_event(ss->ws, SLEEPSTATE_WAKE_MS);
++	return IRQ_HANDLED;
++}
++
++static void smp2p_sleepstate_unregister(void *data)
++{
++	struct smp2p_sleepstate *ss = data;
++
++	unregister_pm_notifier(&ss->pm_nb);
++	wakeup_source_unregister(ss->ws);
++}
++
++static int smp2p_sleepstate_probe(struct platform_device *pdev)
++{
++	struct device *dev = &pdev->dev;
++	struct smp2p_sleepstate *ss;
++	unsigned int bit;
++	int irq, ret;
++
++	ss = devm_kzalloc(dev, sizeof(*ss), GFP_KERNEL);
++	if (!ss)
++		return -ENOMEM;
++
++	ss->dev = dev;
++
++	/* The vendor protocol uses bit 12 regardless of the state cell */
++	ss->state = devm_qcom_smem_state_get(dev, NULL, &bit);
++	if (IS_ERR(ss->state))
++		return dev_err_probe(dev, PTR_ERR(ss->state),
++				     "failed to get sleepstate entry\n");
++
++	qcom_smem_state_update_bits(ss->state, SLEEPSTATE_AWAKE, SLEEPSTATE_AWAKE);
++
++	irq = platform_get_irq_byname(pdev, "smp2p-sleepstate-in");
++	if (irq < 0)
++		return irq;
++
++	ss->ws = wakeup_source_register(dev, "smp2p-sleepstate");
++	if (!ss->ws)
++		return -ENOMEM;
++
++	ss->pm_nb.notifier_call = smp2p_sleepstate_pm_notifier;
++	ss->pm_nb.priority = INT_MAX;
++	ret = register_pm_notifier(&ss->pm_nb);
++	if (ret) {
++		wakeup_source_unregister(ss->ws);
++		return ret;
++	}
++
++	ret = devm_add_action_or_reset(dev, smp2p_sleepstate_unregister, ss);
++	if (ret)
++		return ret;
++
++	ret = devm_request_threaded_irq(dev, irq, NULL, smp2p_sleepstate_irq,
++					IRQF_ONESHOT | IRQF_NO_SUSPEND,
++					"smp2p-sleepstate", ss);
++	if (ret)
++		return dev_err_probe(dev, ret, "failed to request irq\n");
++
++	return 0;
++}
++
++static const struct of_device_id smp2p_sleepstate_of_match[] = {
++	{ .compatible = "qcom,smp2p-sleepstate" },
++	{ }
++};
++MODULE_DEVICE_TABLE(of, smp2p_sleepstate_of_match);
++
++static struct platform_driver smp2p_sleepstate_driver = {
++	.probe = smp2p_sleepstate_probe,
++	.driver = {
++		.name = "qcom-smp2p-sleepstate",
++		.of_match_table = smp2p_sleepstate_of_match,
++	},
++};
++module_platform_driver(smp2p_sleepstate_driver);
++
++MODULE_DESCRIPTION("Report HLOS suspend to a remote processor over SMP2P");
++MODULE_LICENSE("GPL");
