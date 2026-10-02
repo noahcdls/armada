@@ -191,6 +191,8 @@ v2_20260420_neil_armstrong_arm64_qcom_sm8650_misc_enhancements.patch
 0549-interconnect-qcom-sm8750-keep-mc0-in-the-sleep-set.patch
 0550-soc-qcom-add-an-smp2p-sleep-state-notifier.patch
 0551-interconnect-qcom-bcm-voter-switch-keepalive-sleep-at-runtime.patch
+0552-scsi-ufs-ufs-qcom-enable-only-lane-clocks-in-lane-clock-apis.patch
+0553-serial-qcom-geni-force-runtime-suspend-across-system-sleep.patch
 0049-drm-msm-a8xx-add-adreno-830-catalog.patch
 0039-wifi-ath12k-add-initial-hardware-definition-for-WCN7.patch
 0040-wifi-ath12k-send-QDSS-config-when-CNSS_QDSS_CFG_MISS.patch
