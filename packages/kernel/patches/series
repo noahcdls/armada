@@ -196,6 +196,14 @@ v2_20260420_neil_armstrong_arm64_qcom_sm8650_misc_enhancements.patch
 0554-drm-msm-dsi-phy-unprepare-the-ahb-clock-on-runtime-suspend.patch
 0555-soc-qcom-aoss-add-a-raw-qmp-send-debugfs-file.patch
 0556-remoteproc-qcom-pas-add-the-sm8750-soccp.patch
+0557-ASoC-codecs-lpass-wsa-macro-switch-to-pm-clock-framework.patch
+0558-ASoC-codecs-lpass-va-macro-switch-to-pm-clock-framework.patch
+0559-ASoC-codecs-lpass-wsa-macro-use-devm-clk-hw-register-for-mclk.patch
+0560-ASoC-codecs-lpass-tx-macro-switch-to-pm-clock-framework.patch
+0561-ASoC-codecs-lpass-rx-macro-switch-to-pm-clock-framework.patch
+0562-ASoC-codecs-lpass-tx-rx-macro-check-clk-set-rate-return-value.patch
+0563-ASoC-codecs-lpass-macro-force-runtime-suspend-across-system-sleep.patch
+0564-soundwire-qcom-force-runtime-suspend-across-system-sleep.patch
 0049-drm-msm-a8xx-add-adreno-830-catalog.patch
 0039-wifi-ath12k-add-initial-hardware-definition-for-WCN7.patch
 0040-wifi-ath12k-send-QDSS-config-when-CNSS_QDSS_CFG_MISS.patch

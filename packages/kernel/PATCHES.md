@@ -572,6 +572,38 @@ no equivalent submission was found, or a permanent URL to the upstream submissio
   source: Armada; PAS id and SMEM item from the vendor sun_soccp_resource (https://github.com/OnePlusOSS/android_kernel_oneplus_sm8750), domains from the upstream Kaanapali SoCCP
   upstream: none
   notes: Restored from the earlier SoCCP test to check whether the bootloader's D0 SoCCP blocks CXSD. Not auto-booted; firmware is soccp.mbn from the stock modem partition.
+- `patches/0557-ASoC-codecs-lpass-wsa-macro-switch-to-pm-clock-framework.patch`
+  source: https://git.kernel.org/pub/scm/linux/kernel/git/broonie/sound.git/commit/?id=cd054a6e272c
+  upstream: cd054a6e272c in broonie/sound for-7.3
+  notes: Puts every macro clock (including the q6prm HW macro/dcodec votes held since probe) under runtime PM.
+- `patches/0558-ASoC-codecs-lpass-va-macro-switch-to-pm-clock-framework.patch`
+  source: https://git.kernel.org/pub/scm/linux/kernel/git/broonie/sound.git/commit/?id=eb667d0fbdd3
+  upstream: eb667d0fbdd3 in broonie/sound for-7.3
+  notes: Puts every macro clock (including the q6prm HW macro/dcodec votes held since probe) under runtime PM.
+- `patches/0559-ASoC-codecs-lpass-wsa-macro-use-devm-clk-hw-register-for-mclk.patch`
+  source: https://git.kernel.org/pub/scm/linux/kernel/git/broonie/sound.git/commit/?id=541735571578
+  upstream: 541735571578 in broonie/sound for-7.3
+  notes: Puts every macro clock (including the q6prm HW macro/dcodec votes held since probe) under runtime PM.
+- `patches/0560-ASoC-codecs-lpass-tx-macro-switch-to-pm-clock-framework.patch`
+  source: https://git.kernel.org/pub/scm/linux/kernel/git/broonie/sound.git/commit/?id=b9b23e72abef
+  upstream: b9b23e72abef in broonie/sound for-7.3
+  notes: Puts every macro clock (including the q6prm HW macro/dcodec votes held since probe) under runtime PM.
+- `patches/0561-ASoC-codecs-lpass-rx-macro-switch-to-pm-clock-framework.patch`
+  source: https://git.kernel.org/pub/scm/linux/kernel/git/broonie/sound.git/commit/?id=b05482e7ce1b
+  upstream: b05482e7ce1b in broonie/sound for-7.3
+  notes: Puts every macro clock (including the q6prm HW macro/dcodec votes held since probe) under runtime PM.
+- `patches/0562-ASoC-codecs-lpass-tx-rx-macro-check-clk-set-rate-return-value.patch`
+  source: https://git.kernel.org/pub/scm/linux/kernel/git/broonie/sound.git/commit/?id=b8ca90fafe6a
+  upstream: b8ca90fafe6a in broonie/sound for-7.3
+  notes: Puts every macro clock (including the q6prm HW macro/dcodec votes held since probe) under runtime PM.
+- `patches/0563-ASoC-codecs-lpass-macro-force-runtime-suspend-across-system-sleep.patch`
+  source: Armada
+  upstream: none
+  notes: The macros stay runtime-active through s2idle while SoundWire is held; force-suspend so the ADSP ("AUDIO" CXPC voter) can release LPASS.
+- `patches/0564-soundwire-qcom-force-runtime-suspend-across-system-sleep.patch`
+  source: Armada
+  upstream: none
+  notes: Same for the SoundWire controller; the WCD9390 peripherals are kept runtime-active (jack detection).
 - `patches/0049-drm-msm-a8xx-add-adreno-830-catalog.patch`
   source: https://github.com/ROCKNIX/distribution/blob/bcf3b5bc574990b96543484575b06f912153a715/projects/ROCKNIX/devices/SM8750/patches/linux/0049-drm-msm-a8xx-add-adreno-830-catalog.patch
   upstream: unknown
