@@ -604,6 +604,18 @@ no equivalent submission was found, or a permanent URL to the upstream submissio
   source: Armada
   upstream: none
   notes: Same for the SoundWire controller; the WCD9390 peripherals are kept runtime-active (jack detection).
+- `patches/0565-pinctrl-qcom-sm8650-lpass-lpi-force-runtime-suspend-across-system-sleep.patch`
+  source: Armada
+  upstream: none
+  notes: Same for the LPASS LPI pin controller, which the SoundWire controllers keep runtime-active through their device links (held by 0603); otherwise it keeps LPASS_HW_MACRO/DCODEC voted in s2idle.
+- `patches/0566-scsi-ufs-core-fast-abort-unsupported-query-idns.patch`
+  source: https://ratatoskr.run/lkml/2026/09/17549957/t (Stanley Jhu, [PATCH 1/2])
+  upstream: posted to linux-scsi, not yet merged
+  notes: Re-indented from a whitespace-stripped archive copy (diffstat matches the posting). Decodes the 0xFD Query response as -EOPNOTSUPP.
+- `patches/0567-scsi-ufs-core-dynamically-disable-timestamp-on-unsupported-devices.patch`
+  source: https://ratatoskr.run/lkml/2026/09/17549957/t (Stanley Jhu, [PATCH 2/2])
+  upstream: posted to linux-scsi, not yet merged
+  notes: Stops the qTimestamp write on the Odin 3's Kioxia UFS 4.0 part, which claims UFS 4.0 but rejects it (the `ufshcd_set_timestamp_attr ... -22` errors on every boot and UFS resume). Same re-indent as 0566.
 - `patches/0049-drm-msm-a8xx-add-adreno-830-catalog.patch`
   source: https://github.com/ROCKNIX/distribution/blob/bcf3b5bc574990b96543484575b06f912153a715/projects/ROCKNIX/devices/SM8750/patches/linux/0049-drm-msm-a8xx-add-adreno-830-catalog.patch
   upstream: unknown
