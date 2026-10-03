@@ -544,6 +544,10 @@ no equivalent submission was found, or a permanent URL to the upstream submissio
   source: Armada; port of the vendor smp2p_sleepstate driver (https://github.com/OnePlusOSS/android_kernel_oneplus_sm8750)
   upstream: none
   notes: Tells the ADSP when HLOS suspends, as the vendor kernel does; paired with the sleepstate SMP2P entries in dts/cq8725s-ayn-odin3.dts.patch. Not required by 0549 (tested).
+- `patches/0551-interconnect-qcom-bcm-voter-switch-keepalive-sleep-at-runtime.patch`
+  source: Armada
+  upstream: none
+  notes: s2idle test only. icc_bcm_voter.sleep_keepalive turns the 0549 MC0 keepalive off at runtime; drop before merging.
 - `patches/0552-scsi-ufs-ufs-qcom-enable-only-lane-clocks-in-lane-clock-apis.patch`
   source: https://ratatoskr.run/lkml/2026/09/17535347/t
   upstream: f07317a8d57f in mkp/scsi.git 7.4/scsi-queue
@@ -556,6 +560,10 @@ no equivalent submission was found, or a permanent URL to the upstream submissio
   source: Armada
   upstream: none
   notes: pm_clk keeps disp_cc_mdss_ahb_clk (and so bi_tcxo/XO) prepared through s2idle; explicit runtime PM unprepares it. Last HLOS XO holder before CXSD on Odin 3.
+- `patches/0555-soc-qcom-aoss-add-a-raw-qmp-send-debugfs-file.patch`
+  source: Armada
+  upstream: none
+  notes: s2idle test only. /sys/kernel/debug/qcom_aoss/send starts the AOP lpm_mon CXPC violator log (read from 0xc320000); drop before merging.
 - `patches/0556-remoteproc-qcom-pas-add-the-sm8750-soccp.patch`
   source: Armada; PAS id and SMEM item from the vendor sun_soccp_resource (https://github.com/OnePlusOSS/android_kernel_oneplus_sm8750), domains from the upstream Kaanapali SoCCP
   upstream: none
@@ -628,6 +636,10 @@ no equivalent submission was found, or a permanent URL to the upstream submissio
   source: https://patchwork.kernel.org/project/linux-arm-msm/patch/20260513-gmu-sync-state-fix-v1-5-6e33e6aa9b4f@oss.qualcomm.com/ (Akhil P Oommen, [PATCH RFT 5/5] drm/msm: Attach a driver to GMU)
   upstream: RFT v1 on linux-arm-msm/dri-devel, v2 pending
   notes: Binds a driver to the GMU so GCC, GPU_CC and GX_CLKCTL reach sync_state (they wait on 3d37000.gmu otherwise, keeping boot-on GDSCs such as USB30 powered). Backported: drops the extra of_node_put() because a6xx_gpu_init() holds the GMU node with __free(device_node).
+- `patches/0574-pmdomain-qcom-rpmhpd-add-sleep-set-floors-for-CX-MX-and-MXC.patch`
+  source: Armada
+  upstream: none
+  notes: Test only. rpmhpd.{cx,mx,mxc}_sleep_floor hold a minimum sleep-set corner to test whether the s2idle APPS-wake hang needs MX/MXC above retention (suggested by Dmitry Baryshkov's reply on the SDM845 mdp1-mem suspend thread).
 - `patches/0049-drm-msm-a8xx-add-adreno-830-catalog.patch`
   source: https://github.com/ROCKNIX/distribution/blob/bcf3b5bc574990b96543484575b06f912153a715/projects/ROCKNIX/devices/SM8750/patches/linux/0049-drm-msm-a8xx-add-adreno-830-catalog.patch
   upstream: unknown
