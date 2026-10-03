@@ -1,0 +1,107 @@
+From: Armada <noreply@armada.local>
+Subject: [PATCH] soc: qcom: rpmh-rsc: restore wait-for-completion serialization
+
+Commit fef419c463d0 ("soc: qcom: rpmh: Remove serialization of TCS
+commands", v5.12) stopped programming RSC_DRV_CMD_WAIT_FOR_CMPL, so a TCS
+now issues every command at once and only waits for the responses at the
+end. Qualcomm's downstream driver never adopted that: the msm-6.6 driver
+for SM8750 (ported from qcom-6.1) still sets one bit per tcs_cmd::wait
+command, so a command only goes out after the previous waited-on command
+has completed.
+
+On the AYN Odin 3 (SM8750), the APPS wake TCS carries the MC0 vote that
+brings DDR out of self-refresh together with the other BCM, ACV and
+regulator mode votes. Read back from hardware, its WAIT_FOR_CMPL is 0, so
+they all fire in parallel. That is the only path vendor serializes and we
+do not, and s2idle hangs on exactly this APPS wake whenever DDR has been
+allowed to self-refresh.
+
+Program WAIT_FOR_CMPL again, as downstream does, and clear it wherever
+CMD_ENABLE is cleared. wait_for_cmpl selects 0 (upstream), 1 (downstream,
+default) or 2 (every response-required command) at runtime; it takes
+effect at the next rpmh_flush(). Test patch.
+---
+--- a/drivers/soc/qcom/rpmh-rsc.c
++++ b/drivers/soc/qcom/rpmh-rsc.c
+@@ -92,6 +92,15 @@ enum {
+ #define CMD_STATUS_ISSUED		BIT(8)
+ #define CMD_STATUS_COMPL		BIT(16)
+ 
++/*
++ * Program RSC_DRV_CMD_WAIT_FOR_CMPL, as the downstream driver still does:
++ * 0 = never (upstream since v5.12), 1 = commands with tcs_cmd::wait set,
++ * 2 = every response-required command.
++ */
++static int wait_for_cmpl = 1;
++module_param(wait_for_cmpl, int, 0644);
++MODULE_PARM_DESC(wait_for_cmpl, "Serialize TCS commands: 0 never, 1 cmd->wait, 2 all RR");
++
+ /*
+  * Here's a high level overview of how all the registers in RPMH work
+  * together:
+@@ -268,8 +277,10 @@ static void tcs_invalidate(struct rsc_drv *drv, int type)
+ 	if (bitmap_empty(tcs->slots, MAX_TCS_SLOTS))
+ 		return;
+ 
+-	for (m = tcs->offset; m < tcs->offset + tcs->num_tcs; m++)
++	for (m = tcs->offset; m < tcs->offset + tcs->num_tcs; m++) {
+ 		write_tcs_reg_sync(drv, drv->regs[RSC_DRV_CMD_ENABLE], m, 0);
++		write_tcs_reg_sync(drv, drv->regs[RSC_DRV_CMD_WAIT_FOR_CMPL], m, 0);
++	}
+ 
+ 	bitmap_zero(tcs->slots, MAX_TCS_SLOTS);
+ }
+@@ -460,6 +471,7 @@ static irqreturn_t tcs_tx_done(int irq, void *p)
+ skip:
+ 		/* Reclaim the TCS */
+ 		write_tcs_reg(drv, drv->regs[RSC_DRV_CMD_ENABLE], i, 0);
++		write_tcs_reg(drv, drv->regs[RSC_DRV_CMD_WAIT_FOR_CMPL], i, 0);
+ 		writel_relaxed(BIT(i), drv->tcs_base + drv->regs[RSC_DRV_IRQ_CLEAR]);
+ 		spin_lock(&drv->lock);
+ 		clear_bit(i, drv->tcs_in_use);
+@@ -495,11 +507,14 @@ static void __tcs_buffer_write(struct rsc_drv *drv, int tcs_id, int cmd_id,
+ 	u32 msgid;
+ 	u32 cmd_msgid = CMD_MSGID_LEN | CMD_MSGID_WRITE;
+ 	u32 cmd_enable = 0;
++	u32 cmd_complete;
++	int mode = READ_ONCE(wait_for_cmpl);
+ 	struct tcs_cmd *cmd;
+ 	int i, j;
+ 
+ 	/* Convert all commands to RR when the request has wait_for_compl set */
+ 	cmd_msgid |= msg->wait_for_compl ? CMD_MSGID_RESP_REQ : 0;
++	cmd_complete = read_tcs_reg(drv, drv->regs[RSC_DRV_CMD_WAIT_FOR_CMPL], tcs_id);
+ 
+ 	for (i = 0, j = cmd_id; i < msg->num_cmds; i++, j++) {
+ 		cmd = &msg->cmds[i];
+@@ -511,12 +526,22 @@ static void __tcs_buffer_write(struct rsc_drv *drv, int tcs_id, int cmd_id,
+ 		 */
+ 		msgid |= cmd->wait ? CMD_MSGID_RESP_REQ : 0;
+ 
++		/*
++		 * Hold the following commands until this one completes. Without
++		 * it the wake TCS fires every vote at once, including the DDR
++		 * (MC0) vote that brings DDR out of self-refresh.
++		 */
++		if ((mode >= 1 && cmd->wait) ||
++		    (mode >= 2 && (msgid & CMD_MSGID_RESP_REQ)))
++			cmd_complete |= BIT(j);
++
+ 		write_tcs_cmd(drv, drv->regs[RSC_DRV_CMD_MSGID], tcs_id, j, msgid);
+ 		write_tcs_cmd(drv, drv->regs[RSC_DRV_CMD_ADDR], tcs_id, j, cmd->addr);
+ 		write_tcs_cmd(drv, drv->regs[RSC_DRV_CMD_DATA], tcs_id, j, cmd->data);
+ 		trace_rpmh_send_msg(drv, tcs_id, msg->state, j, msgid, cmd);
+ 	}
+ 
++	write_tcs_reg(drv, drv->regs[RSC_DRV_CMD_WAIT_FOR_CMPL], tcs_id, cmd_complete);
+ 	cmd_enable |= read_tcs_reg(drv, drv->regs[RSC_DRV_CMD_ENABLE], tcs_id);
+ 	write_tcs_reg(drv, drv->regs[RSC_DRV_CMD_ENABLE], tcs_id, cmd_enable);
+ }
+@@ -666,6 +691,7 @@ int rpmh_rsc_send_data(struct rsc_drv *drv, const struct tcs_request *msg)
+ 		 * cleaned from rpmh_flush() by invoking rpmh_rsc_invalidate()
+ 		 */
+ 		write_tcs_reg_sync(drv, drv->regs[RSC_DRV_CMD_ENABLE], tcs_id, 0);
++		write_tcs_reg_sync(drv, drv->regs[RSC_DRV_CMD_WAIT_FOR_CMPL], tcs_id, 0);
+ 		enable_tcs_irq(drv, tcs_id, true);
+ 	}
+ 	spin_unlock_irq(&drv->lock);

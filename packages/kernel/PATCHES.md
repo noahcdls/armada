@@ -640,6 +640,10 @@ no equivalent submission was found, or a permanent URL to the upstream submissio
   source: Armada
   upstream: none
   notes: Test only. gunyah_wdt.keep_in_suspend leaves an armed watchdog running across s2idle, relying on Gunyah freezing the VM watchdog while the VM is suspended, to tell whether the APPS vCPUs resume after the s2idle wake hang. Pairs with CONFIG_GUNYAH_WATCHDOG=y.
+- `patches/0575-soc-qcom-rpmh-rsc-restore-wait-for-completion-serialization.patch`
+  source: Armada (restores what fef419c463d0 removed; matches the downstream msm-6.6 rpmh-rsc.c, commit e674920e58d1 "soc: qcom: Port changes for RPMH driver from qcom-6.1")
+  upstream: none
+  notes: Test. Programs RSC_DRV_CMD_WAIT_FOR_CMPL again so waited-on TCS commands are serialized as downstream does; qcom_rpmh.wait_for_cmpl=0/1/2 (upstream/downstream/all RR). Candidate fix for the SM8750 s2idle APPS-wake hang when the DDR (MC0) sleep vote is 0.
 - `patches/0049-drm-msm-a8xx-add-adreno-830-catalog.patch`
   source: https://github.com/ROCKNIX/distribution/blob/bcf3b5bc574990b96543484575b06f912153a715/projects/ROCKNIX/devices/SM8750/patches/linux/0049-drm-msm-a8xx-add-adreno-830-catalog.patch
   upstream: unknown
