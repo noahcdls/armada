@@ -1,0 +1,45 @@
+From: Armada <noreply@armada.local>
+Subject: [PATCH] watchdog: gunyah: optionally keep the watchdog running across suspend
+
+The driver stops an active watchdog on system suspend and restarts it on
+resume. Gunyah already freezes a VM's watchdog while the VM is suspended
+at system level (OSI) and unfreezes it when the first vCPU resumes, so a
+watchdog kept running across suspend can catch a VM that resumes but
+stalls before Linux's resume path runs.
+
+Add keep_in_suspend (default off) for testing the AYN Odin 3 s2idle
+APPS-wake hang. Test only; drop before merging.
+---
+--- a/drivers/watchdog/gunyah_wdt.c
++++ b/drivers/watchdog/gunyah_wdt.c
+@@ -209,11 +209,20 @@ static void gunyah_wdt_remove(struct pla
+ 	gunyah_wdt_stop(wdd);
+ }
+ 
++/*
++ * s2idle testing: leave an active watchdog running across system suspend.
++ * Gunyah freezes the VM watchdog while the VM is suspended at system level,
++ * so it can then catch a VM that resumes but stalls before Linux's resume.
++ */
++static bool keep_in_suspend;
++module_param(keep_in_suspend, bool, 0644);
++MODULE_PARM_DESC(keep_in_suspend, "Keep an active watchdog running across system suspend");
++
+ static int gunyah_wdt_suspend(struct device *dev)
+ {
+ 	struct watchdog_device *wdd = dev_get_drvdata(dev);
+ 
+-	if (watchdog_active(wdd))
++	if (watchdog_active(wdd) && !READ_ONCE(keep_in_suspend))
+ 		gunyah_wdt_stop(wdd);
+ 
+ 	return 0;
+@@ -223,7 +232,7 @@ static int gunyah_wdt_resume(struct devi
+ {
+ 	struct watchdog_device *wdd = dev_get_drvdata(dev);
+ 
+-	if (watchdog_active(wdd))
++	if (watchdog_active(wdd) && !READ_ONCE(keep_in_suspend))
+ 		gunyah_wdt_start(wdd);
+ 
+ 	return 0;

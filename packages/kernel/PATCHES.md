@@ -636,10 +636,10 @@ no equivalent submission was found, or a permanent URL to the upstream submissio
   source: https://patchwork.kernel.org/project/linux-arm-msm/patch/20260513-gmu-sync-state-fix-v1-5-6e33e6aa9b4f@oss.qualcomm.com/ (Akhil P Oommen, [PATCH RFT 5/5] drm/msm: Attach a driver to GMU)
   upstream: RFT v1 on linux-arm-msm/dri-devel, v2 pending
   notes: Binds a driver to the GMU so GCC, GPU_CC and GX_CLKCTL reach sync_state (they wait on 3d37000.gmu otherwise, keeping boot-on GDSCs such as USB30 powered). Backported: drops the extra of_node_put() because a6xx_gpu_init() holds the GMU node with __free(device_node).
-- `patches/0574-pmdomain-qcom-rpmhpd-add-sleep-set-floors-for-CX-MX-and-MXC.patch`
+- `patches/0574-watchdog-gunyah-optionally-keep-the-watchdog-running-across-suspend.patch`
   source: Armada
   upstream: none
-  notes: Test only. rpmhpd.{cx,mx,mxc}_sleep_floor hold a minimum sleep-set corner to test whether the s2idle APPS-wake hang needs MX/MXC above retention (suggested by Dmitry Baryshkov's reply on the SDM845 mdp1-mem suspend thread).
+  notes: Test only. gunyah_wdt.keep_in_suspend leaves an armed watchdog running across s2idle, relying on Gunyah freezing the VM watchdog while the VM is suspended, to tell whether the APPS vCPUs resume after the s2idle wake hang. Pairs with CONFIG_GUNYAH_WATCHDOG=y.
 - `patches/0049-drm-msm-a8xx-add-adreno-830-catalog.patch`
   source: https://github.com/ROCKNIX/distribution/blob/bcf3b5bc574990b96543484575b06f912153a715/projects/ROCKNIX/devices/SM8750/patches/linux/0049-drm-msm-a8xx-add-adreno-830-catalog.patch
   upstream: unknown

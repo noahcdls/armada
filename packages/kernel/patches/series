@@ -212,7 +212,7 @@ v2_20260420_neil_armstrong_arm64_qcom_sm8650_misc_enhancements.patch
 0571-drm-msm-adreno-Fix-invalid-drvdata-typecast-in-adreno_remove.patch
 0572-drm-msm-Always-use-component-model-for-standalone-GPU.patch
 0573-drm-msm-Attach-a-driver-to-the-GMU.patch
-0574-pmdomain-qcom-rpmhpd-add-sleep-set-floors-for-CX-MX-and-MXC.patch
+0574-watchdog-gunyah-optionally-keep-the-watchdog-running-across-suspend.patch
 0049-drm-msm-a8xx-add-adreno-830-catalog.patch
 0039-wifi-ath12k-add-initial-hardware-definition-for-WCN7.patch
 0040-wifi-ath12k-send-QDSS-config-when-CNSS_QDSS_CFG_MISS.patch
