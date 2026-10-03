@@ -210,6 +210,12 @@ v2_20260420_neil_armstrong_arm64_qcom_sm8650_misc_enhancements.patch
 0568-arm64-dts-qcom-sm8750-describe-the-download-mode-register.patch
 0569-firmware-qcom-scm-keep-SDI-enabled-for-ramdump-testing.patch
 0570-interconnect-qcom-bcm-voter-vote-the-SM8750-CPU-fast-path-BCMs-on-wake.patch
+0571-pmdomain-core-Rename-genpd_status_on.patch
+0572-pmdomain-core-Allow-a-non-CPU-device-in-a-CPU-PM-dom.patch
+0573-pmdomain-core-Add-a-genpd-config-to-support-unknown-.patch
+0574-cpuidle-psci-Initialize-the-PM-domains-in-powered-of.patch
+0575-cpuidle-psci-Move-initialization-a-bit-earlier-in-th.patch
+0576-cpuidle-psci-allow-overriding-the-system-level-domain-state-for-testing.patch
 0049-drm-msm-a8xx-add-adreno-830-catalog.patch
 0039-wifi-ath12k-add-initial-hardware-definition-for-WCN7.patch
 0040-wifi-ath12k-send-QDSS-config-when-CNSS_QDSS_CFG_MISS.patch

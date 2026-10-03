@@ -628,6 +628,30 @@ no equivalent submission was found, or a permanent URL to the upstream submissio
   source: Armada (votes taken from the vendor sun dcvs_fp driver)
   upstream: none
   notes: Test. Sleep 0 / wake 1 on MC4 and SH5 (CPU fast-path DDR/LLCC BCMs) via qcom,wake-only-bcms; icc_bcm_voter.fp_wake_vote switches the wake vote at runtime.
+- `patches/0571-pmdomain-core-Rename-genpd_status_on.patch`
+  source: git://git.kernel.org/pub/scm/linux/kernel/git/ulfh/linux-pm.git next, commit 81f1099186fd (Ulf Hansson, v3 series)
+  upstream: queued in ulfh/linux-pm next
+  notes: Test. CPU PM domain fixes (OSI domains start powered off); long shot for the s2idle exit hang.
+- `patches/0572-pmdomain-core-Allow-a-non-CPU-device-in-a-CPU-PM-dom.patch`
+  source: git://git.kernel.org/pub/scm/linux/kernel/git/ulfh/linux-pm.git next, commit 9e8dff8e09 (Ulf Hansson, v3 series)
+  upstream: queued in ulfh/linux-pm next
+  notes: Test. CPU PM domain fixes (OSI domains start powered off); long shot for the s2idle exit hang.
+- `patches/0573-pmdomain-core-Add-a-genpd-config-to-support-unknown-.patch`
+  source: git://git.kernel.org/pub/scm/linux/kernel/git/ulfh/linux-pm.git next, commit 2224d686e7 (Ulf Hansson, v3 series)
+  upstream: queued in ulfh/linux-pm next
+  notes: Test. CPU PM domain fixes (OSI domains start powered off); long shot for the s2idle exit hang.
+- `patches/0574-cpuidle-psci-Initialize-the-PM-domains-in-powered-of.patch`
+  source: git://git.kernel.org/pub/scm/linux/kernel/git/ulfh/linux-pm.git next, commit 6d3080bfe0 (Ulf Hansson, v3 series)
+  upstream: queued in ulfh/linux-pm next
+  notes: Test. CPU PM domain fixes (OSI domains start powered off); long shot for the s2idle exit hang.
+- `patches/0575-cpuidle-psci-Move-initialization-a-bit-earlier-in-th.patch`
+  source: git://git.kernel.org/pub/scm/linux/kernel/git/ulfh/linux-pm.git next, commit 65705b1816 (Ulf Hansson, v3 series)
+  upstream: queued in ulfh/linux-pm next
+  notes: Test. CPU PM domain fixes (OSI domains start powered off); long shot for the s2idle exit hang.
+- `patches/0576-cpuidle-psci-allow-overriding-the-system-level-domain-state-for-testing.patch`
+  source: Armada
+  upstream: none
+  notes: Test only. cpuidle_psci.sys_state_override replaces the power-level-2 (APSS-off) PSCI state at runtime.
 - `patches/0049-drm-msm-a8xx-add-adreno-830-catalog.patch`
   source: https://github.com/ROCKNIX/distribution/blob/bcf3b5bc574990b96543484575b06f912153a715/projects/ROCKNIX/devices/SM8750/patches/linux/0049-drm-msm-a8xx-add-adreno-830-catalog.patch
   upstream: unknown
