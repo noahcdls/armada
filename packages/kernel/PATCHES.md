@@ -564,6 +564,14 @@ no equivalent submission was found, or a permanent URL to the upstream submissio
   source: Armada
   upstream: none
   notes: pm_clk keeps disp_cc_mdss_ahb_clk (and so bi_tcxo/XO) prepared through s2idle; explicit runtime PM unprepares it. Last HLOS XO holder before CXSD on Odin 3.
+- `patches/0555-soc-qcom-aoss-add-a-raw-qmp-send-debugfs-file.patch`
+  source: Armada
+  upstream: none
+  notes: s2idle test only. /sys/kernel/debug/qcom_aoss/send starts the AOP lpm_mon CXPC violator log (read from 0xc320000); drop before merging.
+- `patches/0556-remoteproc-qcom-pas-add-the-sm8750-soccp.patch`
+  source: Armada; PAS id and SMEM item from the vendor sun_soccp_resource (https://github.com/OnePlusOSS/android_kernel_oneplus_sm8750), domains from the upstream Kaanapali SoCCP
+  upstream: none
+  notes: Restored from the earlier SoCCP test to check whether the bootloader's D0 SoCCP blocks CXSD. Not auto-booted; firmware is soccp.mbn from the stock modem partition.
 - `patches/0049-drm-msm-a8xx-add-adreno-830-catalog.patch`
   source: https://github.com/ROCKNIX/distribution/blob/bcf3b5bc574990b96543484575b06f912153a715/projects/ROCKNIX/devices/SM8750/patches/linux/0049-drm-msm-a8xx-add-adreno-830-catalog.patch
   upstream: unknown
