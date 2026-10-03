@@ -624,6 +624,10 @@ no equivalent submission was found, or a permanent URL to the upstream submissio
   source: Armada
   upstream: none
   notes: Test only. Keeps the firmware watchdog CPU-context dump (SDI) enabled so an s2idle-hang ramdump includes CPU state; drop before merging.
+- `patches/0570-interconnect-qcom-bcm-voter-vote-the-SM8750-CPU-fast-path-BCMs-on-wake.patch`
+  source: Armada (votes taken from the vendor sun dcvs_fp driver)
+  upstream: none
+  notes: Test. Sleep 0 / wake 1 on MC4 and SH5 (CPU fast-path DDR/LLCC BCMs) via qcom,wake-only-bcms; icc_bcm_voter.fp_wake_vote switches the wake vote at runtime.
 - `patches/0049-drm-msm-a8xx-add-adreno-830-catalog.patch`
   source: https://github.com/ROCKNIX/distribution/blob/bcf3b5bc574990b96543484575b06f912153a715/projects/ROCKNIX/devices/SM8750/patches/linux/0049-drm-msm-a8xx-add-adreno-830-catalog.patch
   upstream: unknown
