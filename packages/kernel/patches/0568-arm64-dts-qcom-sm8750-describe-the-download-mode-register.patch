@@ -1,0 +1,31 @@
+From: Armada <noreply@armada.local>
+Subject: [PATCH] arm64: dts: qcom: sm8750: describe the download mode register
+
+The SCM firmware on SM8750 has no SET_DLOAD_MODE call, so the
+qcom_scm download_mode parameter fails with "No available mechanism
+for setting download mode". Describe the TCSR block and its
+download-mode cookie at offset 0x19000, as on SM8550/SM8650 and in the
+vendor sun devicetree, so a dump mode can be armed.
+---
+--- a/arch/arm64/boot/dts/qcom/sm8750.dtsi
++++ b/arch/arm64/boot/dts/qcom/sm8750.dtsi
+@@ -228,6 +228,7 @@
+ 	firmware {
+ 		scm: scm {
+ 			compatible = "qcom,scm-sm8750", "qcom,scm";
++			qcom,dload-mode = <&tcsr 0x19000>;
+ 			interconnects = <&aggre2_noc MASTER_CRYPTO QCOM_ICC_TAG_ALWAYS
+ 					 &mc_virt SLAVE_EBI1 QCOM_ICC_TAG_ALWAYS>;
+ 		};
+@@ -2192,6 +2193,11 @@
+ 			#hwlock-cells = <1>;
+ 		};
+ 
++		tcsr: syscon@1fc0000 {
++			compatible = "syscon";
++			reg = <0x0 0x01fc0000 0x0 0x30000>;
++		};
++
+ 		remoteproc_mpss: remoteproc@4080000 {
+ 			compatible = "qcom,sm8750-mpss-pas";
+ 			reg = <0x0 0x04080000 0x0 0x10000>;

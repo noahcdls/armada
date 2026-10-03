@@ -207,6 +207,8 @@ v2_20260420_neil_armstrong_arm64_qcom_sm8650_misc_enhancements.patch
 0565-pinctrl-qcom-sm8650-lpass-lpi-force-runtime-suspend-across-system-sleep.patch
 0566-scsi-ufs-core-fast-abort-unsupported-query-idns.patch
 0567-scsi-ufs-core-dynamically-disable-timestamp-on-unsupported-devices.patch
+0568-arm64-dts-qcom-sm8750-describe-the-download-mode-register.patch
+0569-firmware-qcom-scm-keep-SDI-enabled-for-ramdump-testing.patch
 0049-drm-msm-a8xx-add-adreno-830-catalog.patch
 0039-wifi-ath12k-add-initial-hardware-definition-for-WCN7.patch
 0040-wifi-ath12k-send-QDSS-config-when-CNSS_QDSS_CFG_MISS.patch

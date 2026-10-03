@@ -616,6 +616,14 @@ no equivalent submission was found, or a permanent URL to the upstream submissio
   source: https://ratatoskr.run/lkml/2026/09/17549957/t (Stanley Jhu, [PATCH 2/2])
   upstream: posted to linux-scsi, not yet merged
   notes: Stops the qTimestamp write on the Odin 3's Kioxia UFS 4.0 part, which claims UFS 4.0 but rejects it (the `ufshcd_set_timestamp_attr ... -22` errors on every boot and UFS resume). Same re-indent as 0566.
+- `patches/0568-arm64-dts-qcom-sm8750-describe-the-download-mode-register.patch`
+  source: Armada (offset from the vendor sun devicetree and sm8650.dtsi)
+  upstream: none
+  notes: Adds the TCSR syscon and qcom,dload-mode so qcom_scm download_mode can be armed at runtime (for ramdumps).
+- `patches/0569-firmware-qcom-scm-keep-SDI-enabled-for-ramdump-testing.patch`
+  source: Armada
+  upstream: none
+  notes: Test only. Keeps the firmware watchdog CPU-context dump (SDI) enabled so an s2idle-hang ramdump includes CPU state; drop before merging.
 - `patches/0049-drm-msm-a8xx-add-adreno-830-catalog.patch`
   source: https://github.com/ROCKNIX/distribution/blob/bcf3b5bc574990b96543484575b06f912153a715/projects/ROCKNIX/devices/SM8750/patches/linux/0049-drm-msm-a8xx-add-adreno-830-catalog.patch
   upstream: unknown
