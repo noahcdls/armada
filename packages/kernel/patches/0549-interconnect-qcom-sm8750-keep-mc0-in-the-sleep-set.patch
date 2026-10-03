@@ -1,18 +1,25 @@
 From: Armada <noreply@armada.local>
 Subject: [PATCH] interconnect: qcom: sm8750: keep MC0 in the sleep set
 
-On the AYN Odin 3, s2idle hangs, and a watchdog resets the device about
-2.5 minutes later, whenever HLOS drops its MC0 vote to 0 in the sleep set
-while the ADSP and CDSP are running. Until now the PCIe suspend OPP floor
-hid it, because its memory-path vote happens to land on MC0.
+On the AYN Odin 3, s2idle hangs on the APPS wake whenever every MC0 vote
+in the sleep set is 0, i.e. whenever DDR is allowed to self-refresh. The
+sleep itself is stable; the hang follows the wake (RTC, power key or a
+USB plug delivered through the ADSP alike), and a firmware watchdog then
+resets the SoC through a PMIC hard reset about 120 s later. The ADSP
+wakes from the same state and uses DDR fine; only the APPS wake fails.
+Until now the PCIe suspend OPP floor hid it, because its memory-path vote
+happens to land on MC0.
 
-Runtime bisection with the interconnect debugfs test client, floor
-dropped and both DSPs running:
-- a 1 kBps sleep-only vote llcc_mc -> ebi (MC0 only) resumes, also over
-  120 s;
-- a sleep-only vote that stops at qns_llcc (SH0 only) hangs;
-- holding ACV at 0, AOSS prevent_ddr_collapse, a fixed DDR frequency and
-  prevent_aoss_sleep all still hang.
+What was ruled out, with every MC0 sleep vote at 0:
+- a sleep-only vote that stops at qns_llcc (SH0 only) still hangs;
+- holding ACV at 0, the vendor dcvs_fp MC4/SH5 wake votes, the vendor
+  always-on LDOs, AOSS prevent_ddr_collapse, prevent_cx_collapse,
+  prevent_aoss_sleep and a fixed DDR frequency all still hang;
+- a 1 kBps sleep-only vote llcc_mc -> ebi (MC0 only) resumes.
+
+Vendor kernels hold a DDR vote through suspend in practice (the PCIe
+driver alone keeps 500/800 kBps while its clocks run), so the
+"everything at 0" path appears to be untested in firmware.
 
 Add keepalive_sleep, which extends a BCM's keepalive to one unit in the
 sleep set, and set it for the SM8750 MC0. DDR never entered a low-power

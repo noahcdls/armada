@@ -536,22 +536,14 @@ no equivalent submission was found, or a permanent URL to the upstream submissio
 - `patches/0545-arm64-dts-qcom-sm8750-fix-videocc-clock-inputs.patch`
   source: https://lore.kernel.org/r/20260924161152.1162301-4-shengchao.guo@oss.qualcomm.com
   upstream: https://lore.kernel.org/r/20260924161152.1162301-4-shengchao.guo@oss.qualcomm.com
-- `patches/0548-interconnect-debugfs-client-allow-writes-for-s2idle-testing.patch`
-  source: Armada
-  upstream: none (upstream deliberately compiles the write side out)
-  notes: s2idle test only. Enables /sys/kernel/debug/interconnect/test_client votes to find which sleep-set BCM vote avoids the hang; drop before merging.
 - `patches/0549-interconnect-qcom-sm8750-keep-mc0-in-the-sleep-set.patch`
   source: Armada
   upstream: none
-  notes: s2idle fix. HLOS dropping MC0 to 0 in the sleep set hangs s2idle while the DSPs run; one unit avoids it. Replaces the SM8750 PCIe suspend OPP floor (0521).
+  notes: s2idle fix. With every MC0 sleep vote at 0 (DDR self-refresh) the APPS wake from s2idle hangs inside firmware; one unit avoids it. Replaces the SM8750 PCIe suspend OPP floor (0521).
 - `patches/0550-soc-qcom-add-an-smp2p-sleep-state-notifier.patch`
   source: Armada; port of the vendor smp2p_sleepstate driver (https://github.com/OnePlusOSS/android_kernel_oneplus_sm8750)
   upstream: none
-  notes: Tells the ADSP when HLOS suspends; paired with the sleepstate SMP2P entries in dts/cq8725s-ayn-odin3.dts.patch. Testing whether it makes the MC0 keepalive unnecessary.
-- `patches/0551-interconnect-qcom-bcm-voter-switch-keepalive-sleep-at-runtime.patch`
-  source: Armada
-  upstream: none
-  notes: s2idle test only. icc_bcm_voter.sleep_keepalive turns the 0549 MC0 keepalive off at runtime; drop before merging.
+  notes: Tells the ADSP when HLOS suspends, as the vendor kernel does; paired with the sleepstate SMP2P entries in dts/cq8725s-ayn-odin3.dts.patch. Not required by 0549 (tested).
 - `patches/0552-scsi-ufs-ufs-qcom-enable-only-lane-clocks-in-lane-clock-apis.patch`
   source: https://ratatoskr.run/lkml/2026/09/17535347/t
   upstream: f07317a8d57f in mkp/scsi.git 7.4/scsi-queue
@@ -564,14 +556,10 @@ no equivalent submission was found, or a permanent URL to the upstream submissio
   source: Armada
   upstream: none
   notes: pm_clk keeps disp_cc_mdss_ahb_clk (and so bi_tcxo/XO) prepared through s2idle; explicit runtime PM unprepares it. Last HLOS XO holder before CXSD on Odin 3.
-- `patches/0555-soc-qcom-aoss-add-a-raw-qmp-send-debugfs-file.patch`
-  source: Armada
-  upstream: none
-  notes: s2idle test only. /sys/kernel/debug/qcom_aoss/send starts the AOP lpm_mon CXPC violator log (read from 0xc320000); drop before merging.
 - `patches/0556-remoteproc-qcom-pas-add-the-sm8750-soccp.patch`
   source: Armada; PAS id and SMEM item from the vendor sun_soccp_resource (https://github.com/OnePlusOSS/android_kernel_oneplus_sm8750), domains from the upstream Kaanapali SoCCP
   upstream: none
-  notes: Restored from the earlier SoCCP test to check whether the bootloader's D0 SoCCP blocks CXSD. Not auto-booted; firmware is soccp.mbn from the stock modem partition.
+  notes: Lets the SoCCP be reloaded so it parks in D3 instead of the bootloader's D0. Not required by 0549 (tested). Not auto-booted; firmware is soccp.mbn from the stock modem partition.
 - `patches/0557-ASoC-codecs-lpass-wsa-macro-switch-to-pm-clock-framework.patch`
   source: https://git.kernel.org/pub/scm/linux/kernel/git/broonie/sound.git/commit/?id=cd054a6e272c
   upstream: cd054a6e272c in broonie/sound for-7.3
@@ -618,40 +606,28 @@ no equivalent submission was found, or a permanent URL to the upstream submissio
   notes: Stops the qTimestamp write on the Odin 3's Kioxia UFS 4.0 part, which claims UFS 4.0 but rejects it (the `ufshcd_set_timestamp_attr ... -22` errors on every boot and UFS resume). Same re-indent as 0566.
 - `patches/0568-arm64-dts-qcom-sm8750-describe-the-download-mode-register.patch`
   source: Armada (offset from the vendor sun devicetree and sm8650.dtsi)
-  upstream: none
+  upstream: equivalent posted by Mukesh Ojha, https://ratatoskr.run/lkml/2026/01/3363863/t
   notes: Adds the TCSR syscon and qcom,dload-mode so qcom_scm download_mode can be armed at runtime (for ramdumps).
-- `patches/0569-firmware-qcom-scm-keep-SDI-enabled-for-ramdump-testing.patch`
-  source: Armada
-  upstream: none
-  notes: Test only. Keeps the firmware watchdog CPU-context dump (SDI) enabled so an s2idle-hang ramdump includes CPU state; drop before merging.
-- `patches/0570-interconnect-qcom-bcm-voter-vote-the-SM8750-CPU-fast-path-BCMs-on-wake.patch`
-  source: Armada (votes taken from the vendor sun dcvs_fp driver)
-  upstream: none
-  notes: Test. Sleep 0 / wake 1 on MC4 and SH5 (CPU fast-path DDR/LLCC BCMs) via qcom,wake-only-bcms; icc_bcm_voter.fp_wake_vote switches the wake vote at runtime.
-- `patches/0571-pmdomain-core-Rename-genpd_status_on.patch`
-  source: git://git.kernel.org/pub/scm/linux/kernel/git/ulfh/linux-pm.git next, commit 81f1099186fd (Ulf Hansson, v3 series)
-  upstream: queued in ulfh/linux-pm next
-  notes: Test. CPU PM domain fixes (OSI domains start powered off); long shot for the s2idle exit hang.
-- `patches/0572-pmdomain-core-Allow-a-non-CPU-device-in-a-CPU-PM-dom.patch`
-  source: git://git.kernel.org/pub/scm/linux/kernel/git/ulfh/linux-pm.git next, commit 9e8dff8e09 (Ulf Hansson, v3 series)
-  upstream: queued in ulfh/linux-pm next
-  notes: Test. CPU PM domain fixes (OSI domains start powered off); long shot for the s2idle exit hang.
-- `patches/0573-pmdomain-core-Add-a-genpd-config-to-support-unknown-.patch`
-  source: git://git.kernel.org/pub/scm/linux/kernel/git/ulfh/linux-pm.git next, commit 2224d686e7 (Ulf Hansson, v3 series)
-  upstream: queued in ulfh/linux-pm next
-  notes: Test. CPU PM domain fixes (OSI domains start powered off); long shot for the s2idle exit hang.
-- `patches/0574-cpuidle-psci-Initialize-the-PM-domains-in-powered-of.patch`
-  source: git://git.kernel.org/pub/scm/linux/kernel/git/ulfh/linux-pm.git next, commit 6d3080bfe0 (Ulf Hansson, v3 series)
-  upstream: queued in ulfh/linux-pm next
-  notes: Test. CPU PM domain fixes (OSI domains start powered off); long shot for the s2idle exit hang.
-- `patches/0575-cpuidle-psci-Move-initialization-a-bit-earlier-in-th.patch`
-  source: git://git.kernel.org/pub/scm/linux/kernel/git/ulfh/linux-pm.git next, commit 65705b1816 (Ulf Hansson, v3 series)
-  upstream: queued in ulfh/linux-pm next
-  notes: Test. CPU PM domain fixes (OSI domains start powered off); long shot for the s2idle exit hang.
-- `patches/0576-cpuidle-psci-allow-overriding-the-system-level-domain-state-for-testing.patch`
-  source: Armada
-  upstream: none
-  notes: Test only. cpuidle_psci.sys_state_override replaces the power-level-2 (APSS-off) PSCI state at runtime.
+- `patches/0569-drm-msm-adreno-a6xx-Mark-cxpd-device_link-as-stateless.patch`
+  source: https://patchwork.kernel.org/project/linux-arm-msm/patch/20260513-gmu-sync-state-fix-v1-1-6e33e6aa9b4f@oss.qualcomm.com/ (Akhil P Oommen, [PATCH RFT 1/5] drm/msm: Attach a driver to GMU)
+  upstream: RFT v1 on linux-arm-msm/dri-devel, v2 pending
+  notes: Binds a driver to the GMU so GCC, GPU_CC and GX_CLKCTL reach sync_state (they wait on 3d37000.gmu otherwise, keeping boot-on GDSCs such as USB30 powered).
+- `patches/0570-drm-msm-Centralize-the-standalone-drm-device-check-for-GPU.patch`
+  source: https://patchwork.kernel.org/project/linux-arm-msm/patch/20260513-gmu-sync-state-fix-v1-2-6e33e6aa9b4f@oss.qualcomm.com/ (Akhil P Oommen, [PATCH RFT 2/5] drm/msm: Attach a driver to GMU)
+  upstream: RFT v1 on linux-arm-msm/dri-devel, v2 pending
+  notes: Binds a driver to the GMU so GCC, GPU_CC and GX_CLKCTL reach sync_state (they wait on 3d37000.gmu otherwise, keeping boot-on GDSCs such as USB30 powered).
+- `patches/0571-drm-msm-adreno-Fix-invalid-drvdata-typecast-in-adreno_remove.patch`
+  source: https://patchwork.kernel.org/project/linux-arm-msm/patch/20260513-gmu-sync-state-fix-v1-3-6e33e6aa9b4f@oss.qualcomm.com/ (Akhil P Oommen, [PATCH RFT 3/5] drm/msm: Attach a driver to GMU)
+  upstream: RFT v1 on linux-arm-msm/dri-devel, v2 pending
+  notes: Binds a driver to the GMU so GCC, GPU_CC and GX_CLKCTL reach sync_state (they wait on 3d37000.gmu otherwise, keeping boot-on GDSCs such as USB30 powered).
+- `patches/0572-drm-msm-Always-use-component-model-for-standalone-GPU.patch`
+  source: https://patchwork.kernel.org/project/linux-arm-msm/patch/20260513-gmu-sync-state-fix-v1-4-6e33e6aa9b4f@oss.qualcomm.com/ (Akhil P Oommen, [PATCH RFT 4/5] drm/msm: Attach a driver to GMU)
+  upstream: RFT v1 on linux-arm-msm/dri-devel, v2 pending
+  notes: Binds a driver to the GMU so GCC, GPU_CC and GX_CLKCTL reach sync_state (they wait on 3d37000.gmu otherwise, keeping boot-on GDSCs such as USB30 powered).
+- `patches/0573-drm-msm-Attach-a-driver-to-the-GMU.patch`
+  source: https://patchwork.kernel.org/project/linux-arm-msm/patch/20260513-gmu-sync-state-fix-v1-5-6e33e6aa9b4f@oss.qualcomm.com/ (Akhil P Oommen, [PATCH RFT 5/5] drm/msm: Attach a driver to GMU)
+  upstream: RFT v1 on linux-arm-msm/dri-devel, v2 pending
+  notes: Binds a driver to the GMU so GCC, GPU_CC and GX_CLKCTL reach sync_state (they wait on 3d37000.gmu otherwise, keeping boot-on GDSCs such as USB30 powered). Backported: drops the extra of_node_put() because a6xx_gpu_init() holds the GMU node with __free(device_node).
 - `patches/0049-drm-msm-a8xx-add-adreno-830-catalog.patch`
   source: https://github.com/ROCKNIX/distribution/blob/bcf3b5bc574990b96543484575b06f912153a715/projects/ROCKNIX/devices/SM8750/patches/linux/0049-drm-msm-a8xx-add-adreno-830-catalog.patch
   upstream: unknown
