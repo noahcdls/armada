@@ -561,11 +561,12 @@
 			regulator-initial-mode = <RPMH_REGULATOR_MODE_HPM>;
 		};
 
+		/* WCN7860 rail: let the SMPS drop to PFM at light load, as stock does */
 		vreg_s4d_0p85: smps4 {
 			regulator-name = "vreg_s4d_0p85";
 			regulator-min-microvolt = <852000>;
 			regulator-max-microvolt = <1036000>;
-			regulator-initial-mode = <RPMH_REGULATOR_MODE_HPM>;
+			regulator-initial-mode = <RPMH_REGULATOR_MODE_AUTO>;
 		};
 
 		vreg_l1d_1p2: ldo1 {
@@ -609,11 +610,12 @@
 
 		qcom,pmic-id = "f";
 
+		/* WCN7860 rail: let the SMPS drop to PFM at light load, as stock does */
 		vreg_s5f_0p85: smps5 {
 			regulator-name = "vreg_s5f_0p85";
 			regulator-min-microvolt = <852000>;
 			regulator-max-microvolt = <1000000>;
-			regulator-initial-mode = <RPMH_REGULATOR_MODE_HPM>;
+			regulator-initial-mode = <RPMH_REGULATOR_MODE_AUTO>;
 		};
 
 		vreg_l1f_0p88: ldo1 {
@@ -634,6 +636,15 @@
 			regulator-allow-set-load;
 			regulator-allowed-modes = <RPMH_REGULATOR_MODE_LPM
 						   RPMH_REGULATOR_MODE_HPM>;
+
+			/*
+			 * WCN7860 IO rail, held through suspend while Bluetooth is
+			 * up: idle it in LPM. Mode only, so it still switches off
+			 * when the WCN power sequencer releases it.
+			 */
+			regulator-state-mem {
+				regulator-mode = <RPMH_REGULATOR_MODE_LPM>;
+			};
 		};
 
 		vreg_l3f_1p8: ldo3 {
@@ -644,6 +655,15 @@
 			regulator-allow-set-load;
 			regulator-allowed-modes = <RPMH_REGULATOR_MODE_LPM
 						   RPMH_REGULATOR_MODE_HPM>;
+
+			/*
+			 * WCN7860 IO rail, held through suspend while Bluetooth is
+			 * up: idle it in LPM. Mode only, so it still switches off
+			 * when the WCN power sequencer releases it.
+			 */
+			regulator-state-mem {
+				regulator-mode = <RPMH_REGULATOR_MODE_LPM>;
+			};
 		};
 
 	};
