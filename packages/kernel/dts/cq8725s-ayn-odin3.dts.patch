@@ -13,43 +13,42 @@ Subject: [PATCH] arm64: dts: qcom: odin3: enable DPU dithering, codec rail sleep
  	reset-gpios = <&tlmm 98 GPIO_ACTIVE_LOW>;
  
  	vddio-supply = <&vreg_l12b_1p8>;
-@@ -350,3 +353,125 @@
+@@ -350,3 +353,124 @@
  		};
  	};
  };
 +
-+/* The codec keeps these rails enabled through s2idle; idle them in LPM */
++/*
++ * The codec (and while Bluetooth is up, the WCN7860) keeps these rails
++ * enabled through s2idle: idle them in LPM. Mode only, so a rail still
++ * switches off in sleep once its consumers release it.
++ */
 +&vreg_bob1 {
 +	regulator-state-mem {
-+		regulator-on-in-suspend;
 +		regulator-mode = <RPMH_REGULATOR_MODE_LPM>;
 +	};
 +};
 +
 +&vreg_l15b_1p8 {
 +	regulator-state-mem {
-+		regulator-on-in-suspend;
 +		regulator-mode = <RPMH_REGULATOR_MODE_LPM>;
 +	};
 +};
 +
 +&vreg_l2i_1p2 {
 +	regulator-state-mem {
-+		regulator-on-in-suspend;
 +		regulator-mode = <RPMH_REGULATOR_MODE_LPM>;
 +	};
 +};
 +
 +&vreg_s3g_1p8 {
 +	regulator-state-mem {
-+		regulator-on-in-suspend;
 +		regulator-mode = <RPMH_REGULATOR_MODE_LPM>;
 +	};
 +};
 +
 +&vreg_s7i_1p2 {
 +	regulator-state-mem {
-+		regulator-on-in-suspend;
 +		regulator-mode = <RPMH_REGULATOR_MODE_LPM>;
 +	};
 +};

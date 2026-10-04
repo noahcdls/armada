@@ -1,0 +1,135 @@
+From: Armada <noreply@armada.local>
+Subject: [PATCH] ASoC: codecs: wcd939x: drop vdd-px across system sleep
+
+The driver enables every supply at probe and holds it for the device's
+lifetime. The downstream driver treats vdd-px as an on-demand supply
+with retention support (qcom,cdc-vdd-px-rem-supported in the stock
+SM8750 DT): it switches it off in system suspend once the codec bias is
+off and back on at resume.
+
+Do the same. Manage vdd-px separately and, in suspend_late (after the
+card has suspended), disable it if the codec's DAPM bias is off;
+re-enable it in resume_early, before the card resumes. On the AYN Odin 3
+this lets L2I switch off in s2idle.
+---
+--- a/sound/soc/codecs/wcd939x.c
++++ b/sound/soc/codecs/wcd939x.c
+@@ -206,6 +206,8 @@
+ 	u32 tx_mode[TX_ADC_MAX];
+ 	int variant;
+ 	struct gpio_desc *reset_gpio;
++	struct regulator *vdd_px;
++	bool vdd_px_off;
+ 	int hphr_pdm_wd_int;
+ 	int hphl_pdm_wd_int;
+ 	int ear_pdm_wd_int;
+@@ -215,8 +217,9 @@
+ 	bool ldoh;
+ };
+ 
++/* vdd-px is managed separately so it can be dropped across system sleep */
+ static const char * const wcd939x_supplies[] = {
+-	"vdd-rxtx", "vdd-io", "vdd-buck", "vdd-mic-bias", "vdd-px",
++	"vdd-rxtx", "vdd-io", "vdd-buck", "vdd-mic-bias",
+ };
+ 
+ static const SNDRV_CTL_TLVD_DECLARE_DB_MINMAX(ear_pa_gain, 600, -1800);
+@@ -3478,6 +3481,14 @@
+ }
+ #endif /* CONFIG_TYPEC */
+ 
++static void wcd939x_disable_vdd_px(void *data)
++{
++	struct wcd939x_priv *wcd939x = data;
++
++	if (!wcd939x->vdd_px_off)
++		regulator_disable(wcd939x->vdd_px);
++}
++
+ static int wcd939x_populate_dt_data(struct wcd939x_priv *wcd939x, struct device *dev)
+ {
+ 	struct wcd_mbhc_config *cfg = &wcd939x->mbhc_cfg;
+@@ -3496,6 +3507,19 @@
+ 	if (ret)
+ 		return dev_err_probe(dev, ret, "Failed to get and enable supplies\n");
+ 
++	wcd939x->vdd_px = devm_regulator_get(dev, "vdd-px");
++	if (IS_ERR(wcd939x->vdd_px))
++		return dev_err_probe(dev, PTR_ERR(wcd939x->vdd_px),
++				     "Failed to get vdd-px\n");
++
++	ret = regulator_enable(wcd939x->vdd_px);
++	if (ret)
++		return dev_err_probe(dev, ret, "Failed to enable vdd-px\n");
++
++	ret = devm_add_action_or_reset(dev, wcd939x_disable_vdd_px, wcd939x);
++	if (ret)
++		return ret;
++
+ 	ret = wcd_dt_parse_micbias_info(&wcd939x->common);
+ 	if (ret)
+ 		return dev_err_probe(dev, ret, "Failed to get micbias\n");
+@@ -3924,6 +3948,55 @@
+ MODULE_DEVICE_TABLE(of, wcd939x_dt_match);
+ #endif
+ 
++/*
++ * Like the downstream driver (qcom,cdc-vdd-px-rem-supported), drop the PX
++ * supply across system sleep once the card has turned the codec bias off.
++ * suspend_late/resume_early bracket the card's own suspend and resume.
++ */
++static int wcd939x_suspend_late(struct device *dev)
++{
++	struct wcd939x_priv *wcd939x = dev_get_drvdata(dev);
++	int ret;
++
++	if (!wcd939x || !wcd939x->component ||
++	    snd_soc_dapm_get_bias_level(snd_soc_component_to_dapm(wcd939x->component)) !=
++	    SND_SOC_BIAS_OFF)
++		return 0;
++
++	ret = regulator_disable(wcd939x->vdd_px);
++	if (ret) {
++		dev_warn(dev, "failed to disable vdd-px: %d\n", ret);
++		return 0;
++	}
++	wcd939x->vdd_px_off = true;
++
++	return 0;
++}
++
++static int wcd939x_resume_early(struct device *dev)
++{
++	struct wcd939x_priv *wcd939x = dev_get_drvdata(dev);
++	int ret;
++
++	if (!wcd939x || !wcd939x->vdd_px_off)
++		return 0;
++
++	ret = regulator_enable(wcd939x->vdd_px);
++	if (ret) {
++		dev_err(dev, "failed to enable vdd-px: %d\n", ret);
++		return ret;
++	}
++	wcd939x->vdd_px_off = false;
++	/* LDO settling time required after enable */
++	usleep_range(200, 300);
++
++	return 0;
++}
++
++static const struct dev_pm_ops wcd939x_pm_ops = {
++	LATE_SYSTEM_SLEEP_PM_OPS(wcd939x_suspend_late, wcd939x_resume_early)
++};
++
+ static struct platform_driver wcd939x_codec_driver = {
+ 	.probe = wcd939x_probe,
+ 	.remove = wcd939x_remove,
+@@ -3931,6 +4004,7 @@
+ 		.name = "wcd939x_codec",
+ 		.of_match_table = of_match_ptr(wcd939x_dt_match),
+ 		.suppress_bind_attrs = true,
++		.pm = pm_sleep_ptr(&wcd939x_pm_ops),
+ 	},
+ };
+ 

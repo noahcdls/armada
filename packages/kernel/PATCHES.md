@@ -644,6 +644,10 @@ no equivalent submission was found, or a permanent URL to the upstream submissio
   source: Armada (restores what fef419c463d0 removed; matches the downstream msm-6.6 rpmh-rsc.c, commit e674920e58d1 "soc: qcom: Port changes for RPMH driver from qcom-6.1")
   upstream: none
   notes: Test. Programs RSC_DRV_CMD_WAIT_FOR_CMPL again so waited-on TCS commands are serialized as downstream does; qcom_rpmh.wait_for_cmpl=0/1/2 (upstream/downstream/all RR). Candidate fix for the SM8750 s2idle APPS-wake hang when the DDR (MC0) sleep vote is 0.
+- `patches/0576-ASoC-codecs-wcd939x-drop-vdd-px-across-system-sleep.patch`
+  source: Armada (port of the downstream audio-kernel wcd939x on-demand vdd-px handling)
+  upstream: none
+  notes: Disables vdd-px in suspend_late when the codec bias is off and re-enables it in resume_early, matching the stock SM8750 DT's qcom,cdc-vdd-px-rem-supported. Lets L2I switch off in s2idle on the Odin 3; pairs with the mode-only L2I regulator-state-mem in the odin3 DTS patch.
 - `patches/0049-drm-msm-a8xx-add-adreno-830-catalog.patch`
   source: https://github.com/ROCKNIX/distribution/blob/bcf3b5bc574990b96543484575b06f912153a715/projects/ROCKNIX/devices/SM8750/patches/linux/0049-drm-msm-a8xx-add-adreno-830-catalog.patch
   upstream: unknown

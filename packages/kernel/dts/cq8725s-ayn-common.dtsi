@@ -1352,6 +1352,17 @@
 		bias-pull-down;
 	};
 
+	/*
+	 * vdd_mcu_3v3 is off in s2idle: park the gamepad UART as pulled-down
+	 * inputs so it does not back-power the MCU through its UART pins.
+	 */
+	qup_uart15_sleep: qup-uart15-sleep-state {
+		pins = "gpio30", "gpio31";
+		function = "gpio";
+		drive-strength = <2>;
+		bias-pull-down;
+	};
+
 	mcu_pwr_default: mcu-pwr-default-state {
 		pins = "gpio83";
 		function = "gpio";
@@ -1406,6 +1417,10 @@
 };
 
 &uart15 {
+	pinctrl-0 = <&qup_uart15_default>;
+	pinctrl-1 = <&qup_uart15_sleep>;
+	pinctrl-names = "default", "sleep";
+
 	status = "okay";
 
 	gamepad {
