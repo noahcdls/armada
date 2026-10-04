@@ -192,7 +192,6 @@ v2_20260420_neil_armstrong_arm64_qcom_sm8650_misc_enhancements.patch
 0551-interconnect-qcom-bcm-voter-switch-keepalive-sleep-at-runtime.patch
 0552-scsi-ufs-ufs-qcom-enable-only-lane-clocks-in-lane-clock-apis.patch
 0553-serial-qcom-geni-force-runtime-suspend-across-system-sleep.patch
-0554-drm-msm-dsi-phy-unprepare-the-ahb-clock-on-runtime-suspend.patch
 0555-soc-qcom-aoss-add-a-raw-qmp-send-debugfs-file.patch
 0556-remoteproc-qcom-pas-add-the-sm8750-soccp.patch
 0557-ASoC-codecs-lpass-wsa-macro-switch-to-pm-clock-framework.patch
