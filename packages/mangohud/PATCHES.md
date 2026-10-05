@@ -20,3 +20,6 @@ to a commit, or `armada` if it's original; a URL source with no `notes` is verba
   source: armada
 - `patches/0008-mangoapp-show-active-upscaler.patch`
   source: armada
+- `patches/0009-mangoapp-pause-while-the-Steam-UI-is-focused.patch`
+  source: armada
+  notes: mangoapp drew an empty full-screen overlay every frame in the Steam UI (an extra scanout plane, mangoapp<->Xwayland wakeup storm, ~70 mA idle on the Odin 3). It now pauses while Steam is focused unless mangoapp_steam or steam_ui=1 in /etc/armada/performance-overlay.conf (armada-control "Show in Steam UI" toggle) opts back in, and polls the focused app 4x/s instead of per frame.

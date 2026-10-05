@@ -117,6 +117,17 @@ def set_swipe_gestures_enabled(enabled):
     return bool(call("set_swipe_gestures_enabled", enabled=enabled)["enabled"])
 
 
+def overlay_steam_ui_enabled():
+    try:
+        return bool(call("get_overlay_steam_ui_enabled")["enabled"])
+    except Exception:
+        return False
+
+
+def set_overlay_steam_ui_enabled(enabled):
+    return bool(call("set_overlay_steam_ui_enabled", enabled=bool(enabled))["enabled"])
+
+
 def set_ssh_enabled(enabled):
     return bool(call("set_ssh_enabled", enabled=bool(enabled)).get("enabled"))
 
