@@ -9,7 +9,9 @@ off and back on at resume.
 
 Do the same. Manage vdd-px separately and, in suspend_late (after the
 card has suspended), disable it if the codec's DAPM bias is off;
-re-enable it in resume_early, before the card resumes. On the AYN Odin 3
+re-enable it in resume_early, before the card resumes. The driver never
+set wcd939x->component, so set it in the component probe (and clear it
+on remove) for the bias check. On the AYN Odin 3
 this lets L2I switch off in s2idle.
 ---
 --- a/sound/soc/codecs/wcd939x.c
@@ -34,7 +36,23 @@ this lets L2I switch off in s2idle.
  };
  
  static const SNDRV_CTL_TLVD_DECLARE_DB_MINMAX(ear_pa_gain, 600, -1800);
-@@ -3478,6 +3481,14 @@
+@@ -3267,6 +3270,7 @@
+ 		return ret;
+ 
+ 	snd_soc_component_init_regmap(component, wcd939x->regmap);
++	wcd939x->component = component;
+ 
+ 	ret = pm_runtime_resume_and_get(dev);
+ 	if (ret < 0)
+@@ -3377,6 +3381,7 @@
+ {
+ 	struct wcd939x_priv *wcd939x = snd_soc_component_get_drvdata(component);
+ 
++	wcd939x->component = NULL;
+ 	wcd939x_mbhc_deinit(component);
+ 
+ 	free_irq(wcd939x->ear_pdm_wd_int, wcd939x);
+@@ -3478,6 +3483,14 @@
  }
  #endif /* CONFIG_TYPEC */
  
@@ -49,7 +67,7 @@ this lets L2I switch off in s2idle.
  static int wcd939x_populate_dt_data(struct wcd939x_priv *wcd939x, struct device *dev)
  {
  	struct wcd_mbhc_config *cfg = &wcd939x->mbhc_cfg;
-@@ -3496,6 +3507,19 @@
+@@ -3496,6 +3509,19 @@
  	if (ret)
  		return dev_err_probe(dev, ret, "Failed to get and enable supplies\n");
  
@@ -69,7 +87,7 @@ this lets L2I switch off in s2idle.
  	ret = wcd_dt_parse_micbias_info(&wcd939x->common);
  	if (ret)
  		return dev_err_probe(dev, ret, "Failed to get micbias\n");
-@@ -3924,6 +3948,55 @@
+@@ -3924,6 +3950,55 @@
  MODULE_DEVICE_TABLE(of, wcd939x_dt_match);
  #endif
  
@@ -125,7 +143,7 @@ this lets L2I switch off in s2idle.
  static struct platform_driver wcd939x_codec_driver = {
  	.probe = wcd939x_probe,
  	.remove = wcd939x_remove,
-@@ -3931,6 +4004,7 @@
+@@ -3931,6 +4006,7 @@
  		.name = "wcd939x_codec",
  		.of_match_table = of_match_ptr(wcd939x_dt_match),
  		.suppress_bind_attrs = true,
