@@ -647,6 +647,10 @@ no equivalent submission was found, or a permanent URL to the upstream submissio
   source: Armada (port of the downstream audio-kernel wcd939x on-demand vdd-px handling)
   upstream: none
   notes: Disables vdd-px in suspend_late when the codec bias is off and re-enables it in resume_early, matching the stock SM8750 DT's qcom,cdc-vdd-px-rem-supported. Lets L2I switch off in s2idle on the Odin 3; pairs with the mode-only L2I regulator-state-mem in the odin3 DTS patch.
+- `patches/0577-drm-msm-dpu-count-rotated-planes-fetch-per-line-for-bandwidth.patch`
+  source: Armada
+  upstream: none (candidate for upstream)
+  notes: _dpu_plane_calc_bw() used the framebuffer-orientation width for 90/270-rotated pipes, overestimating their DDR fetch ~3.6x on the Odin 3 (rotated 1920x1080 gamescope layers on a 1080x1920 panel). The display held a 6.5 GB/s DDR vote at idle (DDR pinned at 1708 MHz).
 - `patches/0049-drm-msm-a8xx-add-adreno-830-catalog.patch`
   source: https://github.com/ROCKNIX/distribution/blob/bcf3b5bc574990b96543484575b06f912153a715/projects/ROCKNIX/devices/SM8750/patches/linux/0049-drm-msm-a8xx-add-adreno-830-catalog.patch
   upstream: unknown

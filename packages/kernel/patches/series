@@ -240,3 +240,4 @@ v2_20260420_neil_armstrong_arm64_qcom_sm8650_misc_enhancements.patch
 0530-ASoC-qdsp6-release-AudioReach-graphs-across-system-suspend.patch
 0532-hwmon-pwm-fan-optionally-run-the-fan-while-charging-in-s2idle.patch
 0576-ASoC-codecs-wcd939x-drop-vdd-px-across-system-sleep.patch
+0577-drm-msm-dpu-count-rotated-planes-fetch-per-line-for-bandwidth.patch
