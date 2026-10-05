@@ -55,6 +55,10 @@ no equivalent submission was found, or a permanent URL to the upstream submissio
 - `patches/0078-drm-msm-dpu-fix-vblank-timestamps-on-command-mode-panels.patch`
   source: armada
   upstream: local
+- `patches/0577-drm-msm-dpu-count-rotated-planes-fetch-per-line-for-bandwidth.patch`
+  source: armada
+  upstream: local
+  notes: _dpu_plane_calc_bw() used the framebuffer-orientation width for 90/270-rotated pipes, overestimating their DDR fetch ~3.6x on the Odin 3 (rotated 1920x1080 gamescope layers on a 1080x1920 panel). The display held a 6.5 GB/s DDR vote at idle (DDR pinned at 1708 MHz).
 - `patches/0016-rp5-smooth-brightness-adjustment.patch`
   source: https://github.com/ROCKNIX/distribution/blob/bcf3b5bc574990b96543484575b06f912153a715/projects/ROCKNIX/devices/SM8250/patches/linux/0016-rp5-smooth-brightness-adjustment.patch
   upstream: unknown

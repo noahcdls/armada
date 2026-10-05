@@ -1,0 +1,32 @@
+From: Armada <noreply@armada.local>
+Subject: [PATCH] drm/msm/dpu: size rotated planes' bandwidth by the rotated line width
+
+_dpu_plane_calc_bw() estimates a pipe's fetch as src_width * vtotal *
+fps * bpp. src_rect is kept in framebuffer orientation, so for a pipe
+using 90/270 degree inline rotation each output line actually consumes
+one source column: the per-line fetch is the source height, not its
+width. On the AYN Odin 3 (1080x1920 panel, gamescope scanning out three
+rotated 1920x1080 layers split across two mixers) this overestimates
+each pipe by about 1920/540 = 3.6x; the display then holds a 6.5 GB/s
+average DDR vote at idle and pins DDR at 1708 MHz.
+
+Swap src_width/src_height for rotated pipes before the calculation. The
+scale factor then also compares the rotated source height with the
+destination height, as intended.
+---
+--- a/drivers/gpu/drm/msm/disp/dpu1/dpu_plane.c
++++ b/drivers/gpu/drm/msm/disp/dpu1/dpu_plane.c
+@@ -128,6 +128,13 @@
+ 
+ 	src_width = drm_rect_width(&pipe_cfg->src_rect);
+ 	src_height = drm_rect_height(&pipe_cfg->src_rect);
++	/*
++	 * src_rect is in framebuffer orientation. With inline rotation each
++	 * output line consumes one source column, so the fetch per line is the
++	 * source height, not its width.
++	 */
++	if (pipe_cfg->rotation & DRM_MODE_ROTATE_90)
++		swap(src_width, src_height);
+ 	dst_height = drm_rect_height(&pipe_cfg->dst_rect);
+ 	fps = drm_mode_vrefresh(mode);
+ 	vbp = mode->vtotal - mode->vsync_end;
