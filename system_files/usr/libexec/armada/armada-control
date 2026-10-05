@@ -33,6 +33,8 @@ CLIENT_TIMEOUT = 5
 CONTROLLER_TYPES = {"deck-uhid", "xbox-series", "xb360", "ds5"}
 INTERCEPT_MODES = {"overlay", "reset"}
 SWIPE_GESTURES_CONFIG = Path("/etc/armada/swipe-gestures.conf")
+# Read by mangoapp (mangohud 0009): steam_ui=1 keeps the overlay in the Steam UI
+PERFORMANCE_OVERLAY_CONFIG = Path("/etc/armada/performance-overlay.conf")
 SLEEP_CONFIG = Path("/etc/armada/sleep.conf")
 SUSPEND_MODE_KEY = "suspend_mode"
 NM_IGNORE_SLEEP = Path("/etc/NetworkManager/ignore-sleep")
@@ -492,6 +494,27 @@ def action_set_swipe_gestures_enabled(request):
     return {"enabled": enabled}
 
 
+def action_get_overlay_steam_ui_enabled(request):
+    try:
+        lines = PERFORMANCE_OVERLAY_CONFIG.read_text(encoding="utf-8").splitlines()
+    except (OSError, UnicodeDecodeError):
+        return {"enabled": False}
+    enabled = False
+    for line in lines:
+        match = re.fullmatch(r"\s*steam_ui\s*=\s*([01])\s*", line)
+        if match:
+            enabled = match.group(1) == "1"
+    return {"enabled": enabled}
+
+
+def action_set_overlay_steam_ui_enabled(request):
+    enabled = request.get("enabled")
+    if not isinstance(enabled, bool):
+        raise ValueError("invalid overlay Steam UI state")
+    atomic_write(PERFORMANCE_OVERLAY_CONFIG, f"steam_ui={int(enabled)}\n")
+    return {"enabled": enabled}
+
+
 def action_set_abl_auto_enabled(request):
     atomic_write(ABL_CONFIG, f"auto_update_enabled={int(bool(request.get('enabled')))}\n")
     return {"enabled": abl_auto_enabled()}
@@ -858,6 +881,8 @@ def action_restart_game_mode(request):
 ACTIONS = {
     "get_swipe_gestures_enabled": action_get_swipe_gestures_enabled,
     "set_swipe_gestures_enabled": action_set_swipe_gestures_enabled,
+    "get_overlay_steam_ui_enabled": action_get_overlay_steam_ui_enabled,
+    "set_overlay_steam_ui_enabled": action_set_overlay_steam_ui_enabled,
     "set_controller_type": action_set_controller_type,
     "get_controller_type": action_get_controller_type,
     "get_device_env": action_get_device_env,

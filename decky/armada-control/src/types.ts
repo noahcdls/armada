@@ -134,6 +134,7 @@ export interface Config {
   chargingFanPwm: number;
   sshEnabled: boolean;
   swipeGesturesEnabled: boolean;
+  overlaySteamUiEnabled: boolean;
   mtpEnabled: boolean;
   desktopMode: string;
   desktopModes: DropdownChoice[];

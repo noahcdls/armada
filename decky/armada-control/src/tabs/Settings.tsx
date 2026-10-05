@@ -12,6 +12,7 @@ import {
   setChargingFanPwm as applyChargingFanPwm,
   setControllerType as applyControllerType,
   setMtpEnabled as applyMtpEnabled,
+  setOverlaySteamUiEnabled as applyOverlaySteamUiEnabled,
   setDesktopMode as applyDesktopMode,
   setSleepMode as applySleepMode,
   setSleepLogsEnabled as applySleepLogsEnabled,
@@ -34,6 +35,7 @@ export function Settings({ config, setConfig }: {
   setConfig: Dispatch<SetStateAction<Config | null>>;
 }) {
   const [swipeGesturesSaving, setSwipeGesturesSaving] = useState(false);
+  const [overlaySteamUiSaving, setOverlaySteamUiSaving] = useState(false);
   const [sleepLogsEnabled, setSleepLogsEnabled] = useState<boolean | null>(null);
   const [sleepLogsSaving, setSleepLogsSaving] = useState(false);
   const setBottomScreenBrightness = useDebouncedApply(
@@ -140,6 +142,18 @@ export function Settings({ config, setConfig }: {
       setSwipeGesturesSaving(false);
     }
   };
+  const setOverlaySteamUiEnabled = async (enabled: boolean) => {
+    if (overlaySteamUiSaving) return;
+    setOverlaySteamUiSaving(true);
+    try {
+      const applied = await applyOverlaySteamUiEnabled(enabled);
+      setConfig((current) => (current ? { ...current, overlaySteamUiEnabled: applied } : current));
+    } catch (error) {
+      toaster.toast({ title: t("settings.overlaySteamUiError"), body: String(error) });
+    } finally {
+      setOverlaySteamUiSaving(false);
+    }
+  };
   const setBottomScreenEnabled = async (enabled: boolean) => {
     if (enabled === !!config.bottomScreenEnabled) {
       return;
@@ -206,6 +220,13 @@ export function Settings({ config, setConfig }: {
           value={config.swipeGesturesEnabled}
           disabled={swipeGesturesSaving}
           onChange={setSwipeGesturesEnabled}
+        />
+        <ToggleRow
+          label={t("settings.overlaySteamUi")}
+          description={t("settings.overlaySteamUiDescription")}
+          value={!!config.overlaySteamUiEnabled}
+          disabled={overlaySteamUiSaving}
+          onChange={setOverlaySteamUiEnabled}
         />
         <SelectEdit
           label={t("settings.sleepMode")}

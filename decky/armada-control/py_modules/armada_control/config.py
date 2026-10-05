@@ -17,6 +17,7 @@ from .system import (
     sleep_modes,
     ssh_enabled,
     swipe_gestures_enabled,
+    overlay_steam_ui_enabled,
 )
 from .tweaks import fex_profile_labels, load_env_presets, load_fex_contract, load_tweaks
 
@@ -54,6 +55,7 @@ def build_config(include_games=True):
         "chargingFanPwm": int(power["fan"].get("charging_pwm", 0)),
         "sshEnabled": ssh_enabled(),
         "swipeGesturesEnabled": swipe_gestures_enabled(),
+        "overlaySteamUiEnabled": overlay_steam_ui_enabled(),
         "mtpEnabled": mtp_enabled(),
         "desktopMode": desktop_mode(),
         "desktopModes": desktop_modes(),
