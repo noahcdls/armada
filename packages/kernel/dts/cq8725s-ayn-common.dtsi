@@ -991,6 +991,14 @@
 	pinctrl-0 = <&pcie0_default_state>;
 	pinctrl-names = "default";
 
+	/*
+	 * pcie-qcom sets its OPP once, from the trained link: Gen3 x2 holds CX
+	 * at NOM and a 1.97 GB/s DDR peak vote whenever Wi-Fi is up (stock's
+	 * cnss2 drops the link to Gen1 when idle instead). Gen2 x2 (~6.4 Gb/s)
+	 * still exceeds what the WCN7860 moves, at CX LOW_SVS and 1 GB/s.
+	 */
+	max-link-speed = <2>;
+
 	status = "okay";
 };
 
