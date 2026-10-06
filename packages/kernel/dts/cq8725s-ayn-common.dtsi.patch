@@ -105,7 +105,7 @@ Subject: [PATCH] arm64: dts: qcom: cq8725s: configure the Odin 3 gamepad and DP 
  		};
  
  	};
-@@ -971,6 +1003,14 @@
+@@ -971,9 +1003,32 @@
  	pinctrl-0 = <&pcie0_default_state>;
  	pinctrl-names = "default";
  
@@ -117,10 +117,28 @@ Subject: [PATCH] arm64: dts: qcom: cq8725s: configure the Odin 3 gamepad and DP 
 +	 */
 +	max-link-speed = <2>;
 +
++	/*
++	 * TEST: route PCIe MSIs through the DWC internal MSI controller
++	 * (msi0-msi7) so the GIC ITS, and with it LPIs, can be disabled.
++	 */
++	/delete-property/ msi-map;
++	/delete-property/ msi-map-mask;
++
  	status = "okay";
  };
  
-@@ -982,7 +1022,7 @@
++/*
++ * TEST: with no ITS the GICv3 driver never enables LPIs, so a waking CPU's
++ * redistributor has no LPI tables in DDR to read during the APPS wake.
++ */
++&gic_its {
++	status = "disabled";
++};
++
+ &pcie0_phy {
+ 	vdda-phy-supply = <&vreg_l1f_0p88>;
+ 	vdda-pll-supply = <&vreg_l3g_1p2>;
+@@ -982,7 +1037,7 @@
  };
  
  &pcieport0 {
@@ -129,7 +147,7 @@ Subject: [PATCH] arm64: dts: qcom: cq8725s: configure the Odin 3 gamepad and DP 
  	reset-gpios = <&tlmm 102 GPIO_ACTIVE_LOW>;
  
  	wifi@0 {
-@@ -1332,6 +1372,17 @@
+@@ -1332,6 +1387,17 @@
  		bias-pull-down;
  	};
  
@@ -147,7 +165,7 @@ Subject: [PATCH] arm64: dts: qcom: cq8725s: configure the Odin 3 gamepad and DP 
  	mcu_pwr_default: mcu-pwr-default-state {
  		pins = "gpio83";
  		function = "gpio";
-@@ -1386,10 +1437,16 @@
+@@ -1386,10 +1452,16 @@
  };
  
  &uart15 {
