@@ -561,12 +561,11 @@
 			regulator-initial-mode = <RPMH_REGULATOR_MODE_HPM>;
 		};
 
-		/* WCN7860 rail: let the SMPS drop to PFM at light load, as stock does */
 		vreg_s4d_0p85: smps4 {
 			regulator-name = "vreg_s4d_0p85";
 			regulator-min-microvolt = <852000>;
 			regulator-max-microvolt = <1036000>;
-			regulator-initial-mode = <RPMH_REGULATOR_MODE_AUTO>;
+			regulator-initial-mode = <RPMH_REGULATOR_MODE_HPM>;
 		};
 
 		vreg_l1d_1p2: ldo1 {
@@ -610,12 +609,11 @@
 
 		qcom,pmic-id = "f";
 
-		/* WCN7860 rail: let the SMPS drop to PFM at light load, as stock does */
 		vreg_s5f_0p85: smps5 {
 			regulator-name = "vreg_s5f_0p85";
 			regulator-min-microvolt = <852000>;
 			regulator-max-microvolt = <1000000>;
-			regulator-initial-mode = <RPMH_REGULATOR_MODE_AUTO>;
+			regulator-initial-mode = <RPMH_REGULATOR_MODE_HPM>;
 		};
 
 		vreg_l1f_0p88: ldo1 {
@@ -636,15 +634,6 @@
 			regulator-allow-set-load;
 			regulator-allowed-modes = <RPMH_REGULATOR_MODE_LPM
 						   RPMH_REGULATOR_MODE_HPM>;
-
-			/*
-			 * WCN7860 IO rail, held through suspend while Bluetooth is
-			 * up: idle it in LPM. Mode only, so it still switches off
-			 * when the WCN power sequencer releases it.
-			 */
-			regulator-state-mem {
-				regulator-mode = <RPMH_REGULATOR_MODE_LPM>;
-			};
 		};
 
 		vreg_l3f_1p8: ldo3 {
@@ -655,15 +644,6 @@
 			regulator-allow-set-load;
 			regulator-allowed-modes = <RPMH_REGULATOR_MODE_LPM
 						   RPMH_REGULATOR_MODE_HPM>;
-
-			/*
-			 * WCN7860 IO rail, held through suspend while Bluetooth is
-			 * up: idle it in LPM. Mode only, so it still switches off
-			 * when the WCN power sequencer releases it.
-			 */
-			regulator-state-mem {
-				regulator-mode = <RPMH_REGULATOR_MODE_LPM>;
-			};
 		};
 
 	};
@@ -990,14 +970,6 @@
 &pcie0 {
 	pinctrl-0 = <&pcie0_default_state>;
 	pinctrl-names = "default";
-
-	/*
-	 * pcie-qcom sets its OPP once, from the trained link: Gen3 x2 holds CX
-	 * at NOM and a 1.97 GB/s DDR peak vote whenever Wi-Fi is up (stock's
-	 * cnss2 drops the link to Gen1 when idle instead). Gen2 x2 (~6.4 Gb/s)
-	 * still exceeds what the WCN7860 moves, at CX LOW_SVS and 1 GB/s.
-	 */
-	max-link-speed = <2>;
 
 	status = "okay";
 };
@@ -1360,17 +1332,6 @@
 		bias-pull-down;
 	};
 
-	/*
-	 * vdd_mcu_3v3 is off in s2idle: park the gamepad UART as pulled-down
-	 * inputs so it does not back-power the MCU through its UART pins.
-	 */
-	qup_uart15_sleep: qup-uart15-sleep-state {
-		pins = "gpio30", "gpio31";
-		function = "gpio";
-		drive-strength = <2>;
-		bias-pull-down;
-	};
-
 	mcu_pwr_default: mcu-pwr-default-state {
 		pins = "gpio83";
 		function = "gpio";
@@ -1425,10 +1386,6 @@
 };
 
 &uart15 {
-	pinctrl-0 = <&qup_uart15_default>;
-	pinctrl-1 = <&qup_uart15_sleep>;
-	pinctrl-names = "default", "sleep";
-
 	status = "okay";
 
 	gamepad {

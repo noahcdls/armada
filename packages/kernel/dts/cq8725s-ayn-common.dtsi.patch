@@ -1,5 +1,5 @@
 From: Armada <noreply@armada.local>
-Subject: [PATCH] arm64: dts: qcom: cq8725s: configure the Odin 3 gamepad and DP audio, fix PCIe WAKE# polarity, keep the Wi-Fi PMU rails on
+Subject: [PATCH] arm64: dts: qcom: cq8725s: configure the Odin 3 gamepad and DP audio, fix PCIe WAKE# polarity, keep the Wi-Fi PMU rails on, trim idle power
 
 --- a/arch/arm64/boot/dts/qcom/cq8725s-ayn-common.dtsi
 +++ b/arch/arm64/boot/dts/qcom/cq8725s-ayn-common.dtsi
@@ -42,23 +42,37 @@ Subject: [PATCH] arm64: dts: qcom: cq8725s: configure the Odin 3 gamepad and DP 
  		vddio-supply = <&vreg_l3f_1p8>;
  		vddio1p2-supply = <&vreg_l2f_1p2>;
  		vddaon-supply = <&vreg_s4d_0p85>;
-@@ -565,6 +581,7 @@
+@@ -561,11 +577,13 @@
+ 			regulator-initial-mode = <RPMH_REGULATOR_MODE_HPM>;
+ 		};
+ 
++		/* WCN7860 rail: let the SMPS drop to PFM at light load, as stock does */
+ 		vreg_s4d_0p85: smps4 {
  			regulator-name = "vreg_s4d_0p85";
  			regulator-min-microvolt = <852000>;
  			regulator-max-microvolt = <1036000>;
+-			regulator-initial-mode = <RPMH_REGULATOR_MODE_HPM>;
 +			regulator-always-on;
- 			regulator-initial-mode = <RPMH_REGULATOR_MODE_HPM>;
++			regulator-initial-mode = <RPMH_REGULATOR_MODE_AUTO>;
  		};
  
-@@ -613,6 +630,7 @@
+ 		vreg_l1d_1p2: ldo1 {
+@@ -609,11 +627,13 @@
+ 
+ 		qcom,pmic-id = "f";
+ 
++		/* WCN7860 rail: let the SMPS drop to PFM at light load, as stock does */
+ 		vreg_s5f_0p85: smps5 {
  			regulator-name = "vreg_s5f_0p85";
  			regulator-min-microvolt = <852000>;
  			regulator-max-microvolt = <1000000>;
+-			regulator-initial-mode = <RPMH_REGULATOR_MODE_HPM>;
 +			regulator-always-on;
- 			regulator-initial-mode = <RPMH_REGULATOR_MODE_HPM>;
++			regulator-initial-mode = <RPMH_REGULATOR_MODE_AUTO>;
  		};
  
-@@ -630,6 +648,7 @@
+ 		vreg_l1f_0p88: ldo1 {
+@@ -630,20 +650,32 @@
  			regulator-name = "vreg_l2f_1p2";
  			regulator-min-microvolt = <1200000>;
  			regulator-max-microvolt = <1200000>;
@@ -66,7 +80,15 @@ Subject: [PATCH] arm64: dts: qcom: cq8725s: configure the Odin 3 gamepad and DP 
  			regulator-initial-mode = <RPMH_REGULATOR_MODE_HPM>;
  			regulator-allow-set-load;
  			regulator-allowed-modes = <RPMH_REGULATOR_MODE_LPM
-@@ -640,6 +659,7 @@
+ 						   RPMH_REGULATOR_MODE_HPM>;
++
++			/* WCN7860 IO rail, kept on through suspend: idle it in LPM */
++			regulator-state-mem {
++				regulator-mode = <RPMH_REGULATOR_MODE_LPM>;
++			};
+ 		};
+ 
+ 		vreg_l3f_1p8: ldo3 {
  			regulator-name = "vreg_l3f_1p8";
  			regulator-min-microvolt = <1800000>;
  			regulator-max-microvolt = <1800000>;
@@ -74,7 +96,31 @@ Subject: [PATCH] arm64: dts: qcom: cq8725s: configure the Odin 3 gamepad and DP 
  			regulator-initial-mode = <RPMH_REGULATOR_MODE_HPM>;
  			regulator-allow-set-load;
  			regulator-allowed-modes = <RPMH_REGULATOR_MODE_LPM
-@@ -982,7 +1002,7 @@
+ 						   RPMH_REGULATOR_MODE_HPM>;
++
++			/* WCN7860 IO rail, kept on through suspend: idle it in LPM */
++			regulator-state-mem {
++				regulator-mode = <RPMH_REGULATOR_MODE_LPM>;
++			};
+ 		};
+ 
+ 	};
+@@ -971,6 +1003,14 @@
+ 	pinctrl-0 = <&pcie0_default_state>;
+ 	pinctrl-names = "default";
+ 
++	/*
++	 * pcie-qcom sets its OPP once, from the trained link: Gen3 x2 holds CX
++	 * at NOM and a 1.97 GB/s DDR peak vote whenever Wi-Fi is up (stock's
++	 * cnss2 drops the link to Gen1 when idle instead). Gen2 x2 (~6.4 Gb/s)
++	 * still exceeds what the WCN7860 moves, at CX LOW_SVS and 1 GB/s.
++	 */
++	max-link-speed = <2>;
++
+ 	status = "okay";
+ };
+ 
+@@ -982,7 +1022,7 @@
  };
  
  &pcieport0 {
@@ -83,7 +129,33 @@ Subject: [PATCH] arm64: dts: qcom: cq8725s: configure the Odin 3 gamepad and DP 
  	reset-gpios = <&tlmm 102 GPIO_ACTIVE_LOW>;
  
  	wifi@0 {
-@@ -1390,6 +1410,8 @@
+@@ -1332,6 +1372,17 @@
+ 		bias-pull-down;
+ 	};
+ 
++	/*
++	 * vdd_mcu_3v3 is off in s2idle: park the gamepad UART as pulled-down
++	 * inputs so it does not back-power the MCU through its UART pins.
++	 */
++	qup_uart15_sleep: qup-uart15-sleep-state {
++		pins = "gpio30", "gpio31";
++		function = "gpio";
++		drive-strength = <2>;
++		bias-pull-down;
++	};
++
+ 	mcu_pwr_default: mcu-pwr-default-state {
+ 		pins = "gpio83";
+ 		function = "gpio";
+@@ -1386,10 +1437,16 @@
+ };
+ 
+ &uart15 {
++	pinctrl-0 = <&qup_uart15_default>;
++	pinctrl-1 = <&qup_uart15_sleep>;
++	pinctrl-names = "default", "sleep";
++
+ 	status = "okay";
  
  	gamepad {
  		compatible = "gamepad,rsinput";
