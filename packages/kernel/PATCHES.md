@@ -635,6 +635,76 @@ no equivalent submission was found, or a permanent URL to the upstream submissio
 - `patches/0532-hwmon-pwm-fan-optionally-run-the-fan-while-charging-in-s2idle.patch`
   source: armada
   upstream: local
+- `patches/0700-wifi-mac80211-fix-unauthorised-port-check-for-encap-.patch`
+  source: https://git.kernel.org/next/linux-next/c/d59b9bf7df49367e01b06e82dd0f6e7ad3be493c
+  upstream: https://patch.msgid.link/20260802105818.dd5da579813d.I51ed0121154bb652bebc97bb0597b1fae9ac978f@changeid
+- `patches/0701-wifi-mac80211-fix-key-selection-for-encap-offload-fr.patch`
+  source: https://git.kernel.org/next/linux-next/c/0e80db08668b560b3522849cb705623148bcd4b5
+  upstream: https://patch.msgid.link/20260802105818.0feb7ad61047.Ia506ca211176a3c466bc60e4cc3e506df34a4a67@changeid
+- `patches/0702-wifi-mac80211-don-t-send-encap-offload-frames-unencr.patch`
+  source: https://git.kernel.org/next/linux-next/c/a48daf145fed445d41ef422573411500785415c8
+  upstream: https://patch.msgid.link/20260802085818.1336616-7-johannes@sipsolutions.net
+  notes: ath12k uses 802.11 encapsulation offload; without this, mac80211 can send data frames unencrypted to a station that requires encryption.
+- `patches/0703-wifi-mac80211-drop-encap-offload-frames-with-a-taint.patch`
+  source: https://git.kernel.org/next/linux-next/c/c8ddbe1e8c43f6d008591c50f8be8de39cdce267
+  upstream: https://patch.msgid.link/20260802105818.870b6ef31374.Ib87175b55b9fd94c16ba6d9cd816b7a09248df87@changeid
+- `patches/0704-mac80211-tx-Use-info-flags-in-ieee80211_tx_h_select_.patch`
+  source: https://git.kernel.org/next/linux-next/c/5f2530a4df8e0573e54cc0f4175c06ecb810a4dd
+  upstream: https://patch.msgid.link/20260908094341.12196-1-spasswolf@web.de
+- `patches/0705-wifi-mac80211-don-t-reset-the-TXQ-scheduling-round-n.patch`
+  source: https://git.kernel.org/next/linux-next/c/8ea81827d3537db7cfcc82c008f052bb1bbe7567
+  upstream: https://patch.msgid.link/20260908144155.756569-1-julius@bairaktaris.de
+- `patches/0706-wifi-mac80211-drain-PS-delivery-work-during-station-.patch`
+  source: https://git.kernel.org/torvalds/c/67a9e80c3ca20c9044cd6ee72cd6278dd19b5023
+  upstream: https://patch.msgid.link/20260916113735.31029-1-enderaoelyther@gmail.com
+- `patches/0707-wifi-mac80211-shut-down-RX-BA-session-timer-on-teard.patch`
+  source: https://git.kernel.org/torvalds/c/e588e83e5c7a0f6d7a77dbbb58927c8c8cfd598e
+  upstream: https://git.kernel.org/torvalds/c/e588e83e5c7a0f6d7a77dbbb58927c8c8cfd598e
+- `patches/0708-wifi-ath12k-fix-truncated-TX-buffer-DMA-address-in-M.patch`
+  source: https://git.kernel.org/next/linux-next/c/979ecb88ed3528e08dd7f87b90b029374226ca84
+  upstream: https://patch.msgid.link/20260818-ath12k-truncated-tx-dma-addr-v1-1-ead978969371@oss.qualcomm.com
+  notes: TX buffers mapped above 4 GB were handed to the firmware with the high address bits cleared.
+- `patches/0709-wifi-ath12k-fix-stale-skb-pointers-after-aligned-TX-.patch`
+  source: https://git.kernel.org/next/linux-next/c/6c40719489c8d799798989b15bc07b0700c132f8
+  upstream: https://patch.msgid.link/20260818-ath12k-uaf-for-aligned-tx-v1-1-d6ae195b15e7@oss.qualcomm.com
+- `patches/0710-wifi-ath12k-fix-DMA-unwind-for-ext-MSDU-descriptor-r.patch`
+  source: https://git.kernel.org/next/linux-next/c/4de5a8a0edddc453f1a4c93b6d9f09013a23b72e
+  upstream: https://patch.msgid.link/20260813-ext-msdu-fix-v1-1-c5e80ccd061a@oss.qualcomm.com
+- `patches/0711-wifi-ath12k-signal-regd-update-completion-when-reg-e.patch`
+  source: https://git.kernel.org/next/linux-next/c/f2576dc0f894ef33045ba7ed057ec417988bba8a
+  upstream: https://patch.msgid.link/20260729-ath12k-regd-wait-timeout-v1-1-504aa6e7e93c@oss.qualcomm.com
+- `patches/0712-soc-qcom-pmic_glink-Avoid-losing-early-rpmsg-probe.patch`
+  source: https://git.kernel.org/next/linux-next/c/1517efff0e9d21cc4c9cc7ffa1fcc30225e6b069
+  upstream: https://patch.msgid.link/20260720-topic-pmic_glink_defer-v1-1-94c0f233f2f7@oss.qualcomm.com
+  notes: If the rpmsg device appears before pmic_glink has probed, USB-C and battery reporting were lost for that boot.
+- `patches/0713-soc-qcom-pmic_glink-Fix-device-access-from-worker-du.patch`
+  source: https://git.kernel.org/next/linux-next/c/7d0767c5cd878707fd6711023731549c83563840
+  upstream: https://lore.kernel.org/r/20260819-b4-soc-qcom-pmic-glink-fix-device-access-on-worker-while-suspended-v3-1-169b00e0d9d4@oss.qualcomm.com
+- `patches/0714-drm-msm-Fix-vm_bo-use-after-free-in-with_vm_locks.patch`
+  source: https://git.kernel.org/next/linux-next/c/81878aa1a2f551f51a3d3aef2a9509503ec34d8b
+  upstream: https://lore.kernel.org/r/20260916175548.2089821-1-vulab@iscas.ac.cn
+- `patches/0715-arm64-topology-fix-arch_freq_get_on_cpu-overflow-abo.patch`
+  source: https://git.kernel.org/torvalds/c/3872cc6b92940af0f73c6f9a45d65300492d648d
+  upstream: https://git.kernel.org/torvalds/c/3872cc6b92940af0f73c6f9a45d65300492d648d
+  notes: The SM8750 prime cores run at 4.32 GHz, above the 4.19 GHz where cpuinfo_avg_freq wrapped.
+- `patches/0716-clk-qcom-rcg2-Initialize-shared-floor-clock-state.patch`
+  source: https://git.kernel.org/next/linux-next/c/b9a14395e6edfeb3ce241f19f84991106efcd3b3
+  upstream: https://patch.msgid.link/20260917-topic-qc_clk_fixes-v1-1-5531cb00514b@oss.qualcomm.com
+- `patches/0717-clk-qcom-rcg2-Clear-force-enable-after-rate-failure.patch`
+  source: https://git.kernel.org/next/linux-next/c/ae881bdb1b1d081ea3febcc16fe6ee16d3a2a0d1
+  upstream: https://patch.msgid.link/20260917-topic-qc_clk_fixes-v1-3-5531cb00514b@oss.qualcomm.com
+- `patches/0718-clk-qcom-rcg2-Propagate-force-enable-status-errors.patch`
+  source: https://git.kernel.org/next/linux-next/c/396e900a120db686c3fe375df3b9fb6a62f173a6
+  upstream: https://patch.msgid.link/20260917-topic-qc_clk_fixes-v1-2-5531cb00514b@oss.qualcomm.com
+- `patches/0719-firmware-qcom_scm-handle-empty-PAS-resource-table.patch`
+  source: https://git.kernel.org/next/linux-next/c/abb698e1a973869a3f82a604d5ef7c6066f60725
+  upstream: https://patch.msgid.link/20260921195636.1925869-2-mukesh.ojha@oss.qualcomm.com
+- `patches/0720-usb-dwc3-gadget-fix-IRQ-storm-on-invalid-event-buffe.patch`
+  source: https://git.kernel.org/torvalds/c/1ff77cbefe5a653ea12874c213ea4bd0d72c1067
+  upstream: https://patch.msgid.link/20260915110637.17658-1-jiazi.liu1984@gmail.com
+- `patches/0721-pinctrl-qcom-spmi-gpio-make-direction-changes-exclus.patch`
+  source: https://git.kernel.org/next/linux-next/c/19fc4240358be2a25ce8e0a49a2819588ed61c5d
+  upstream: https://patch.msgid.link/20260927010913.1212600-1-shengchao.guo@oss.qualcomm.com
 - `patches/0540-arm64-signal-reapply-the-ssbs-policy-on-sigreturn.patch`
   source: armada
   upstream: local
