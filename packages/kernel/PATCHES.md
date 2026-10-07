@@ -705,6 +705,32 @@ no equivalent submission was found, or a permanent URL to the upstream submissio
 - `patches/0721-pinctrl-qcom-spmi-gpio-make-direction-changes-exclus.patch`
   source: https://git.kernel.org/next/linux-next/c/19fc4240358be2a25ce8e0a49a2819588ed61c5d
   upstream: https://patch.msgid.link/20260927010913.1212600-1-shengchao.guo@oss.qualcomm.com
+- `patches/0722-drm-msm-a6xx-Honor-perfmode_bw-threshold-on-A8x.patch`
+  source: https://git.kernel.org/next/linux-next/c/db6a2e4a7ebd4378d03a97f4bef22f8c157240ad
+  upstream: https://lore.kernel.org/r/20260923-hawi-gpu-v1-1-0c3c79a1a470@oss.qualcomm.com
+  notes: Without it the A8xx GMU votes DDR performance mode (ACV) for every GPU bandwidth level and ignores the Adreno 830 perfmode_bw threshold in 0049.
+- `patches/0723-drm-msm-a6xx-Fix-RPMH-dependency-votes.patch`
+  source: https://git.kernel.org/next/linux-next/c/eab0aff8965ee17cf972a37eb6456032c45b7acd
+  upstream: https://lore.kernel.org/r/20260923-hawi-gpu-v1-3-0c3c79a1a470@oss.qualcomm.com
+- `patches/0724-drm-msm-a6xx-Fix-secondary-rail-vote-in-ARC-votes.patch`
+  source: https://git.kernel.org/next/linux-next/c/128a0edde50780ed9eb93ab5d2e18ca24c1f1c43
+  upstream: https://lore.kernel.org/r/20260923-hawi-gpu-v1-2-0c3c79a1a470@oss.qualcomm.com
+- `patches/0725-drm-msm-a8xx-enable-the-PC-block-clock-gating-on-Adreno-830.patch`
+  source: armada
+  upstream: local
+  notes: Applies the a8xx_gpu.c hunk of upstream's Adreno 830 support (https://git.kernel.org/next/linux-next/c/2c94d177a927a25d3eb111fe83694b5f84239069) to Armada's 0049 catalog entry; drop when 0049 is replaced by the upstream entry.
+- `patches/0726-phy-qualcomm-phy-qcom-eusb2-repeater-Fix-SMB-Power-l.patch`
+  source: https://lore.kernel.org/r/20260917-smb-repeater-power-leakage-v1-1-6d7311c3c03e@oss.qualcomm.com
+  upstream: https://lore.kernel.org/r/20260917-smb-repeater-power-leakage-v1-1-6d7311c3c03e@oss.qualcomm.com
+  notes: Posted, not yet merged. Found on Glymur's SMB2370; the Odin 3 uses the PMIH0108 repeater and the SM8550/SM8650 boards the PM8550B one, which the same exit path covers.
+- `patches/0727-drm-msm-dsi-fix-AHB-clock-staying-enabled-across-sus.patch`
+  source: https://lore.kernel.org/r/20261006-dsi-ahb-clk-suspend-fix-v1-1-67da848e1b0a@oss.qualcomm.com
+  upstream: https://lore.kernel.org/r/20261006-dsi-ahb-clk-suspend-fix-v1-1-67da848e1b0a@oss.qualcomm.com
+  notes: Posted, not yet merged. Releases disp_cc_mdss_ahb_clk (and its XO vote) in s2idle; replaces the earlier runtime-PM attempt, which caused display problems around suspend.
+- `patches/0543-arm64-dts-qcom-sm8750-add-t-power-on-us-property-for-PCIe-root-port.patch`
+  source: https://lore.kernel.org/r/20260911-t_pwr_on-v1-7-c9eee197d082@oss.qualcomm.com
+  upstream: https://lore.kernel.org/r/20260911-t_pwr_on-v1-7-c9eee197d082@oss.qualcomm.com
+  notes: Posted, not yet merged. Linux 7.2 already programs T_POWER_ON from this property; SM8750 just never set it.
 - `patches/0540-arm64-signal-reapply-the-ssbs-policy-on-sigreturn.patch`
   source: armada
   upstream: local

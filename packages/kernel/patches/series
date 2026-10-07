@@ -243,3 +243,12 @@ v2_20260420_neil_armstrong_arm64_qcom_sm8650_misc_enhancements.patch
 0720-usb-dwc3-gadget-fix-IRQ-storm-on-invalid-event-buffe.patch
 0721-pinctrl-qcom-spmi-gpio-make-direction-changes-exclus.patch
 
+# ============== Upstream power fixes ==============
+0722-drm-msm-a6xx-Honor-perfmode_bw-threshold-on-A8x.patch
+0723-drm-msm-a6xx-Fix-RPMH-dependency-votes.patch
+0724-drm-msm-a6xx-Fix-secondary-rail-vote-in-ARC-votes.patch
+0725-drm-msm-a8xx-enable-the-PC-block-clock-gating-on-Adreno-830.patch
+0726-phy-qualcomm-phy-qcom-eusb2-repeater-Fix-SMB-Power-l.patch
+0727-drm-msm-dsi-fix-AHB-clock-staying-enabled-across-sus.patch
+0543-arm64-dts-qcom-sm8750-add-t-power-on-us-property-for-PCIe-root-port.patch
+
