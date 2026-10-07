@@ -1,5 +1,5 @@
 From: Armada <noreply@armada.local>
-Subject: [PATCH] arm64: dts: qcom: cq8725s: configure the Odin 3 gamepad and DP audio, fix PCIe WAKE# polarity, keep the Wi-Fi PMU rails on
+Subject: [PATCH] arm64: dts: qcom: cq8725s: configure the Odin 3 gamepad and DP audio, fix PCIe WAKE# polarity, keep the Wi-Fi PMU rails on, cap the Wi-Fi PCIe link at Gen2
 
 --- a/arch/arm64/boot/dts/qcom/cq8725s-ayn-common.dtsi
 +++ b/arch/arm64/boot/dts/qcom/cq8725s-ayn-common.dtsi
@@ -74,7 +74,22 @@ Subject: [PATCH] arm64: dts: qcom: cq8725s: configure the Odin 3 gamepad and DP 
  			regulator-initial-mode = <RPMH_REGULATOR_MODE_HPM>;
  			regulator-allow-set-load;
  			regulator-allowed-modes = <RPMH_REGULATOR_MODE_LPM
-@@ -982,7 +1002,7 @@
+@@ -971,6 +991,14 @@
+ 	pinctrl-0 = <&pcie0_default_state>;
+ 	pinctrl-names = "default";
+ 
++	/*
++	 * pcie-qcom sets its OPP once, from the trained link: Gen3 x2 holds CX
++	 * at NOM and a 1.97 GB/s DDR peak vote whenever Wi-Fi is up (stock's
++	 * cnss2 drops the link to Gen1 when idle instead). Gen2 x2 (~6.4 Gb/s)
++	 * still exceeds what the WCN7860 moves, at CX LOW_SVS and 1 GB/s.
++	 */
++	max-link-speed = <2>;
++
+ 	status = "okay";
+ };
+ 
+@@ -982,7 +1010,7 @@
  };
  
  &pcieport0 {
@@ -83,7 +98,7 @@ Subject: [PATCH] arm64: dts: qcom: cq8725s: configure the Odin 3 gamepad and DP 
  	reset-gpios = <&tlmm 102 GPIO_ACTIVE_LOW>;
  
  	wifi@0 {
-@@ -1390,6 +1410,8 @@
+@@ -1390,6 +1418,8 @@
  
  	gamepad {
  		compatible = "gamepad,rsinput";
