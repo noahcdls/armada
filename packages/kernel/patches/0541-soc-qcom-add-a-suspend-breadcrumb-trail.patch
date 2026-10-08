@@ -22,12 +22,15 @@ provided the reset kept DRAM contents.
 
 On the Odin 3 every reset path loses DRAM, so a compact summary also goes
 to a PMIC SDAM block, the first of the "armada,sdam" phandles that the
-SPMI arbiter lets this EE write: counters (s2idle
-entries, PSCI domain idle enter/exit, RSC flushes with the last result
-and the sleep/wake command counts), the last PSCI state, CPU and IRQ, and
-a ring of the last 96 one-byte stage codes. SDAM keeps its contents
+SPMI arbiter lets this EE write. It restarts at each suspend and holds
+counters (s2idle entries, PSCI domain idle enter/exit overall and at
+system level, RSC flushes with the last result and the sleep/wake
+command counts), the last PSCI state, CPU and IRQ, each CPU's last idle
+depth and whether it is still inside PSCI, and a ring of the last 96
+one-byte stage codes. SDAM keeps its contents
 across any reset short of losing the battery. The next boot logs the
-summary and exposes it in suspend_trail/sdam_last.
+summary and exposes it in suspend_trail/sdam_last (decoded) and
+suspend_trail/sdam_last_raw.
 
 Non-obvious choices:
 - The ring counter lives in normal kernel memory; the reserved region is
@@ -43,7 +46,7 @@ Non-obvious choices:
 - SDAM writes go through the PMIC regmap, which is fast_io over the
   raw-spinlocked SPMI arbiter, so they are safe from the idle path. TCS
   writes are only counted; each SDAM event costs one ring byte plus a
-  19-byte header write.
+  30-byte header write.
 ---
 diff --git a/drivers/soc/qcom/Kconfig b/drivers/soc/qcom/Kconfig
 index 2caadbb..d5af2d5 100644
@@ -114,10 +117,10 @@ index 66928ca..7f5e2a8 100644
  	return NOTIFY_OK;
 diff --git a/drivers/soc/qcom/suspend-trail.c b/drivers/soc/qcom/suspend-trail.c
 new file mode 100644
-index 0000000..1b59575
+index 0000000..f3e5696
 --- /dev/null
 +++ b/drivers/soc/qcom/suspend-trail.c
-@@ -0,0 +1,693 @@
+@@ -0,0 +1,743 @@
 +// SPDX-License-Identifier: GPL-2.0-only
 +/*
 + * Suspend breadcrumb trail for Qualcomm platforms.
@@ -214,22 +217,30 @@ index 0000000..1b59575
 +#define SDAM_MAGIC1		'T'
 +#define SDAM_RING_LEN		96
 +
++/*
++ * Counters cover the last suspend cycle and wrap at 8 bits. cpu_state holds,
++ * per CPU, the last PSCI domain idle depth (1 CPU, 2 cluster, 3 system) with
++ * BIT(7) set while the CPU is inside the PSCI call.
++ */
 +struct sdam_rec {
 +	u8 magic[2];
 +	u8 boot;
-+	u8 idx;
 +	u8 n_s2idle;
++	__le16 idx;
 +	u8 n_psci_enter;
 +	u8 n_psci_exit;
 +	u8 n_flush;
 +	s8 flush_ret;
 +	u8 last_cpu;
++	u8 n_irq;
 +	__le32 psci_state;
 +	__le16 irq_hwirq;
 +	u8 n_sleep_cmds;
 +	u8 n_wake_cmds;
-+	u8 n_irq;
-+	u8 rsvd[13];
++	u8 n_sys_enter;
++	u8 n_sys_exit;
++	u8 cpu_state[8];
++	u8 rsvd[2];
 +	u8 ring[SDAM_RING_LEN];
 +} __packed;
 +static_assert(sizeof(struct sdam_rec) == 128);
@@ -241,6 +252,7 @@ index 0000000..1b59575
 +static u32 sdam_base;
 +static DEFINE_SPINLOCK(sdam_lock);
 +static struct sdam_rec sdam_cur, sdam_prev;
++static struct debugfs_blob_wrapper sdam_prev_blob;
 +static bool sdam_prev_valid;
 +static u8 sdam_sleep_cmds, sdam_wake_cmds;
 +
@@ -343,7 +355,8 @@ index 0000000..1b59575
 +{
 +	struct sdam_rec *r = &sdam_cur;
 +	unsigned long flags;
-+	u8 code;
++	u8 code, depth;
++	u16 idx;
 +
 +	if (!READ_ONCE(sdam_map))
 +		return;
@@ -386,13 +399,19 @@ index 0000000..1b59575
 +			r->n_s2idle++;
 +		break;
 +	case QST_EV_PSCI_ENTER:
++		depth = ((a >> 24) & 0x3) + 1;
 +		r->n_psci_enter++;
++		r->n_sys_enter += depth == 3;
 +		r->last_cpu = b;
 +		r->psci_state = cpu_to_le32(a);
++		r->cpu_state[b % ARRAY_SIZE(r->cpu_state)] = BIT(7) | depth;
 +		break;
 +	case QST_EV_PSCI_EXIT:
++		depth = ((a >> 24) & 0x3) + 1;
 +		r->n_psci_exit++;
++		r->n_sys_exit += depth == 3;
 +		r->last_cpu = b;
++		r->cpu_state[b % ARRAY_SIZE(r->cpu_state)] = depth;
 +		break;
 +	case QST_EV_RSC_PD:
 +		if (a == GENPD_NOTIFY_PRE_OFF) {
@@ -410,11 +429,12 @@ index 0000000..1b59575
 +		break;
 +	}
 +
-+	r->ring[r->idx % SDAM_RING_LEN] = code;
++	idx = le16_to_cpu(r->idx);
++	r->ring[idx % SDAM_RING_LEN] = code;
 +	regmap_write(sdam_map, sdam_base + SDAM_DATA +
-+		     offsetof(struct sdam_rec, ring) + r->idx % SDAM_RING_LEN,
++		     offsetof(struct sdam_rec, ring) + idx % SDAM_RING_LEN,
 +		     code);
-+	r->idx++;
++	r->idx = cpu_to_le16(idx + 1);
 +	regmap_bulk_write(sdam_map, sdam_base + SDAM_DATA, r, SDAM_HDR_LEN);
 +
 +	spin_unlock_irqrestore(&sdam_lock, flags);
@@ -448,7 +468,7 @@ index 0000000..1b59575
 +
 +static void sdam_show(struct seq_file *m, const struct sdam_rec *r)
 +{
-+	unsigned int i, n, first;
++	unsigned int i, n, first, idx;
 +	char name[40];
 +
 +	seq_printf(m,
@@ -458,11 +478,18 @@ index 0000000..1b59575
 +	seq_printf(m, "last psci state %#x on cpu%u, irqs %u (last hwirq %u)\n",
 +		   le32_to_cpu(r->psci_state), r->last_cpu, r->n_irq,
 +		   le16_to_cpu(r->irq_hwirq));
++	seq_printf(m, "system-level psci enter %u exit %u\n", r->n_sys_enter,
++		   r->n_sys_exit);
++	for (i = 0; i < ARRAY_SIZE(r->cpu_state); i++)
++		seq_printf(m, "cpu%u: %s depth %u\n", i,
++			   r->cpu_state[i] & BIT(7) ? "IN PSCI" : "out",
++			   r->cpu_state[i] & 0x7f);
 +
-+	n = min_t(unsigned int, r->idx, SDAM_RING_LEN);
-+	first = r->idx - n;
-+	seq_printf(m, "last %u of %u stage codes, oldest first:\n", n, r->idx);
-+	for (i = first; i < r->idx; i++)
++	idx = le16_to_cpu(r->idx);
++	n = min_t(unsigned int, idx, SDAM_RING_LEN);
++	first = idx - n;
++	seq_printf(m, "last %u of %u stage codes, oldest first:\n", n, idx);
++	for (i = first; i < idx; i++)
 +		seq_printf(m, "  %3u %s\n", i,
 +			   sdam_code_name(r->ring[i % SDAM_RING_LEN], name,
 +					  sizeof(name)));
@@ -501,7 +528,7 @@ index 0000000..1b59575
 +	struct platform_device *pdev;
 +	struct regmap *map;
 +	char name[40];
-+	unsigned int i, n;
++	unsigned int i, n, idx;
 +	u32 base;
 +
 +	pdev = of_find_device_by_node(np);
@@ -530,8 +557,12 @@ index 0000000..1b59575
 +			sdam_prev.n_sleep_cmds, sdam_prev.n_wake_cmds,
 +			le32_to_cpu(sdam_prev.psci_state), sdam_prev.last_cpu,
 +			sdam_prev.n_irq, le16_to_cpu(sdam_prev.irq_hwirq));
-+		n = min_t(unsigned int, sdam_prev.idx, 16);
-+		for (i = sdam_prev.idx - n; i != sdam_prev.idx; i++)
++		pr_info("SDAM: system-level psci enter %u exit %u, cpus in psci: %*phN\n",
++			sdam_prev.n_sys_enter, sdam_prev.n_sys_exit,
++			(int)sizeof(sdam_prev.cpu_state), sdam_prev.cpu_state);
++		idx = le16_to_cpu(sdam_prev.idx);
++		n = min_t(unsigned int, idx, 16);
++		for (i = idx - n; i != idx; i++)
 +			pr_info("SDAM:   %3u %s\n", i,
 +				sdam_code_name(sdam_prev.ring[i % SDAM_RING_LEN],
 +					       name, sizeof(name)));
@@ -580,12 +611,31 @@ index 0000000..1b59575
 +}
 +late_initcall_sync(qcom_suspend_trail_sdam_init);
 +
++/* Restarts the SDAM record so it describes only the coming suspend. */
++static void sdam_new_cycle(void)
++{
++	unsigned long flags;
++
++	if (!sdam_map)
++		return;
++
++	spin_lock_irqsave(&sdam_lock, flags);
++	memset(&sdam_cur.n_s2idle, 0,
++	       sizeof(sdam_cur) - offsetof(struct sdam_rec, n_s2idle));
++	sdam_sleep_cmds = 0;
++	sdam_wake_cmds = 0;
++	regmap_bulk_write(sdam_map, sdam_base + SDAM_DATA, &sdam_cur,
++			  sizeof(sdam_cur));
++	spin_unlock_irqrestore(&sdam_lock, flags);
++}
++
 +static int trail_pm_notify(struct notifier_block *nb, unsigned long action,
 +			   void *unused)
 +{
 +	switch (action) {
 +	case PM_SUSPEND_PREPARE:
 +		sdam_resolve();
++		sdam_new_cycle();
 +		WRITE_ONCE(trail_armed, true);
 +		trail_record(QST_EV_PM, 0, action, 0);
 +		break;
@@ -806,6 +856,9 @@ index 0000000..1b59575
 +	debugfs_create_file("current", 0400, dir, NULL, &trail_current_fops);
 +	debugfs_create_file("sdam_last", 0400, dir, NULL, &sdam_last_fops);
 +	debugfs_create_file("sdam_current", 0400, dir, NULL, &sdam_current_fops);
++	sdam_prev_blob.data = &sdam_prev;
++	sdam_prev_blob.size = sizeof(sdam_prev);
++	debugfs_create_blob("sdam_last_raw", 0400, dir, &sdam_prev_blob);
 +
 +	pr_info("%u entries at %pa\n", nent, &res.start);
 +	return 0;
