@@ -34,7 +34,7 @@ Subject: [PATCH] arm64: dts: qcom: cq8725s: configure the Odin 3 gamepad and DP 
  	};
  
  	pmic-glink {
-@@ -231,6 +246,32 @@
+@@ -231,6 +246,36 @@
  		};
  	};
  
@@ -48,8 +48,12 @@ Subject: [PATCH] arm64: dts: qcom: cq8725s: configure the Odin 3 gamepad and DP 
 +			compatible = "armada,suspend-trail";
 +			reg = <0x8 0xf0000000 0x0 0x20000>;
 +			no-map;
-+			/* DRAM does not survive the hang's reset; SDAM does. */
-+			armada,sdam = <&pmk8550_sdam_a800>;
++			/*
++			 * DRAM does not survive the hang's reset; SDAM does. The
++			 * first block this EE may write is used.
++			 */
++			armada,sdam = <&pmk8550_sdam_9800>, <&pmk8550_sdam_8400>,
++				      <&pmk8550_sdam_7d00>;
 +		};
 +
 +		ramoops@8f0100000 {
@@ -67,7 +71,7 @@ Subject: [PATCH] arm64: dts: qcom: cq8725s: configure the Odin 3 gamepad and DP 
  	vdd_fan_5v0: vdd-fan-5v0-regulator {
  		compatible = "regulator-fixed";
  		regulator-name = "vdd_fan_5v0";
-@@ -287,6 +328,7 @@
+@@ -287,6 +332,7 @@
  		wlan-enable-gpios = <&tlmm 16 GPIO_ACTIVE_HIGH>;
  		bt-enable-gpios = <&pm8550ve_f_gpios 3 GPIO_ACTIVE_HIGH>;
  
@@ -75,7 +79,7 @@ Subject: [PATCH] arm64: dts: qcom: cq8725s: configure the Odin 3 gamepad and DP 
  		vddio-supply = <&vreg_l3f_1p8>;
  		vddio1p2-supply = <&vreg_l2f_1p2>;
  		vddaon-supply = <&vreg_s4d_0p85>;
-@@ -565,6 +607,7 @@
+@@ -565,6 +611,7 @@
  			regulator-name = "vreg_s4d_0p85";
  			regulator-min-microvolt = <852000>;
  			regulator-max-microvolt = <1036000>;
@@ -83,7 +87,7 @@ Subject: [PATCH] arm64: dts: qcom: cq8725s: configure the Odin 3 gamepad and DP 
  			regulator-initial-mode = <RPMH_REGULATOR_MODE_HPM>;
  		};
  
-@@ -613,6 +656,7 @@
+@@ -613,6 +660,7 @@
  			regulator-name = "vreg_s5f_0p85";
  			regulator-min-microvolt = <852000>;
  			regulator-max-microvolt = <1000000>;
@@ -91,7 +95,7 @@ Subject: [PATCH] arm64: dts: qcom: cq8725s: configure the Odin 3 gamepad and DP 
  			regulator-initial-mode = <RPMH_REGULATOR_MODE_HPM>;
  		};
  
-@@ -630,6 +674,7 @@
+@@ -630,6 +678,7 @@
  			regulator-name = "vreg_l2f_1p2";
  			regulator-min-microvolt = <1200000>;
  			regulator-max-microvolt = <1200000>;
@@ -99,7 +103,7 @@ Subject: [PATCH] arm64: dts: qcom: cq8725s: configure the Odin 3 gamepad and DP 
  			regulator-initial-mode = <RPMH_REGULATOR_MODE_HPM>;
  			regulator-allow-set-load;
  			regulator-allowed-modes = <RPMH_REGULATOR_MODE_LPM
-@@ -640,6 +685,7 @@
+@@ -640,6 +689,7 @@
  			regulator-name = "vreg_l3f_1p8";
  			regulator-min-microvolt = <1800000>;
  			regulator-max-microvolt = <1800000>;
@@ -107,7 +111,7 @@ Subject: [PATCH] arm64: dts: qcom: cq8725s: configure the Odin 3 gamepad and DP 
  			regulator-initial-mode = <RPMH_REGULATOR_MODE_HPM>;
  			regulator-allow-set-load;
  			regulator-allowed-modes = <RPMH_REGULATOR_MODE_LPM
-@@ -982,7 +1028,7 @@
+@@ -982,7 +1032,7 @@
  };
  
  &pcieport0 {
@@ -116,20 +120,34 @@ Subject: [PATCH] arm64: dts: qcom: cq8725s: configure the Odin 3 gamepad and DP 
  	reset-gpios = <&tlmm 102 GPIO_ACTIVE_LOW>;
  
  	wifi@0 {
-@@ -1040,6 +1086,12 @@
+@@ -1040,6 +1090,26 @@
  		compatible = "qcom,spmi-sdam";
  		reg = <0x9d00>;
  	};
 +
-+	/* Unused by the stock firmware; holds the suspend trail summary. */
-+	pmk8550_sdam_a800: nvram@a800 {
++	/*
++	 * Suspend trail candidates. The vendor kernel gives these to the
++	 * AMOLED ECM and LPG pattern tables, neither of which this board
++	 * uses, so they are writable from HLOS and read all zero.
++	 */
++	pmk8550_sdam_7d00: nvram@7d00 {
 +		compatible = "qcom,spmi-sdam";
-+		reg = <0xa800>;
++		reg = <0x7d00>;
++	};
++
++	pmk8550_sdam_8400: nvram@8400 {
++		compatible = "qcom,spmi-sdam";
++		reg = <0x8400>;
++	};
++
++	pmk8550_sdam_9800: nvram@9800 {
++		compatible = "qcom,spmi-sdam";
++		reg = <0x9800>;
 +	};
  };
  
  &pmih0108 {
-@@ -1390,6 +1442,8 @@
+@@ -1390,6 +1460,8 @@
  
  	gamepad {
  		compatible = "gamepad,rsinput";

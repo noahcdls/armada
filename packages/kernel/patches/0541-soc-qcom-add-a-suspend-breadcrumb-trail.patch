@@ -21,7 +21,8 @@ whole trail in debugfs (suspend_trail/last and suspend_trail/current),
 provided the reset kept DRAM contents.
 
 On the Odin 3 every reset path loses DRAM, so a compact summary also goes
-to a PMIC SDAM block named by an "armada,sdam" phandle: counters (s2idle
+to a PMIC SDAM block, the first of the "armada,sdam" phandles that the
+SPMI arbiter lets this EE write: counters (s2idle
 entries, PSCI domain idle enter/exit, RSC flushes with the last result
 and the sleep/wake command counts), the last PSCI state, CPU and IRQ, and
 a ring of the last 96 one-byte stage codes. SDAM keeps its contents
@@ -36,6 +37,9 @@ Non-obvious choices:
   barrier, so a torn record from the moment of a hang is skipped.
 - Only rpmh_rsc_pd_callback() is touched outside the new driver, to
   record the flush result; everything else uses existing tracepoints.
+- Ownership is probed by writing back the first data byte unchanged,
+  so a block another EE owns, and the previous boot's trail, are left
+  untouched until a block is claimed.
 - SDAM writes go through the PMIC regmap, which is fast_io over the
   raw-spinlocked SPMI arbiter, so they are safe from the idle path. TCS
   writes are only counted; each SDAM event costs one ring byte plus a
@@ -110,10 +114,10 @@ index 66928ca..7f5e2a8 100644
  	return NOTIFY_OK;
 diff --git a/drivers/soc/qcom/suspend-trail.c b/drivers/soc/qcom/suspend-trail.c
 new file mode 100644
-index 0000000..0bbe7a2
+index 0000000..1b59575
 --- /dev/null
 +++ b/drivers/soc/qcom/suspend-trail.c
-@@ -0,0 +1,680 @@
+@@ -0,0 +1,693 @@
 +// SPDX-License-Identifier: GPL-2.0-only
 +/*
 + * Suspend breadcrumb trail for Qualcomm platforms.
@@ -487,39 +491,33 @@ index 0000000..0bbe7a2
 +}
 +DEFINE_SHOW_ATTRIBUTE(sdam_current);
 +
-+/* Looks up the SDAM block once the PMIC has probed. Process context only. */
-+static void sdam_resolve(void)
++/*
++ * Claims an SDAM block if the SPMI arbiter lets this EE write it. Ownership is
++ * probed by writing back the first data byte unchanged, so blocks owned by
++ * other EEs and the previous trail are left untouched.
++ */
++static int sdam_claim(struct device_node *np)
 +{
 +	struct platform_device *pdev;
-+	struct device_node *np;
 +	struct regmap *map;
 +	char name[40];
 +	unsigned int i, n;
 +	u32 base;
 +
-+	if (sdam_map || !trail_np)
-+		return;
-+
-+	np = of_parse_phandle(trail_np, "armada,sdam", 0);
-+	if (!np)
-+		return;
-+
 +	pdev = of_find_device_by_node(np);
-+	if (of_property_read_u32(np, "reg", &base) || !pdev) {
-+		of_node_put(np);
-+		return;
-+	}
-+	of_node_put(np);
-+
++	if (!pdev)
++		return -EPROBE_DEFER;
 +	map = dev_get_regmap(pdev->dev.parent, NULL);
 +	put_device(&pdev->dev);
-+	if (!map)
-+		return;
++	if (!map || of_property_read_u32(np, "reg", &base))
++		return -ENODEV;
 +
 +	if (regmap_bulk_read(map, base + SDAM_DATA, &sdam_prev,
-+			     sizeof(sdam_prev))) {
-+		pr_err("cannot read SDAM at %#x\n", base);
-+		return;
++			     sizeof(sdam_prev)))
++		return -EIO;
++	if (regmap_write(map, base + SDAM_DATA, sdam_prev.magic[0])) {
++		pr_info("SDAM: %#x is not writable from this EE\n", base);
++		return -EPERM;
 +	}
 +
 +	sdam_prev_valid = sdam_prev.magic[0] == SDAM_MAGIC0 &&
@@ -547,13 +545,32 @@ index 0000000..0bbe7a2
 +	sdam_cur.boot = sdam_prev_valid ? sdam_prev.boot + 1 : 1;
 +	if (regmap_bulk_write(map, base + SDAM_DATA, &sdam_cur,
 +			      sizeof(sdam_cur))) {
-+		pr_err("cannot write SDAM at %#x\n", base);
-+		return;
++		pr_err("SDAM: cannot write %#x\n", base);
++		return -EIO;
 +	}
 +
 +	sdam_base = base;
 +	WRITE_ONCE(sdam_map, map);
 +	pr_info("SDAM: recording to PMIC SDAM %#x\n", base);
++	return 0;
++}
++
++/* Claims the first usable "armada,sdam" block. Process context only. */
++static void sdam_resolve(void)
++{
++	struct device_node *np;
++	int i, ret;
++
++	if (sdam_map || !trail_np)
++		return;
++
++	for (i = 0; (np = of_parse_phandle(trail_np, "armada,sdam", i)); i++) {
++		ret = sdam_claim(np);
++		of_node_put(np);
++		/* Keep the order stable across boots: wait for an earlier block. */
++		if (!ret || ret == -EPROBE_DEFER)
++			return;
++	}
 +}
 +
 +static int __init qcom_suspend_trail_sdam_init(void)
