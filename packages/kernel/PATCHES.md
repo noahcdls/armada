@@ -370,7 +370,6 @@ no equivalent submission was found, or a permanent URL to the upstream submissio
 - `patches/0521-arm64-dts-qcom-sm8750-add-a-pcie-suspend-opp.patch`
   source: armada
   upstream: local
-  notes: The suspend OPP votes 0 kBps peak and average on both PCIe paths, so PCIe contributes nothing to the interconnect sleep set; it no longer serves as the SM8750 DDR (MC0) sleep floor that s2idle resume needs.
 - `patches/0527-arm64-dts-qcom-sm8650-add-a-pcie-suspend-opp.patch`
   source: armada
   upstream: local
