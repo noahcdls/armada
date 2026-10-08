@@ -1,0 +1,535 @@
+From: Armada <noreply@armada.local>
+Subject: [PATCH] soc: qcom: add a suspend breadcrumb trail
+
+Debug aid for suspend hangs that end in a reset, where the kernel log and
+trace buffers are lost with the hang.
+
+Record the late system suspend/resume sequence into a reserved memory
+region described by an "armada,suspend-trail" node:
+- PM notifier and suspend_resume phases (dpm_*, CPU_OFF, syscore,
+  machine_suspend), with the wakeup IRQ at post-suspend;
+- PSCI domain idle entry and exit with the composite state;
+- every RPMh TCS write (active votes from suspend prepare on, sleep and
+  wake sets from the noirq phase on) and active-request completions;
+- the APPS RSC power-domain notifier result, i.e. whether the sleep and
+  wake sets were flushed before the domain collapsed;
+- IRQs from the noirq phase until noirq resume.
+
+Each record is 24 bytes and carries the arch counter and CPU. The next
+boot prints the last 40 records of the previous trail and exposes the
+whole trail in debugfs (suspend_trail/last and suspend_trail/current),
+provided the reset kept DRAM contents.
+
+Non-obvious choices:
+- The ring counter lives in normal kernel memory; the reserved region is
+  mapped write-combine and atomics on non-cacheable memory are not
+  reliable.
+- Records are written with a sentinel seq first and committed with a
+  barrier, so a torn record from the moment of a hang is skipped.
+- Only rpmh_rsc_pd_callback() is touched outside the new driver, to
+  record the flush result; everything else uses existing tracepoints.
+---
+diff --git a/drivers/soc/qcom/Kconfig b/drivers/soc/qcom/Kconfig
+index 2caadbb..d5af2d5 100644
+--- a/drivers/soc/qcom/Kconfig
++++ b/drivers/soc/qcom/Kconfig
+@@ -171,6 +171,20 @@ config QCOM_RPMH
+ 	  of hardware components aggregate requests for these resources and
+ 	  help apply the aggregated state on the resource.
+ 
++config QCOM_SUSPEND_TRAIL
++	bool "Qualcomm suspend breadcrumb trail"
++	depends on ARM64 && PM_SLEEP && TRACEPOINTS && DEBUG_FS
++	depends on QCOM_RPMH=y
++	help
++	  Record the late system suspend and resume sequence (PM phases,
++	  PSCI domain idle entry and exit, RPMh TCS writes and flushes, late
++	  IRQs) into a reserved memory region described by an
++	  "armada,suspend-trail" node. When a suspend hang ends in a reset
++	  that keeps DRAM contents, the next boot prints the tail of the
++	  previous trail and exposes it in debugfs.
++
++	  If unsure, say N.
++
+ config QCOM_SMEM
+ 	tristate "Qualcomm Shared Memory Manager (SMEM)"
+ 	depends on ARCH_QCOM || COMPILE_TEST
+diff --git a/drivers/soc/qcom/Makefile b/drivers/soc/qcom/Makefile
+index b7f1d2a..1f511f8 100644
+--- a/drivers/soc/qcom/Makefile
++++ b/drivers/soc/qcom/Makefile
+@@ -22,6 +22,7 @@ obj-$(CONFIG_QCOM_RPM_MASTER_STATS)	+= rpm_master_stats.o
+ obj-$(CONFIG_QCOM_RPMH)		+= qcom_rpmh.o
+ qcom_rpmh-y			+= rpmh-rsc.o
+ qcom_rpmh-y			+= rpmh.o
++obj-$(CONFIG_QCOM_SUSPEND_TRAIL)	+= suspend-trail.o
+ obj-$(CONFIG_QCOM_SMD_RPM)	+= rpm-proc.o smd-rpm.o
+ obj-$(CONFIG_QCOM_SMEM) +=	smem.o
+ obj-$(CONFIG_QCOM_SMEM_STATE) += smem_state.o
+diff --git a/drivers/soc/qcom/rpmh-rsc.c b/drivers/soc/qcom/rpmh-rsc.c
+index 66928ca..7f5e2a8 100644
+--- a/drivers/soc/qcom/rpmh-rsc.c
++++ b/drivers/soc/qcom/rpmh-rsc.c
+@@ -29,6 +29,7 @@
+ 
+ #include <clocksource/arm_arch_timer.h>
+ #include <soc/qcom/cmd-db.h>
++#include <soc/qcom/suspend-trail.h>
+ #include <soc/qcom/tcs.h>
+ #include <dt-bindings/soc/qcom,rpmh-rsc.h>
+ 
+@@ -935,10 +936,15 @@ static int rpmh_rsc_pd_callback(struct notifier_block *nfb,
+ 				unsigned long action, void *v)
+ {
+ 	struct rsc_drv *drv = container_of(nfb, struct rsc_drv, genpd_nb);
++	int ret = 0;
+ 
+ 	/* We don't need to lock as genpd on/off are serialized */
+-	if ((action == GENPD_NOTIFY_PRE_OFF) &&
+-	    (rpmh_rsc_ctrlr_is_busy(drv) || rpmh_flush(&drv->client)))
++	if (action == GENPD_NOTIFY_PRE_OFF)
++		ret = rpmh_rsc_ctrlr_is_busy(drv) ? -EAGAIN :
++		      rpmh_flush(&drv->client);
++
++	qcom_suspend_trail_late(QST_EV_RSC_PD, drv->id, action, ret);
++	if (ret)
+ 		return NOTIFY_BAD;
+ 
+ 	return NOTIFY_OK;
+diff --git a/drivers/soc/qcom/suspend-trail.c b/drivers/soc/qcom/suspend-trail.c
+new file mode 100644
+index 0000000..c70a2ab
+--- /dev/null
++++ b/drivers/soc/qcom/suspend-trail.c
+@@ -0,0 +1,400 @@
++// SPDX-License-Identifier: GPL-2.0-only
++/*
++ * Suspend breadcrumb trail for Qualcomm platforms.
++ *
++ * Records the late system suspend/resume sequence (PM phases, PSCI domain
++ * idle entry and exit, RPMh TCS writes and flushes, late IRQs) into a
++ * reserved memory region. If the system hangs and resets with DRAM contents
++ * intact, the next boot prints the tail of the previous trail and exposes
++ * all of it in debugfs, showing how far suspend or resume got.
++ */
++
++#define pr_fmt(fmt) "suspend-trail: " fmt
++
++#include <linux/debugfs.h>
++#include <linux/init.h>
++#include <linux/interrupt.h>
++#include <linux/io.h>
++#include <linux/irq.h>
++#include <linux/of.h>
++#include <linux/of_address.h>
++#include <linux/pm_domain.h>
++#include <linux/seq_file.h>
++#include <linux/suspend.h>
++#include <linux/vmalloc.h>
++
++#include <asm/arch_timer.h>
++#include <clocksource/arm_arch_timer.h>
++#include <soc/qcom/suspend-trail.h>
++#include <trace/events/irq.h>
++#include <trace/events/power.h>
++
++#include "rpmh-internal.h"
++#include "trace-rpmh.h"
++
++#define TRAIL_MAGIC	0x4c525453	/* "STRL" */
++#define TRAIL_VERSION	1
++
++struct trail_hdr {
++	u32 magic;
++	u32 version;
++	u32 boot;
++	u32 nent;
++	u32 head;
++	u32 rsvd[11];
++};
++
++struct trail_entry {
++	u64 ts;
++	u32 seq;
++	u8 ev;
++	u8 cpu;
++	u16 x;
++	u32 a;
++	u32 b;
++};
++
++static const char * const sr_names[] = {
++	"?", "freeze_processes", "thaw_processes", "sync_filesystems",
++	"suspend_enter", "dpm_prepare", "dpm_suspend", "dpm_suspend_late",
++	"dpm_suspend_noirq", "CPU_OFF", "CPU_ON", "syscore_suspend",
++	"syscore_resume", "machine_suspend", "dpm_resume_noirq",
++	"dpm_resume_early", "dpm_resume", "dpm_complete",
++	"console_resume_all",
++};
++
++#define SR_DPM_SUSPEND_NOIRQ	8
++#define SR_DPM_RESUME_NOIRQ	14
++
++static const char * const tcs_states[] = { "sleep", "wake", "active", "?" };
++static const char * const pd_actions[] = { "pre-off", "off", "pre-on", "on" };
++
++static struct trail_hdr *hdr;
++static struct trail_entry *ents;
++static u32 nent;
++static atomic_t trail_seq = ATOMIC_INIT(0);
++static bool trail_armed;
++static bool trail_late;
++
++static void *last_trail;
++static size_t trail_size;
++
++static void trail_record(u8 ev, u16 x, u32 a, u32 b)
++{
++	struct trail_entry *e;
++	u32 seq;
++
++	if (!hdr)
++		return;
++
++	seq = atomic_inc_return(&trail_seq) - 1;
++	e = &ents[seq % nent];
++	WRITE_ONCE(e->seq, U32_MAX);
++	WRITE_ONCE(e->ts, __arch_counter_get_cntvct());
++	WRITE_ONCE(e->ev, ev);
++	WRITE_ONCE(e->cpu, raw_smp_processor_id());
++	WRITE_ONCE(e->x, x);
++	WRITE_ONCE(e->a, a);
++	WRITE_ONCE(e->b, b);
++	wmb();
++	WRITE_ONCE(e->seq, seq);
++	WRITE_ONCE(hdr->head, seq + 1);
++	wmb();
++}
++
++void qcom_suspend_trail_late(u8 ev, u16 x, u32 a, u32 b)
++{
++	if (READ_ONCE(trail_late))
++		trail_record(ev, x, a, b);
++}
++
++static void probe_suspend_resume(void *data, const char *action, int val,
++				 bool start)
++{
++	unsigned int id;
++
++	if (!READ_ONCE(trail_armed))
++		return;
++
++	for (id = ARRAY_SIZE(sr_names) - 1; id > 0; id--)
++		if (!strcmp(action, sr_names[id]))
++			break;
++
++	if (id == SR_DPM_SUSPEND_NOIRQ && start)
++		WRITE_ONCE(trail_late, true);
++
++	trail_record(QST_EV_SR, start, id, val);
++
++	if (id == SR_DPM_RESUME_NOIRQ && !start)
++		WRITE_ONCE(trail_late, false);
++}
++
++static void probe_psci_enter(void *data, unsigned int cpu, unsigned int state,
++			     bool s2idle)
++{
++	qcom_suspend_trail_late(QST_EV_PSCI_ENTER, s2idle, state, cpu);
++}
++
++static void probe_psci_exit(void *data, unsigned int cpu, unsigned int state,
++			    bool s2idle)
++{
++	qcom_suspend_trail_late(QST_EV_PSCI_EXIT, s2idle, state, cpu);
++}
++
++static void probe_rpmh_send(void *data, struct rsc_drv *d, int m,
++			    enum rpmh_state state, int n, u32 h,
++			    const struct tcs_cmd *c)
++{
++	u16 x = (state & 0x3) | (m & 0xf) << 2 | (n & 0x1f) << 6 |
++		(c->wait ? BIT(11) : 0) | (d->id & 0xf) << 12;
++
++	if (state == RPMH_ACTIVE_ONLY_STATE) {
++		if (READ_ONCE(trail_armed))
++			trail_record(QST_EV_TCS, x, c->addr, c->data);
++	} else {
++		qcom_suspend_trail_late(QST_EV_TCS, x, c->addr, c->data);
++	}
++}
++
++static void probe_rpmh_tx_done(void *data, struct rsc_drv *d, int m,
++			       const struct tcs_request *r)
++{
++	if (READ_ONCE(trail_armed))
++		trail_record(QST_EV_TX_DONE, m, r->cmds[0].addr, r->num_cmds);
++}
++
++static void probe_irq_entry(void *data, int irq, struct irqaction *action)
++{
++	struct irq_data *d = irq_get_irq_data(irq);
++
++	qcom_suspend_trail_late(QST_EV_IRQ, 0, irq, d ? d->hwirq : 0);
++}
++
++static int trail_pm_notify(struct notifier_block *nb, unsigned long action,
++			   void *unused)
++{
++	switch (action) {
++	case PM_SUSPEND_PREPARE:
++		WRITE_ONCE(trail_armed, true);
++		trail_record(QST_EV_PM, 0, action, 0);
++		break;
++	case PM_POST_SUSPEND:
++		trail_record(QST_EV_PM, 0, action, pm_wakeup_irq());
++		WRITE_ONCE(trail_late, false);
++		WRITE_ONCE(trail_armed, false);
++		break;
++	}
++
++	return NOTIFY_DONE;
++}
++
++static struct notifier_block trail_pm_nb = {
++	.notifier_call = trail_pm_notify,
++};
++
++static int trail_format(char *buf, size_t len, const struct trail_entry *e,
++			u32 rate)
++{
++	u64 sec = div_u64(e->ts, rate);
++	u64 usec = div_u64((e->ts - sec * rate) * USEC_PER_SEC, rate);
++	int n;
++
++	n = scnprintf(buf, len, "%8u %5llu.%06llu cpu%u ", e->seq, sec, usec,
++		      e->cpu);
++
++	switch (e->ev) {
++	case QST_EV_BOOT:
++		n += scnprintf(buf + n, len - n, "boot %u", e->a);
++		break;
++	case QST_EV_PM:
++		n += scnprintf(buf + n, len - n, "pm %s wakeup_irq=%u",
++			       e->a == PM_SUSPEND_PREPARE ? "suspend-prepare" :
++			       e->a == PM_POST_SUSPEND ? "post-suspend" : "?",
++			       e->b);
++		break;
++	case QST_EV_SR:
++		n += scnprintf(buf + n, len - n, "%s %s val=%d",
++			       e->a < ARRAY_SIZE(sr_names) ? sr_names[e->a] : "?",
++			       e->x ? "begin" : "end", (int)e->b);
++		break;
++	case QST_EV_PSCI_ENTER:
++	case QST_EV_PSCI_EXIT:
++		n += scnprintf(buf + n, len - n, "psci-%s state=%#x s2idle=%u",
++			       e->ev == QST_EV_PSCI_ENTER ? "enter" : "exit",
++			       e->a, e->x);
++		break;
++	case QST_EV_TCS:
++		n += scnprintf(buf + n, len - n,
++			       "tcs %s drv%u tcs%u cmd%u addr=%#x data=%#x%s",
++			       tcs_states[e->x & 0x3], e->x >> 12,
++			       (e->x >> 2) & 0xf, (e->x >> 6) & 0x1f, e->a, e->b,
++			       e->x & BIT(11) ? " wait" : "");
++		break;
++	case QST_EV_TX_DONE:
++		n += scnprintf(buf + n, len - n, "tx-done tcs%u addr=%#x n=%u",
++			       e->x, e->a, e->b);
++		break;
++	case QST_EV_IRQ:
++		n += scnprintf(buf + n, len - n, "irq %u hwirq %u", e->a, e->b);
++		break;
++	case QST_EV_RSC_PD:
++		n += scnprintf(buf + n, len - n, "rsc%u-pd %s ret=%d", e->x,
++			       e->a < ARRAY_SIZE(pd_actions) ?
++			       pd_actions[e->a] : "?", (int)e->b);
++		break;
++	default:
++		n += scnprintf(buf + n, len - n, "ev%u x=%#x a=%#x b=%#x",
++			       e->ev, e->x, e->a, e->b);
++		break;
++	}
++
++	return n;
++}
++
++/* Calls fn on each surviving entry of a trail image, oldest first. */
++static void trail_walk(const void *image,
++		       void (*fn)(const struct trail_entry *e, void *arg),
++		       void *arg, u32 max)
++{
++	const struct trail_hdr *h = image;
++	const struct trail_entry *es = image + sizeof(*h);
++	u32 newest = 0, first, s, i;
++	bool any = false;
++
++	for (i = 0; i < h->nent; i++) {
++		if (!es[i].ev || es[i].seq == U32_MAX)
++			continue;
++		if (!any || es[i].seq > newest)
++			newest = es[i].seq;
++		any = true;
++	}
++	if (!any)
++		return;
++
++	first = newest + 1 > h->nent ? newest + 1 - h->nent : 0;
++	if (max && newest + 1 - first > max)
++		first = newest + 1 - max;
++
++	for (s = first; s <= newest; s++) {
++		const struct trail_entry *e = &es[s % h->nent];
++
++		if (e->ev && e->seq == s)
++			fn(e, arg);
++	}
++}
++
++static void trail_show_entry(const struct trail_entry *e, void *arg)
++{
++	struct seq_file *m = arg;
++	char buf[128];
++
++	trail_format(buf, sizeof(buf), e, arch_timer_get_rate());
++	seq_printf(m, "%s\n", buf);
++}
++
++static int trail_last_show(struct seq_file *m, void *unused)
++{
++	if (!last_trail) {
++		seq_puts(m, "no trail from the previous boot\n");
++		return 0;
++	}
++
++	seq_printf(m, "boot %u\n", ((struct trail_hdr *)last_trail)->boot);
++	trail_walk(last_trail, trail_show_entry, m, 0);
++	return 0;
++}
++DEFINE_SHOW_ATTRIBUTE(trail_last);
++
++static int trail_current_show(struct seq_file *m, void *unused)
++{
++	void *image = vmalloc(trail_size);
++
++	if (!image)
++		return -ENOMEM;
++
++	memcpy(image, hdr, trail_size);
++	seq_printf(m, "boot %u\n", hdr->boot);
++	trail_walk(image, trail_show_entry, m, 0);
++	vfree(image);
++	return 0;
++}
++DEFINE_SHOW_ATTRIBUTE(trail_current);
++
++static void trail_print_entry(const struct trail_entry *e, void *arg)
++{
++	char buf[128];
++
++	trail_format(buf, sizeof(buf), e, arch_timer_get_rate());
++	pr_info("  %s\n", buf);
++}
++
++static int __init qcom_suspend_trail_init(void)
++{
++	struct device_node *np;
++	struct resource res;
++	struct dentry *dir;
++	u32 boot = 0;
++	void *base;
++	int ret;
++
++	np = of_find_compatible_node(NULL, NULL, "armada,suspend-trail");
++	if (!np)
++		return 0;
++
++	ret = of_address_to_resource(np, 0, &res);
++	of_node_put(np);
++	if (ret)
++		return ret;
++
++	trail_size = resource_size(&res);
++	if (trail_size < sizeof(*hdr) + 64 * sizeof(*ents))
++		return -EINVAL;
++
++	base = memremap(res.start, trail_size, MEMREMAP_WC);
++	if (!base)
++		return -ENOMEM;
++
++	nent = (trail_size - sizeof(*hdr)) / sizeof(*ents);
++
++	if (((struct trail_hdr *)base)->magic == TRAIL_MAGIC &&
++	    ((struct trail_hdr *)base)->version == TRAIL_VERSION &&
++	    ((struct trail_hdr *)base)->nent == nent) {
++		last_trail = vmalloc(trail_size);
++		if (last_trail) {
++			memcpy(last_trail, base, trail_size);
++			boot = ((struct trail_hdr *)last_trail)->boot;
++			pr_info("previous boot %u left %u events, last 40:\n",
++				boot, ((struct trail_hdr *)last_trail)->head);
++			trail_walk(last_trail, trail_print_entry, NULL, 40);
++		}
++	} else {
++		pr_info("no trail from the previous boot\n");
++	}
++
++	memset(base, 0, trail_size);
++	hdr = base;
++	ents = base + sizeof(*hdr);
++	hdr->magic = TRAIL_MAGIC;
++	hdr->version = TRAIL_VERSION;
++	hdr->boot = boot + 1;
++	hdr->nent = nent;
++	wmb();
++
++	trail_record(QST_EV_BOOT, 0, hdr->boot, 0);
++
++	WARN_ON(register_trace_suspend_resume(probe_suspend_resume, NULL));
++	WARN_ON(register_trace_psci_domain_idle_enter(probe_psci_enter, NULL));
++	WARN_ON(register_trace_psci_domain_idle_exit(probe_psci_exit, NULL));
++	WARN_ON(register_trace_rpmh_send_msg(probe_rpmh_send, NULL));
++	WARN_ON(register_trace_rpmh_tx_done(probe_rpmh_tx_done, NULL));
++	WARN_ON(register_trace_irq_handler_entry(probe_irq_entry, NULL));
++	register_pm_notifier(&trail_pm_nb);
++
++	dir = debugfs_create_dir("suspend_trail", NULL);
++	debugfs_create_file("last", 0400, dir, NULL, &trail_last_fops);
++	debugfs_create_file("current", 0400, dir, NULL, &trail_current_fops);
++
++	pr_info("%u entries at %pa\n", nent, &res.start);
++	return 0;
++}
++subsys_initcall(qcom_suspend_trail_init);
+diff --git a/include/soc/qcom/suspend-trail.h b/include/soc/qcom/suspend-trail.h
+new file mode 100644
+index 0000000..0baa845
+--- /dev/null
++++ b/include/soc/qcom/suspend-trail.h
+@@ -0,0 +1,25 @@
++/* SPDX-License-Identifier: GPL-2.0-only */
++#ifndef __SOC_QCOM_SUSPEND_TRAIL_H__
++#define __SOC_QCOM_SUSPEND_TRAIL_H__
++
++#include <linux/types.h>
++
++enum qcom_suspend_trail_event {
++	QST_EV_BOOT = 1,
++	QST_EV_PM,
++	QST_EV_SR,
++	QST_EV_PSCI_ENTER,
++	QST_EV_PSCI_EXIT,
++	QST_EV_TCS,
++	QST_EV_TX_DONE,
++	QST_EV_IRQ,
++	QST_EV_RSC_PD,
++};
++
++#if IS_ENABLED(CONFIG_QCOM_SUSPEND_TRAIL)
++void qcom_suspend_trail_late(u8 ev, u16 x, u32 a, u32 b);
++#else
++static inline void qcom_suspend_trail_late(u8 ev, u16 x, u32 a, u32 b) { }
++#endif
++
++#endif /* __SOC_QCOM_SUSPEND_TRAIL_H__ */

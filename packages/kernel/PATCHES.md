@@ -353,6 +353,12 @@ no equivalent submission was found, or a permanent URL to the upstream submissio
 - `patches/0526-regulator-apply-state-mem-in-s2idle-only-for-opted-in-drivers.patch`
   source: armada
   upstream: local
+- `patches/0541-soc-qcom-add-a-suspend-breadcrumb-trail.patch`
+  source: armada
+  upstream: local
+- `patches/0543-PCI-qcom-let-the-suspend-opp-floor-be-skipped-for-debugging.patch`
+  source: armada
+  upstream: local
 - `patches/0514-PCI-qcom-honor-iommu-map-cell-count.patch`
   source: https://lkml.iu.edu/2609.0/16096.html
   upstream: https://lore.kernel.org/r/20260907143349.317495-1-mani@kernel.org
@@ -555,6 +561,9 @@ no equivalent submission was found, or a permanent URL to the upstream submissio
   source: https://github.com/ROCKNIX/distribution/blob/b1e9d07b251c5a013d303a518106c547db001b74/projects/ROCKNIX/devices/SM8750/patches/linux/0075-arm64-dts-qcom-sm8750-add-CPU-thermal-cooling.patch
   upstream: unknown
   notes: Linux 7.2 supplies the CPU cooling-cell properties; Armada retains the missing passive trips and cooling maps.
+- `patches/0542-arm64-dts-qcom-sm8750-describe-the-tcsr-download-mode-cookie.patch`
+  source: armada
+  upstream: local
 - `patches/0049-drm-msm-a8xx-add-adreno-830-catalog.patch`
   source: https://github.com/ROCKNIX/distribution/blob/bcf3b5bc574990b96543484575b06f912153a715/projects/ROCKNIX/devices/SM8750/patches/linux/0049-drm-msm-a8xx-add-adreno-830-catalog.patch
   upstream: unknown

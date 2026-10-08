@@ -1,0 +1,35 @@
+From: Armada <noreply@armada.local>
+Subject: [PATCH] PCI: qcom: let the suspend OPP floor be skipped for debugging
+
+Add pcie_qcom.suspend_opp_floor (default Y, writable at runtime). Setting
+it to N makes s2idle drop the PCIe OPP to NULL as upstream does, removing
+the DDR sleep-set floor from the suspend OPP. This reproduces the s2idle
+DDR-collapse hang on demand, without a rebuild, for the suspend trail
+and RAM-dump debugging. The default keeps the floor.
+---
+diff --git a/drivers/pci/controller/dwc/pcie-qcom.c b/drivers/pci/controller/dwc/pcie-qcom.c
+index ec4fc54..44d31a7 100644
+--- a/drivers/pci/controller/dwc/pcie-qcom.c
++++ b/drivers/pci/controller/dwc/pcie-qcom.c
+@@ -2197,6 +2197,12 @@ err_pm_runtime_put:
+ 	return ret;
+ }
+ 
++/* Debug knob: drop the suspend OPP floor to reproduce the s2idle hang. */
++static bool suspend_opp_floor = true;
++module_param(suspend_opp_floor, bool, 0644);
++MODULE_PARM_DESC(suspend_opp_floor,
++		 "Keep the DT suspend OPP during s2idle (default: Y)");
++
+ /*
+  * Use the DT suspend OPP to retain the PCIe DDR/LLCC sleep-set votes
+  * during s2idle. Suspend-to-RAM tears the link down and keeps dropping
+@@ -2209,7 +2215,7 @@ static int qcom_pcie_set_suspend_opp(struct qcom_pcie *pcie)
+ 	unsigned long freq;
+ 	int ret;
+ 
+-	if (pm_suspend_target_state == PM_SUSPEND_MEM)
++	if (pm_suspend_target_state == PM_SUSPEND_MEM || !suspend_opp_floor)
+ 		return dev_pm_opp_set_opp(dev, NULL);
+ 
+ 	freq = dev_pm_opp_get_suspend_opp_freq(dev);
