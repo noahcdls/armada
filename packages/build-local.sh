@@ -42,6 +42,11 @@ case "${pkg}" in
         phase2_args=(--network none) ;;
 esac
 
+# The kernel cross-compiles natively elsewhere; its output is arm64 either way.
+if [ "${pkg}" = kernel ] && [ "$(uname -m)" != aarch64 ]; then
+    platform=linux/amd64
+fi
+
 if [ "${platform}" = linux/aarch64 ] && [ "$(uname -m)" != aarch64 ]; then
     echo "warning: ${pkg} builds aarch64 under emulation on $(uname -m); expect it to be very slow" >&2
 fi

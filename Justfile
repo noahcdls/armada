@@ -109,6 +109,41 @@ packages:
         just package "${pkg}"
     done
 
+# Cross-build the kernel here and tag it so `just build` uses it
+[group('Packages')]
+kernel-local:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    packages/build-local.sh kernel
+    hash="$(packages/package-hash.sh kernel)"
+    # Same layout as the out-kernel stage; no RUN, so no emulation needed.
+    printf 'FROM scratch\nCOPY . /kernel/\n' | podman build \
+        --platform linux/arm64 \
+        -t "localhost/armada/pkg/kernel:${hash}" \
+        -f - packages/kernel/out
+    echo "==> localhost/armada/pkg/kernel:${hash}"
+
+# Push an image to a registry devices can pull from (default: one on this host at :5000)
+[group('Packages')]
+push-local $target_image=image_name $tag=default_tag:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    registry="${ARMADA_LOCAL_REGISTRY:-localhost:5000}"
+    if [[ "${registry}" == localhost:* ]]; then
+        if ! podman container exists armada-registry; then
+            podman run -d --name armada-registry \
+                -p "${registry#localhost:}:5000" \
+                -v armada-registry:/var/lib/registry \
+                docker.io/library/registry:2
+        fi
+        podman start armada-registry >/dev/null
+    fi
+    podman push --tls-verify=false "${target_image}:${tag}" \
+        "${registry}/${target_image}:${tag}"
+    echo "==> ${registry}/${target_image}:${tag}"
+    echo "On the device, with the registry listed as insecure in"
+    echo "/etc/containers/registries.conf.d: sudo bootc switch <host>:${registry##*:}/${target_image}:${tag}"
+
 # Show each package's content hash and whether it is built locally
 [group('Packages')]
 packages-status:

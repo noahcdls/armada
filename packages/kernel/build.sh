@@ -15,5 +15,9 @@ mkdir -p out
 dnf -y install gcc binutils make bc bison flex openssl-devel \
     elfutils-libelf-devel dwarves zstd xz cpio patch curl perl-interpreter python3 \
     findutils diffutils gawk grep sed coreutils hostname gzip tar ccache kmod
+# build-local.sh cross-compiles on x86_64 hosts instead of emulating arm64.
+if [ "$(uname -m)" = x86_64 ]; then
+    dnf -y install gcc-aarch64-linux-gnu binutils-aarch64-linux-gnu
+fi
 WORK_DIR=/tmp/armada-kernel-build OUT_DIR=/work/out \
     bash scripts/build-kernel.sh
