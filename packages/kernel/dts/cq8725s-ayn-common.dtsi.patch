@@ -1,5 +1,5 @@
 From: Armada <noreply@armada.local>
-Subject: [PATCH] arm64: dts: qcom: cq8725s: configure the Odin 3 gamepad and DP audio, fix PCIe WAKE# polarity, keep the Wi-Fi PMU rails on, reserve suspend debug memory, disable the unused WSA macros
+Subject: [PATCH] arm64: dts: qcom: cq8725s: configure the Odin 3 gamepad and DP audio, fix PCIe WAKE# polarity, keep the Wi-Fi PMU rails on, reserve suspend debug memory, disable the unused WSA macros, fix the swapped USB QMP PHY supplies
 
 --- a/arch/arm64/boot/dts/qcom/cq8725s-ayn-common.dtsi
 +++ b/arch/arm64/boot/dts/qcom/cq8725s-ayn-common.dtsi
@@ -176,3 +176,14 @@ Subject: [PATCH] arm64: dts: qcom: cq8725s: configure the Odin 3 gamepad and DP 
  
  		gamepad-name = "AYN Odin3 Gamepad";
  		gamepad-bus = <0x0003>;
+@@ -1430,8 +1515,8 @@
+ };
+ 
+ &usb_dp_qmpphy {
+-	vdda-phy-supply = <&vreg_l3g_1p2>;
+-	vdda-pll-supply = <&vreg_l2d_0p88>;
++	vdda-phy-supply = <&vreg_l2d_0p88>;
++	vdda-pll-supply = <&vreg_l3g_1p2>;
+ 
+ 	mode-switch;
+ 

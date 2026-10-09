@@ -234,3 +234,17 @@ v2_20260420_neil_armstrong_arm64_qcom_sm8650_misc_enhancements.patch
 0563-ASoC-codecs-lpass-macro-force-runtime-suspend-across-system-sleep.patch
 0564-soundwire-qcom-force-runtime-suspend-across-system-sleep.patch
 0565-pinctrl-qcom-sm8650-lpass-lpi-force-runtime-suspend-across-system-sleep.patch
+
+# ============== Upstream fixes from linux-next (Oct 2026) ==============
+# 0570-0574: cpuidle PSCI OSI domains start powered off (needs the three genpd core patches)
+0570-pmdomain-core-Rename-genpd_status_on.patch
+0571-pmdomain-core-Allow-a-non-CPU-device-in-a-CPU-PM-dom.patch
+0572-pmdomain-core-Add-a-genpd-config-to-support-unknown-.patch
+0573-cpuidle-psci-Initialize-the-PM-domains-in-powered-of.patch
+0574-cpuidle-psci-Move-initialization-a-bit-earlier-in-th.patch
+0575-thermal-drivers-qcom-spmi-temp-alarm-Fix-temp_map-in.patch
+0576-wifi-ath12k-fix-out-of-bounds-access-on-TX-stats-arr.patch
+0577-wifi-ath12k-Reserve-space-for-a-string-terminator.patch
+0578-wifi-ath12k-Free-allocated-CE-IRQs-on-request_irq-fa.patch
+0579-drm-msm-dpu-compute-the-CRTC-bandwidth-from-the-stat.patch
+0580-Revert-wifi-ath12k-add-panic-handler.patch

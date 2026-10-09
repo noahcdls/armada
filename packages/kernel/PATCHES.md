@@ -837,3 +837,47 @@ no equivalent submission was found, or a permanent URL to the upstream submissio
   source: armada
   upstream: local
   notes: Same for the LPASS LPI pin controller, which the SoundWire controllers keep runtime-active through their device links (held by 0603); otherwise it keeps LPASS_HW_MACRO/DCODEC voted in s2idle.
+- `patches/0570-pmdomain-core-Rename-genpd_status_on.patch`
+  source: https://git.kernel.org/next/linux-next/c/81f1099186fd501768ea4bd24523347211322fbe
+  upstream: n/a
+  notes: Prerequisite for 0573.
+- `patches/0571-pmdomain-core-Allow-a-non-CPU-device-in-a-CPU-PM-dom.patch`
+  source: https://git.kernel.org/next/linux-next/c/9e8dff8e097814e4d7c65cd211ccb1e2fceb460a
+  upstream: https://lore.kernel.org/all/CAPx+jO-sCierYj8jnoKQHckJG16dOBxnNrsZVYO=38R2cLV8nw@mail.gmail.com/
+  notes: Prerequisite for 0573.
+- `patches/0572-pmdomain-core-Add-a-genpd-config-to-support-unknown-.patch`
+  source: https://git.kernel.org/next/linux-next/c/2224d686e788d6ad3af4cc48bbf68723f8abd326
+  upstream: https://lore.kernel.org/all/20260811-domain_off_ss3-v1-0-6a0a0fc023f5@oss.qualcomm.com/
+  notes: Prerequisite for 0573 (GENPD_FLAG_POWER_UNKNOWN).
+- `patches/0573-cpuidle-psci-Initialize-the-PM-domains-in-powered-of.patch`
+  source: https://git.kernel.org/next/linux-next/c/6d3080bfe007c88c38b6faf6d3ab23171af359f0
+  upstream: https://lore.kernel.org/all/20260811-domain_off_ss3-v1-0-6a0a0fc023f5@oss.qualcomm.com/
+  notes: SM8750 uses PSCI OS-initiated mode; the CPU cluster genpds were registered as on, which can pick a shallower domain idle state.
+- `patches/0574-cpuidle-psci-Move-initialization-a-bit-earlier-in-th.patch`
+  source: https://git.kernel.org/next/linux-next/c/65705b18162bbf0771adf742ee528521957fb496
+  upstream: n/a
+  notes: Second half of the OSI init fix.
+- `patches/0575-thermal-drivers-qcom-spmi-temp-alarm-Fix-temp_map-in.patch`
+  source: https://git.kernel.org/next/linux-next/c/1419c8256fba229625ec7dbd465d39b6b90dab2c
+  upstream: https://patch.msgid.link/20260928132823.1426513-1-djakov@kernel.org
+  notes: Out-of-bounds read of the trip table; wrong PMIC temp-alarm thresholds whenever the threshold index is non-zero (PM8550/PMIH0108 on the Odin 3).
+- `patches/0576-wifi-ath12k-fix-out-of-bounds-access-on-TX-stats-arr.patch`
+  source: https://git.kernel.org/next/linux-next/c/c8f83d3389d1d1b318ac3bd2ae3d60c2862c90b4
+  upstream: https://patch.msgid.link/20260819053247.1420393-2-pardeep.kaur@oss.qualcomm.com
+  notes: Unchecked hardware indices on the TX completion path could write past the stats arrays.
+- `patches/0577-wifi-ath12k-Reserve-space-for-a-string-terminator.patch`
+  source: https://git.kernel.org/next/linux-next/c/13b15eabe2c541b80406166964cdc8ccb5e9c32a
+  upstream: https://patch.msgid.link/20261003095913.575108-1-yaojiale02@163.com
+  notes: ath12k string buffer missing room for the NUL.
+- `patches/0578-wifi-ath12k-Free-allocated-CE-IRQs-on-request_irq-fa.patch`
+  source: https://git.kernel.org/next/linux-next/c/12ca935af2e68447e9218a615ebbb5ff7faf1554
+  upstream: https://patch.msgid.link/20260819110215.2485514-2-aaradhana.sahu@oss.qualcomm.com
+  notes: Error-path cleanup for CE IRQ registration.
+- `patches/0579-drm-msm-dpu-compute-the-CRTC-bandwidth-from-the-stat.patch`
+  source: https://git.kernel.org/next/linux-next/c/480ba24aa34031c898d0a711405664cd947bbee4
+  upstream: https://patch.msgid.link/20261002130656.50577-1-26rote@gmail.com
+  notes: After DPMS off/on or s2idle the MDP average bandwidth vote stayed 0 until a plane changed.
+- `patches/0580-Revert-wifi-ath12k-add-panic-handler.patch`
+  source: https://git.kernel.org/torvalds/c/05165f7b3b9ab6817fe216c24f90755b7c5e15f3
+  upstream: https://patch.msgid.link/20260612032332.2278338-1-yingying.tang@oss.qualcomm.com
+  notes: The panic notifier sleeps under RCU, turning a panic into a hang (and losing the ramoops record). Rebased: core.h context.
