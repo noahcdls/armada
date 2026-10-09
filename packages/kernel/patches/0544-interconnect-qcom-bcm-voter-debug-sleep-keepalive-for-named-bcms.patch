@@ -1,0 +1,68 @@
+From: Armada <noreply@armada.local>
+Subject: [PATCH] interconnect: qcom: bcm-voter: debug sleep keepalive for named BCMs
+
+The SM8750 s2idle hang on wake is avoided by the PCIe suspend OPP floor,
+which keeps MC0 and SH0 at one unit in the sleep set. A one-unit MC0
+sleep vote alone no longer avoids it.
+
+Add icc_bcm_voter.sleep_keepalive_bcms, a comma-separated list of BCM
+names (e.g. "MC0,SH0") that keep a one-unit sleep-set vote when they
+would otherwise drop to 0. It is empty by default and writable at
+runtime, so the minimal floor can be found by testing combinations
+with pcie_qcom.suspend_opp_floor=N. A change applies at the next commit
+of each BCM.
+
+Test only.
+---
+diff --git a/drivers/interconnect/qcom/bcm-voter.c b/drivers/interconnect/qcom/bcm-voter.c
+index a2d437a..8e159cf 100644
+--- a/drivers/interconnect/qcom/bcm-voter.c
++++ b/drivers/interconnect/qcom/bcm-voter.c
+@@ -58,6 +58,34 @@ static u64 bcm_div(u64 num, u32 base)
+ 	return num;
+ }
+ 
++/*
++ * Debug knob: comma-separated BCM names, e.g. "MC0,SH0", that keep a one-unit
++ * sleep-set vote. Used to find the minimal floor that avoids a suspend hang.
++ * Empty by default. A change applies at the next commit of each BCM.
++ */
++static char sleep_keepalive_bcms[64];
++module_param_string(sleep_keepalive_bcms, sleep_keepalive_bcms,
++		    sizeof(sleep_keepalive_bcms), 0644);
++MODULE_PARM_DESC(sleep_keepalive_bcms,
++		 "BCMs that keep a minimal sleep-set vote (debug, default: none)");
++
++static bool bcm_sleep_keepalive(const struct qcom_icc_bcm *bcm)
++{
++	const char *s = sleep_keepalive_bcms;
++	size_t len = strlen(bcm->name);
++
++	while (*s) {
++		if (!strncmp(s, bcm->name, len) &&
++		    (s[len] == ',' || s[len] == '\n' || s[len] == '\0'))
++			return true;
++		s = strchrnul(s, ',');
++		if (*s)
++			s++;
++	}
++
++	return false;
++}
++
+ /* BCMs with enable_mask use one-hot-encoding for on/off signaling */
+ static void bcm_aggregate_mask(struct qcom_icc_bcm *bcm)
+ {
+@@ -122,6 +150,12 @@ static void bcm_aggregate(struct qcom_icc_bcm *bcm)
+ 		bcm->vote_y[QCOM_ICC_BUCKET_AMC] = 1;
+ 		bcm->vote_y[QCOM_ICC_BUCKET_WAKE] = 1;
+ 	}
++
++	if (bcm->vote_x[QCOM_ICC_BUCKET_SLEEP] == 0 &&
++	    bcm->vote_y[QCOM_ICC_BUCKET_SLEEP] == 0 && bcm_sleep_keepalive(bcm)) {
++		bcm->vote_x[QCOM_ICC_BUCKET_SLEEP] = 1;
++		bcm->vote_y[QCOM_ICC_BUCKET_SLEEP] = 1;
++	}
+ }
+ 
+ static inline void tcs_cmd_gen(struct tcs_cmd *cmd, u64 vote_x, u64 vote_y,
