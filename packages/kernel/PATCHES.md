@@ -359,6 +359,10 @@ no equivalent submission was found, or a permanent URL to the upstream submissio
 - `patches/0543-PCI-qcom-let-the-suspend-opp-floor-be-skipped-for-debugging.patch`
   source: armada
   upstream: local
+- `patches/0544-interconnect-qcom-sm8750-optional-mc0-only-sleep-floor.patch`
+  source: armada
+  upstream: local
+  notes: Test knob. icc_bcm_voter.sleep_keepalive (default N) keeps only MC0 in the sleep set, as an alternative to the PCIe floor that also holds SH0/CN0.
 - `patches/0514-PCI-qcom-honor-iommu-map-cell-count.patch`
   source: https://lkml.iu.edu/2609.0/16096.html
   upstream: https://lore.kernel.org/r/20260907143349.317495-1-mani@kernel.org
