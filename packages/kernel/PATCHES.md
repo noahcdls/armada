@@ -363,6 +363,10 @@ no equivalent submission was found, or a permanent URL to the upstream submissio
   source: armada
   upstream: local
   notes: Test knob. icc_bcm_voter.sleep_keepalive_bcms (default empty) keeps a one-unit sleep vote on the listed BCMs, to find the minimal suspend floor.
+- `patches/0545-interconnect-qcom-sm8750-keep-sn4-in-the-sleep-set.patch`
+  source: armada
+  upstream: local
+  notes: Fixes the SM8750 s2idle wake hang: SN4 (PCIe aggregate NoC) must stay nonzero in the APPS sleep set. Replaces the 0521 PCIe suspend OPP floor.
 - `patches/0514-PCI-qcom-honor-iommu-map-cell-count.patch`
   source: https://lkml.iu.edu/2609.0/16096.html
   upstream: https://lore.kernel.org/r/20260907143349.317495-1-mani@kernel.org
