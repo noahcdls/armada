@@ -120,6 +120,7 @@ v9_20260729_qualcomm_crypto_qce_runtime_pm_interconnect.patch
 0543-PCI-qcom-let-the-suspend-opp-floor-be-skipped-for-debugging.patch
 0544-interconnect-qcom-bcm-voter-debug-sleep-keepalive-for-named-bcms.patch
 0545-interconnect-qcom-sm8750-keep-sn4-in-the-sleep-set.patch
+0546-interconnect-qcom-bcm-voter-debug-knob-to-ignore-the-built-in-sleep-keepalive.patch
 0522-PCI-host-common-let-only-endpoints-veto-d3cold.patch
 0523-regulator-qcom-rpmh-add-suspend-state-support.patch
 0524-regulator-core-apply-mem-state-for-s2idle.patch

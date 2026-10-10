@@ -881,3 +881,7 @@ no equivalent submission was found, or a permanent URL to the upstream submissio
   source: https://git.kernel.org/torvalds/c/05165f7b3b9ab6817fe216c24f90755b7c5e15f3
   upstream: https://patch.msgid.link/20260612032332.2278338-1-yingying.tang@oss.qualcomm.com
   notes: The panic notifier sleeps under RCU, turning a panic into a hang (and losing the ramoops record). Rebased: core.h context.
+- `patches/0546-interconnect-qcom-bcm-voter-debug-knob-to-ignore-the-built-in-sleep-keepalive.patch`
+  source: armada
+  upstream: local
+  notes: Debug only. Runtime switch to drop the 0545 SN4 sleep keepalive for re-testing the s2idle wake hang.
