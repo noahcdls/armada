@@ -1,0 +1,65 @@
+From: Armada <noreply@armada.local>
+Subject: [PATCH] interconnect: qcom: bcm-voter: debug wake keepalive for named BCMs
+
+The SM8750 s2idle wake hang is avoided by keeping SN4 at one unit in the
+sleep set (keepalive_sleep), which leaves it at 1 asleep and 0 in the
+wake set. That vote also appears to be what keeps DDR out of low power,
+and DDR is the only thing the AOP reports as blocking CX power collapse.
+
+To test the opposite arrangement, add icc_bcm_voter.wake_keepalive_bcms,
+a comma-separated list of BCM names that get the regular keepalive: one
+unit in the active and wake sets when they would otherwise be 0, sleep
+set untouched. Together with sleep_keepalive_off=Y this gives SN4 = 0
+while asleep and 1 restored by the wake set. Empty by default and
+writable at runtime; a change applies at the next commit of each BCM.
+
+Test only.
+---
+--- a/drivers/interconnect/qcom/bcm-voter.c
++++ b/drivers/interconnect/qcom/bcm-voter.c
+@@ -79,9 +79,21 @@
+ MODULE_PARM_DESC(sleep_keepalive_off,
+ 		 "Ignore the built-in sleep-set keepalive (debug, default: false)");
+ 
+-static bool bcm_sleep_keepalive(const struct qcom_icc_bcm *bcm)
++/*
++ * Debug knob: comma-separated BCM names that get the regular keepalive, i.e. a
++ * one-unit vote in the active and wake sets when they would otherwise be 0,
++ * without touching the sleep set. With sleep_keepalive_off this gives "0
++ * while asleep, 1 from the wake set on". Empty by default. A change applies
++ * at the next commit of each BCM.
++ */
++static char wake_keepalive_bcms[64];
++module_param_string(wake_keepalive_bcms, wake_keepalive_bcms,
++		    sizeof(wake_keepalive_bcms), 0644);
++MODULE_PARM_DESC(wake_keepalive_bcms,
++		 "BCMs that keep a minimal active and wake-set vote (debug, default: none)");
++
++static bool bcm_name_listed(const char *s, const struct qcom_icc_bcm *bcm)
+ {
+-	const char *s = sleep_keepalive_bcms;
+ 	size_t len = strlen(bcm->name);
+ 
+ 	while (*s) {
+@@ -96,6 +108,11 @@
+ 	return false;
+ }
+ 
++static bool bcm_sleep_keepalive(const struct qcom_icc_bcm *bcm)
++{
++	return bcm_name_listed(sleep_keepalive_bcms, bcm);
++}
++
+ /* BCMs with enable_mask use one-hot-encoding for on/off signaling */
+ static void bcm_aggregate_mask(struct qcom_icc_bcm *bcm)
+ {
+@@ -153,7 +170,8 @@
+ 		bcm->vote_y[bucket] = bcm_div(temp, bcm->aux_data.unit);
+ 	}
+ 
+-	if (bcm->keepalive && bcm->vote_x[QCOM_ICC_BUCKET_AMC] == 0 &&
++	if ((bcm->keepalive || bcm_name_listed(wake_keepalive_bcms, bcm)) &&
++	    bcm->vote_x[QCOM_ICC_BUCKET_AMC] == 0 &&
+ 	    bcm->vote_y[QCOM_ICC_BUCKET_AMC] == 0) {
+ 		bcm->vote_x[QCOM_ICC_BUCKET_AMC] = 1;
+ 		bcm->vote_x[QCOM_ICC_BUCKET_WAKE] = 1;

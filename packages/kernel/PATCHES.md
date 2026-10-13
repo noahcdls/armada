@@ -852,6 +852,10 @@ no equivalent submission was found, or a permanent URL to the upstream submissio
   source: armada
   upstream: local
   notes: Debug only. Runtime switch to drop the 0545 SN4 sleep keepalive for re-testing the s2idle wake hang.
+- `patches/0547-interconnect-qcom-bcm-voter-debug-wake-keepalive-for-named-bcms.patch`
+  source: armada
+  upstream: local
+  notes: Debug only. icc_bcm_voter.wake_keepalive_bcms names BCMs that keep one unit in the active and wake sets (sleep set untouched); with sleep_keepalive_off=Y it tests SN4 at 0 asleep and 1 from the wake set.
 - `patches/0555-soc-qcom-aoss-add-a-raw-qmp-send-debugfs-file.patch`
   source: armada
   upstream: local
