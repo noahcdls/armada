@@ -860,6 +860,10 @@ no equivalent submission was found, or a permanent URL to the upstream submissio
   source: armada
   upstream: local
   notes: Debug only. /sys/kernel/debug/qcom_aoss/send forwards a raw QMP message, used to start the AOP lpm_mon violator log (read back from 0xc320000) that shows which DRV blocks CX power collapse in suspend.
+- `patches/0556-remoteproc-qcom-pas-add-the-sm8750-soccp.patch`
+  source: armada
+  upstream: local
+  notes: Debug only. Adds the SM8750 SoCCP to the PAS driver (manual start, reloads soccp.mbn) and a soccp_dstate file that requests D0/D3 over SMP2P with the vendor's DDR path vote, to test whether the unmanaged SoCCP is what needs the system NoC during sleep.
 - `patches/0700-wifi-mac80211-fix-unauthorised-port-check-for-encap-.patch`
   source: https://git.kernel.org/next/linux-next/c/d59b9bf7df49367e01b06e82dd0f6e7ad3be493c
   upstream: https://patch.msgid.link/20260802105818.dd5da579813d.I51ed0121154bb652bebc97bb0597b1fae9ac978f@changeid

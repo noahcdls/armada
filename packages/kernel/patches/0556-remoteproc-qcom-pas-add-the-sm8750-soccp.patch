@@ -1,0 +1,155 @@
+From: Armada <noreply@armada.local>
+Subject: [PATCH] remoteproc: qcom: pas: add the SM8750 SoCCP with a D-state test interface
+
+The SM8750 bootloader leaves an early SoCCP image running that does not
+speak SMP2P and stays in D0. The SoCCP sits on the aggre2 NoC, behind
+the system NoC, and on the Odin 3 an s2idle wake hangs whenever every
+system NoC vote is 0 in the APPS sleep set. The vendor kernel reloads
+soccp.mbn through PAS (id 51), votes the SoCCP's path to DDR while it is
+in D0, and drops that vote only after asking it to go to D3.
+
+Add the SM8750 SoCCP with the vendor's PAS id and crash-reason SMEM item
+and the CX/MX proxy domains used for the Kaanapali SoCCP. It is not
+auto-booted: the reload resets a running SoCCP through TZ.
+
+When the node carries the vendor's "wakeup" and "sleep" SMP2P states,
+add a write-only soccp_dstate file: "d0" votes the DDR path and requests
+D0, "d3" requests D3 and then drops the vote.
+
+Test only.
+---
+--- a/drivers/remoteproc/qcom_q6v5_pas.c
++++ b/drivers/remoteproc/qcom_q6v5_pas.c
+@@ -10,6 +10,7 @@
+ #include <linux/clk.h>
+ #include <linux/delay.h>
+ #include <linux/firmware.h>
++#include <linux/interconnect.h>
+ #include <linux/interrupt.h>
+ #include <linux/iommu.h>
+ #include <linux/kernel.h>
+@@ -123,6 +124,13 @@
+ 
+ 	struct qcom_pas_context *pas_ctx;
+ 	struct qcom_pas_context *dtb_pas_ctx;
++
++	/* SoCCP D-state requests over SMP2P */
++	struct qcom_smem_state *soccp_wake_state;
++	struct qcom_smem_state *soccp_sleep_state;
++	unsigned int soccp_wake_bit;
++	unsigned int soccp_sleep_bit;
++	bool soccp_path_voted;
+ };
+ 
+ static void qcom_pas_segment_dump(struct rproc *rproc,
+@@ -818,6 +826,49 @@
+ 	}
+ }
+ 
++#define SOCCP_STATE_MASK	(BIT(9) | BIT(10))
++#define SOCCP_PATH_KBPS		1200
++
++/*
++ * Test interface for the SoCCP power states, following the vendor driver:
++ * "d0" votes the SoCCP's path to DDR and asks it to run, "d3" asks it to go
++ * dormant and then drops the path. The state it reached can be read from the
++ * TCSR register at 0x1fda000 (2 = D0, 4 = D1, 8 = D3).
++ */
++static ssize_t soccp_dstate_store(struct device *dev, struct device_attribute *attr,
++				  const char *buf, size_t count)
++{
++	struct qcom_pas *pas = dev_get_drvdata(dev);
++	int ret;
++
++	if (sysfs_streq(buf, "d0")) {
++		if (!pas->soccp_path_voted) {
++			ret = icc_set_bw(pas->q6v5.path, SOCCP_PATH_KBPS, SOCCP_PATH_KBPS);
++			if (ret)
++				return ret;
++			pas->soccp_path_voted = true;
++		}
++		ret = qcom_smem_state_update_bits(pas->soccp_wake_state, SOCCP_STATE_MASK,
++						  BIT(pas->soccp_wake_bit));
++	} else if (sysfs_streq(buf, "d3")) {
++		ret = qcom_smem_state_update_bits(pas->soccp_sleep_state, SOCCP_STATE_MASK,
++						  BIT(pas->soccp_sleep_bit));
++		if (ret)
++			return ret;
++		/* The vendor polls the state register for up to 5 ms before releasing */
++		msleep(100);
++		if (pas->soccp_path_voted) {
++			icc_set_bw(pas->q6v5.path, 0, 0);
++			pas->soccp_path_voted = false;
++		}
++	} else {
++		return -EINVAL;
++	}
++
++	return ret ? ret : count;
++}
++static DEVICE_ATTR_WO(soccp_dstate);
++
+ static int qcom_pas_probe(struct platform_device *pdev)
+ {
+ 	const struct qcom_pas_data *desc;
+@@ -931,6 +982,16 @@
+ 	if (desc->early_boot)
+ 		pas->rproc->state = RPROC_DETACHED;
+ 
++	if (of_property_match_string(pdev->dev.of_node, "qcom,smem-state-names",
++				     "wakeup") >= 0) {
++		pas->soccp_wake_state = devm_qcom_smem_state_get(&pdev->dev, "wakeup",
++								 &pas->soccp_wake_bit);
++		pas->soccp_sleep_state = devm_qcom_smem_state_get(&pdev->dev, "sleep",
++								  &pas->soccp_sleep_bit);
++		if (!IS_ERR(pas->soccp_wake_state) && !IS_ERR(pas->soccp_sleep_state))
++			device_create_file(&pdev->dev, &dev_attr_soccp_dstate);
++	}
++
+ 	ret = rproc_add(rproc);
+ 	if (ret)
+ 		goto remove_ssr_sysmon;
+@@ -963,6 +1024,8 @@
+ {
+ 	struct qcom_pas *pas = platform_get_drvdata(pdev);
+ 
++	device_remove_file(&pdev->dev, &dev_attr_soccp_dstate);
++
+ 	if (pas->bam_dmux)
+ 		of_platform_device_destroy(&pas->bam_dmux->dev, NULL);
+ 
+@@ -1763,6 +1826,26 @@
+ 	.region_assign_vmid = QCOM_SCM_VMID_MSS_MSA,
+ };
+ 
++/*
++ * The bootloader leaves an early SoCCP image running that does not speak
++ * SMP2P and stays in D0; the vendor kernel reloads soccp.mbn, which then
++ * follows the D0/D3 requests. Not auto-booted: the reload resets a running
++ * SoCCP through TZ, so it is started by hand while that is being validated.
++ */
++static const struct qcom_pas_data sm8750_soccp_resource = {
++	.crash_reason_smem = 656,
++	.firmware_name = "soccp.mbn",
++	.pas_id = 51,
++	.proxy_pd_names = (char*[]){
++		"cx",
++		"mx",
++		NULL
++	},
++	.ssr_name = "soccp",
++	.sysmon_name = "soccp",
++	.auto_boot = false,
++};
++
+ static const struct qcom_pas_data kaanapali_soccp_resource = {
+ 	.crash_reason_smem = 656,
+ 	.firmware_name = "soccp.mbn",
+@@ -1906,6 +1989,7 @@
+ 	{ .compatible = "qcom,sm8650-cdsp-pas", .data = &sm8650_cdsp_resource },
+ 	{ .compatible = "qcom,sm8650-mpss-pas", .data = &sm8650_mpss_resource },
+ 	{ .compatible = "qcom,sm8750-mpss-pas", .data = &sm8750_mpss_resource },
++	{ .compatible = "qcom,sm8750-soccp-pas", .data = &sm8750_soccp_resource },
+ 	{ .compatible = "qcom,x1e80100-adsp-pas", .data = &x1e80100_adsp_resource },
+ 	{ .compatible = "qcom,x1e80100-cdsp-pas", .data = &x1e80100_cdsp_resource },
+ 	{ },

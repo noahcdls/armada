@@ -124,6 +124,7 @@
 0546-interconnect-qcom-bcm-voter-debug-knob-to-ignore-the-built-in-sleep-keepalive.patch
 0547-interconnect-qcom-bcm-voter-debug-wake-keepalive-for-named-bcms.patch
 0555-soc-qcom-aoss-add-a-raw-qmp-send-debugfs-file.patch
+0556-remoteproc-qcom-pas-add-the-sm8750-soccp.patch
 0522-PCI-host-common-let-only-endpoints-veto-d3cold.patch
 0523-regulator-qcom-rpmh-add-suspend-state-support.patch
 0524-regulator-core-apply-mem-state-for-s2idle.patch
