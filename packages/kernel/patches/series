@@ -128,6 +128,8 @@ v9_20260729_qualcomm_crypto_qce_runtime_pm_interconnect.patch
 0544-interconnect-qcom-bcm-voter-debug-sleep-keepalive-for-named-bcms.patch
 0545-interconnect-qcom-sm8750-keep-sn4-in-the-sleep-set.patch
 0546-interconnect-qcom-bcm-voter-debug-knob-to-ignore-the-built-in-sleep-keepalive.patch
+0555-soc-qcom-aoss-add-a-raw-qmp-send-debugfs-file.patch
+0556-remoteproc-qcom-pas-manage-the-sm8750-soccp.patch
 0522-PCI-host-common-let-only-endpoints-veto-d3cold.patch
 0523-regulator-qcom-rpmh-add-suspend-state-support.patch
 0524-regulator-core-apply-mem-state-for-s2idle.patch
@@ -209,6 +211,7 @@ v2_20260420_neil_armstrong_arm64_qcom_sm8650_misc_enhancements.patch
 0035-arm64-dts-qcom-sm8750-set-CPU-capacity-dmips-mhz.patch
 0037-arm64-dts-qcom-sm8750-add-CPU-thermal-cooling.patch
 0542-arm64-dts-qcom-sm8750-describe-the-tcsr-download-mode-cookie.patch
+0557-arm64-dts-qcom-sm8750-add-the-soccp.patch
 0049-drm-msm-a8xx-add-adreno-830-catalog.patch
 0039-wifi-ath12k-add-initial-hardware-definition-for-WCN7.patch
 0040-wifi-ath12k-send-QDSS-config-when-CNSS_QDSS_CFG_MISS.patch
@@ -233,6 +236,7 @@ v2_20260420_neil_armstrong_arm64_qcom_sm8650_misc_enhancements.patch
 0538-ASoC-qcom-sc8280xp-cap-Pocket-DS-speaker-digital-volume.patch
 0529-ASoC-qdsp6-q6apm-fail-the-graph-open-when-the-DSP-rejects-it.patch
 0530-ASoC-qdsp6-release-AudioReach-graphs-across-system-suspend.patch
+0531-ASoC-qcom-sc8280xp-release-the-board-i2s-clock-across-system-suspend.patch
 0532-hwmon-pwm-fan-optionally-run-the-fan-while-charging-in-s2idle.patch
 
 # ============== LPASS clocks released in s2idle (7.3 backports + force suspend) ==============
