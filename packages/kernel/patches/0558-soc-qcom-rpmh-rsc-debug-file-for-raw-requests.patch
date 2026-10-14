@@ -1,0 +1,112 @@
+From: Armada <noreply@armada.local>
+Subject: [PATCH] soc: qcom: rpmh-rsc: debug file for raw requests
+
+Add /sys/kernel/debug/<rsc>_raw. Writing "<a|s|w> <addr> <data>" sends one
+request in the active, sleep or wake state through the normal rpmh_write()
+path. It is for finding what keeps the SM8750 out of AOSS deep sleep:
+votes the bootloader left on resources that no Linux driver owns (unused
+XO clock buffers, rails, bus clocks) can be cleared or changed one at a
+time, with addresses taken from /sys/kernel/debug/cmd-db.
+
+Test only. A wrong request can take the board down.
+---
+--- a/drivers/soc/qcom/rpmh-rsc.c
++++ b/drivers/soc/qcom/rpmh-rsc.c
+@@ -8,6 +8,7 @@
+ 
+ #include <linux/atomic.h>
+ #include <linux/cpu_pm.h>
++#include <linux/debugfs.h>
+ #include <linux/delay.h>
+ #include <linux/interrupt.h>
+ #include <linux/io.h>
+@@ -25,10 +26,12 @@
+ #include <linux/pm_runtime.h>
+ #include <linux/slab.h>
+ #include <linux/spinlock.h>
++#include <linux/uaccess.h>
+ #include <linux/wait.h>
+ 
+ #include <clocksource/arm_arch_timer.h>
+ #include <soc/qcom/cmd-db.h>
++#include <soc/qcom/rpmh.h>
+ #include <soc/qcom/suspend-trail.h>
+ #include <soc/qcom/tcs.h>
+ #include <dt-bindings/soc/qcom,rpmh-rsc.h>
+@@ -1056,6 +1059,66 @@
+ 	return 0;
+ }
+ 
++/*
++ * Debug only: "<a|s|w> <addr> <data>" sends one raw request in the active,
++ * sleep or wake state, for clearing or testing votes that no driver owns.
++ * An active request waits for its completion; sleep and wake requests are
++ * cached and written at the next flush.
++ */
++static ssize_t rpmh_rsc_raw_write(struct file *file, const char __user *ubuf,
++				  size_t count, loff_t *ppos)
++{
++	struct rsc_drv *drv = file->private_data;
++	struct tcs_cmd cmd = {};
++	enum rpmh_state state;
++	struct device *child;
++	u32 addr, data;
++	char buf[40], st;
++	int ret;
++
++	if (count >= sizeof(buf))
++		return -EINVAL;
++	if (copy_from_user(buf, ubuf, count))
++		return -EFAULT;
++	buf[count] = '\0';
++
++	if (sscanf(buf, "%c %x %x", &st, &addr, &data) != 3)
++		return -EINVAL;
++
++	switch (st) {
++	case 'a':
++		state = RPMH_ACTIVE_ONLY_STATE;
++		break;
++	case 's':
++		state = RPMH_SLEEP_STATE;
++		break;
++	case 'w':
++		state = RPMH_WAKE_ONLY_STATE;
++		break;
++	default:
++		return -EINVAL;
++	}
++
++	/* rpmh_write() finds the controller through a child of the RSC */
++	child = device_find_any_child(drv->dev);
++	if (!child)
++		return -ENODEV;
++
++	cmd.addr = addr;
++	cmd.data = data;
++	cmd.wait = state == RPMH_ACTIVE_ONLY_STATE;
++	ret = rpmh_write(child, state, &cmd, 1);
++	put_device(child);
++
++	return ret ? ret : count;
++}
++
++static const struct file_operations rpmh_rsc_raw_fops = {
++	.open = simple_open,
++	.write = rpmh_rsc_raw_write,
++	.llseek = default_llseek,
++};
++
+ static int rpmh_rsc_probe(struct platform_device *pdev)
+ {
+ 	struct device_node *dn = pdev->dev.of_node;
+@@ -1158,6 +1221,9 @@
+ 	dev_set_drvdata(&pdev->dev, drv);
+ 	drv->dev = &pdev->dev;
+ 
++	debugfs_create_file(devm_kasprintf(&pdev->dev, GFP_KERNEL, "%s_raw", drv->name) ?: "rsc_raw",
++			    0200, NULL, drv, &rpmh_rsc_raw_fops);
++
+ 	return devm_of_platform_populate(&pdev->dev);
+ }
+ 
