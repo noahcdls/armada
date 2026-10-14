@@ -355,6 +355,10 @@ no equivalent submission was found, or a permanent URL to the upstream submissio
 - `patches/0541-soc-qcom-add-a-suspend-breadcrumb-trail.patch`
   source: armada
   upstream: local
+- `patches/0558-soc-qcom-rpmh-rsc-debug-file-for-raw-requests.patch`
+  source: armada
+  upstream: local
+  notes: Debug only, for the AOSS deep sleep (aosd) investigation. /sys/kernel/debug/apps_rsc_raw takes "<a|s|w> <addr> <data>" and sends one raw RPMh request, to clear or change votes no Linux driver owns.
 - `patches/0543-PCI-qcom-let-the-suspend-opp-floor-be-skipped-for-debugging.patch`
   source: armada
   upstream: local
