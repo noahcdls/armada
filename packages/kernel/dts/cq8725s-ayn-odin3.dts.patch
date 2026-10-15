@@ -13,7 +13,7 @@ Subject: [PATCH] arm64: dts: qcom: odin3: enable DPU dithering, codec and WCN ra
  	reset-gpios = <&tlmm 98 GPIO_ACTIVE_LOW>;
  
  	vddio-supply = <&vreg_l12b_1p8>;
-@@ -350,3 +353,84 @@
+@@ -350,3 +353,92 @@
  		};
  	};
  };
@@ -88,6 +88,14 @@ Subject: [PATCH] arm64: dts: qcom: odin3: enable DPU dithering, codec and WCN ra
 +};
 +
 +&vreg_s5f_0p85 {
++	regulator-state-mem {
++		regulator-on-in-suspend;
++		regulator-mode = <RPMH_REGULATOR_MODE_LPM>;
++	};
++};
++
++/* Experiment: also idle the USB PHY PLL rail in LPM to see whether aosd is reachable */
++&vreg_l3g_1p2 {
 +	regulator-state-mem {
 +		regulator-on-in-suspend;
 +		regulator-mode = <RPMH_REGULATOR_MODE_LPM>;
