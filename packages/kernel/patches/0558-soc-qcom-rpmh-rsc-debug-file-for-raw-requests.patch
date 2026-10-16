@@ -17,6 +17,11 @@ last-CPU PRE_OFF of an s2idle cycle, snapshot the GCC GDSC status
 registers and the SoCCP TCSR D-state, to catch a domain the kernel thinks
 is off but the hardware keeps on (as the PCIe GDSCs were with 0044).
 
+Also add /sys/kernel/debug/el1_timers: per-CPU CNTP/CNTV control and
+compare values (writing "disarm" clears CNTP_CTL on every CPU), captured
+at the PRE_OFF too once a manual read succeeded, to check for an EL1
+physical timer the boot chain left armed.
+
 Test only. A wrong request can take the board down.
 ---
 --- a/drivers/soc/qcom/rpmh-rsc.c
@@ -30,7 +35,7 @@ Test only. A wrong request can take the board down.
  #include <linux/delay.h>
  #include <linux/interrupt.h>
  #include <linux/io.h>
-@@ -25,10 +27,13 @@
+@@ -25,10 +27,14 @@
  #include <linux/pm_runtime.h>
  #include <linux/slab.h>
  #include <linux/spinlock.h>
@@ -38,13 +43,14 @@ Test only. A wrong request can take the board down.
 +#include <linux/uaccess.h>
  #include <linux/wait.h>
  
++#include <asm/sysreg.h>
  #include <clocksource/arm_arch_timer.h>
  #include <soc/qcom/cmd-db.h>
 +#include <soc/qcom/rpmh.h>
  #include <soc/qcom/suspend-trail.h>
  #include <soc/qcom/tcs.h>
  #include <dt-bindings/soc/qcom,rpmh-rsc.h>
-@@ -941,6 +946,81 @@
+@@ -941,6 +947,176 @@
   * * NOTIFY_OK          - success
   * * NOTIFY_BAD         - failure
   */
@@ -78,6 +84,96 @@ Test only. A wrong request can take the board down.
 +static unsigned int rsc_snap_count;
 +static bool rsc_snap_ready;
 +
++/*
++ * Debug only: EL1 physical and virtual timer state per CPU. Linux at EL1 here
++ * ticks on CNTV; CNTP is unused, so a deadline the boot chain left armed in it
++ * would never be cleared, and the firmware may derive the APSS wake deadline
++ * from it. The PRE_OFF capture only runs after a manual read succeeded.
++ */
++struct rsc_tmr {
++	u64 pctl, pcval, vctl, vcval, pcnt, vcnt;
++};
++
++static DEFINE_PER_CPU(struct rsc_tmr, rsc_tmr_now);
++static struct rsc_tmr rsc_tmr_snap;
++static int rsc_tmr_snap_cpu = -1;
++static bool rsc_tmr_safe;
++
++static void rsc_tmr_read(struct rsc_tmr *t)
++{
++	t->pctl = read_sysreg(cntp_ctl_el0);
++	t->pcval = read_sysreg(cntp_cval_el0);
++	t->vctl = read_sysreg(cntv_ctl_el0);
++	t->vcval = read_sysreg(cntv_cval_el0);
++	t->pcnt = read_sysreg(cntpct_el0);
++	t->vcnt = read_sysreg(cntvct_el0);
++}
++
++static void rsc_tmr_read_cpu(void *unused)
++{
++	rsc_tmr_read(this_cpu_ptr(&rsc_tmr_now));
++}
++
++static void rsc_tmr_disarm_cpu(void *unused)
++{
++	write_sysreg(0, cntp_ctl_el0);
++	isb();
++}
++
++static void rsc_tmr_print(struct seq_file *m, int cpu, struct rsc_tmr *t)
++{
++	seq_printf(m, "%4d  %8llx %+14lld  %8llx %+14lld\n", cpu,
++		   t->pctl, div_s64((s64)(t->pcval - t->pcnt), 19200),
++		   t->vctl, div_s64((s64)(t->vcval - t->vcnt), 19200));
++}
++
++static int rpmh_rsc_tmr_show(struct seq_file *m, void *unused)
++{
++	int cpu;
++
++	on_each_cpu(rsc_tmr_read_cpu, NULL, 1);
++	rsc_tmr_safe = true;
++
++	seq_puts(m, " cpu  CNTP_CTL  CVAL-now (ms)  CNTV_CTL  CVAL-now (ms)   CTL: bit0 enable, bit1 mask, bit2 pending\n");
++	for_each_online_cpu(cpu)
++		rsc_tmr_print(m, cpu, per_cpu_ptr(&rsc_tmr_now, cpu));
++	if (rsc_tmr_snap_cpu >= 0) {
++		seq_puts(m, "last s2idle PRE_OFF (last CPU):\n");
++		rsc_tmr_print(m, rsc_tmr_snap_cpu, &rsc_tmr_snap);
++	}
++
++	return 0;
++}
++
++static int rpmh_rsc_tmr_open(struct inode *inode, struct file *file)
++{
++	return single_open(file, rpmh_rsc_tmr_show, NULL);
++}
++
++static ssize_t rpmh_rsc_tmr_write(struct file *file, const char __user *ubuf,
++				  size_t count, loff_t *ppos)
++{
++	char buf[16] = {};
++
++	if (copy_from_user(buf, ubuf, min(count, sizeof(buf) - 1)))
++		return -EFAULT;
++	if (!sysfs_streq(buf, "disarm"))
++		return -EINVAL;
++
++	on_each_cpu(rsc_tmr_disarm_cpu, NULL, 1);
++	pr_info("rpmh-rsc: CNTP disarmed on all CPUs\n");
++
++	return count;
++}
++
++static const struct file_operations rpmh_rsc_tmr_fops = {
++	.open = rpmh_rsc_tmr_open,
++	.read = seq_read,
++	.write = rpmh_rsc_tmr_write,
++	.llseek = seq_lseek,
++	.release = single_release,
++};
++
 +static void rpmh_rsc_snap(void)
 +{
 +	int i;
@@ -87,6 +183,10 @@ Test only. A wrong request can take the board down.
 +
 +	for (i = 0; i < ARRAY_SIZE(rsc_snap_regs); i++)
 +		rsc_snap_val[i] = readl_relaxed(rsc_snap_base[i]);
++	if (rsc_tmr_safe) {
++		rsc_tmr_read(&rsc_tmr_snap);
++		rsc_tmr_snap_cpu = smp_processor_id();
++	}
 +	rsc_snap_count++;
 +}
 +
@@ -121,12 +221,13 @@ Test only. A wrong request can take the board down.
 +	}
 +	rsc_snap_ready = true;
 +	debugfs_create_file("rsc_suspend_snapshot", 0400, NULL, NULL, &rpmh_rsc_snap_fops);
++	debugfs_create_file("el1_timers", 0600, NULL, NULL, &rpmh_rsc_tmr_fops);
 +}
 +
  static int rpmh_rsc_pd_callback(struct notifier_block *nfb,
  				unsigned long action, void *v)
  {
-@@ -951,6 +1031,8 @@
+@@ -951,6 +1127,8 @@
  	if (action == GENPD_NOTIFY_PRE_OFF)
  		ret = rpmh_rsc_ctrlr_is_busy(drv) ? -EAGAIN :
  		      rpmh_flush(&drv->client);
@@ -135,7 +236,7 @@ Test only. A wrong request can take the board down.
  
  	qcom_suspend_trail_late(QST_EV_RSC_PD, drv->id, action, ret);
  	if (ret)
-@@ -1056,6 +1138,95 @@
+@@ -1056,6 +1234,95 @@
  	return 0;
  }
  
@@ -231,7 +332,7 @@ Test only. A wrong request can take the board down.
  static int rpmh_rsc_probe(struct platform_device *pdev)
  {
  	struct device_node *dn = pdev->dev.of_node;
-@@ -1158,6 +1329,13 @@
+@@ -1158,6 +1425,13 @@
  	dev_set_drvdata(&pdev->dev, drv);
  	drv->dev = &pdev->dev;
  
