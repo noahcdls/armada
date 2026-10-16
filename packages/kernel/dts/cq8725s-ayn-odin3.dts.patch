@@ -13,7 +13,7 @@ Subject: [PATCH] arm64: dts: qcom: odin3: enable DPU dithering, codec and WCN ra
  	reset-gpios = <&tlmm 98 GPIO_ACTIVE_LOW>;
  
  	vddio-supply = <&vreg_l12b_1p8>;
-@@ -350,3 +353,120 @@
+@@ -350,3 +353,124 @@
  		};
  	};
  };
@@ -123,6 +123,10 @@ Subject: [PATCH] arm64: dts: qcom: odin3: enable DPU dithering, codec and WCN ra
 +		interrupts-extended = <&sleepstate_smp2p_in 0 IRQ_TYPE_EDGE_BOTH>;
 +		interrupt-names = "smp2p-sleepstate-in";
 +	};
++};
++/* TEST: no SPMI (PMIC SDAM) writes from the suspend trail at sleep entry; DRAM trail only */
++&{/reserved-memory/suspend-trail@8f0000000} {
++	/delete-property/ armada,sdam;
 +};
 +/* Replaces the bootloader's early SoCCP image, which blocks SoC deep sleep */
 +&remoteproc_soccp {
