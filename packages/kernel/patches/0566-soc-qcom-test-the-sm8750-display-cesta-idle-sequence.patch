@@ -12,7 +12,10 @@ is held: SCC init, AOSS vote, optional pass-through priming (pt_nodes),
 GDSC to hardware control, release, then poll for mode2. The CRM state is
 logged at each step and kept in /sys/kernel/debug/disp_cesta. A wedged
 pass-through FSM aborts the suspend rather than hanging the next CX
-collapse. Off unless sm8750_disp_cesta.enable is set.
+collapse. On resume from mode2 it votes again so the sequencer powers the
+GDSC back up, then returns it to software control before the display
+resumes. Every step leaves a suspend-trail SDAM stage code. Off unless
+sm8750_disp_cesta.enable is set.
 ---
 --- a/drivers/soc/qcom/Makefile
 +++ b/drivers/soc/qcom/Makefile
@@ -26,7 +29,7 @@ collapse. Off unless sm8750_disp_cesta.enable is set.
  obj-$(CONFIG_QCOM_SMEM) +=	qcom_smem.o
 --- /dev/null
 +++ b/drivers/soc/qcom/sm8750-disp-cesta.c
-@@ -0,0 +1,379 @@
+@@ -0,0 +1,458 @@
 +// SPDX-License-Identifier: GPL-2.0-only
 +/*
 + * SM8750 display CESTA idle test.
@@ -43,6 +46,11 @@ collapse. Off unless sm8750_disp_cesta.enable is set.
 + * while MMCX is held, and log the CRM state at each step. Off unless the
 + * "enable" parameter is set; pass-through nodes are only used when set in
 + * "pt_nodes". If the GDSC is not collapsed it goes back to software control.
++ *
++ * On resume from mode2, vote again so the sequencer powers the GDSC back up,
++ * then take it back under software control before the display resumes. The
++ * votes are left in place. Each step leaves a stage code in the suspend
++ * trail's PMIC SDAM ring, which survives a reset.
 + */
 +
 +#include <linux/debugfs.h>
@@ -57,6 +65,8 @@ collapse. Off unless sm8750_disp_cesta.enable is set.
 +#include <linux/pm_runtime.h>
 +#include <linux/seq_file.h>
 +#include <linux/stdarg.h>
++
++#include <soc/qcom/suspend-trail.h>
 +
 +#define RSCC_SEQ_PWR_CTRL_STATUS	0x2d0
 +#define RSCC_MODE2			BIT(12)
@@ -85,6 +95,9 @@ collapse. Off unless sm8750_disp_cesta.enable is set.
 +#define CRM_SW0_PT_IRQ_CLEAR		(CRM_SW0 + 0xa4)
 +#define CRM_SW0_PT_IRQ_EN		(CRM_SW0 + 0xa8)
 +#define CRM_SW0_PT_TRIGGER		(CRM_SW0 + 0x100)
++#define CRM_SW0_CLK_ACTIVE		(CRM_SW0 + 0x20)
++#define CRM_SW0_CLK_SLEEP		(CRM_SW0 + 0x24)
++#define CRM_SW0_CLK_WAKE		(CRM_SW0 + 0x28)
 +#define CRMB_PT_DATA(node)		(0x6400 + 0x14 * (node))
 +#define CRMB_PT_STATUS(node)		(0x6400 + 0x14 * (node) + 0xc)
 +#define CRMB_PT_FSM			0x647c
@@ -107,7 +120,17 @@ collapse. Off unless sm8750_disp_cesta.enable is set.
 +#define GDSC_CFG_DOWN			BIT(15)
 +
 +#define POLL_US				5000
-+#define LOG_SIZE			2048
++
++/* Suspend trail stage codes */
++enum {
++	ST_SUSPEND = 0x01, ST_AOSS_UP, ST_GDSC_HW, ST_AOSS_DOWN, ST_MODE2,
++	ST_NO_MODE2, ST_SW_COLLAPSED, ST_BUSY = 0x0f,
++	ST_PRIME = 0x10, ST_RELEASE = 0x20,	/* | node */
++	ST_RESUME = 0x30, ST_WAKE_VOTED, ST_WAKE_UP, ST_WAKE_NOT_UP,
++	ST_WAKE_CLK, ST_SW_BACK, ST_RESUME_DONE,
++	ST_COMPLETE = 0x38, ST_COMPLETE_DONE,
++};
++#define LOG_SIZE			4096
 +
 +static bool enable;
 +module_param(enable, bool, 0644);
@@ -117,6 +140,10 @@ collapse. Off unless sm8750_disp_cesta.enable is set.
 +module_param(pt_nodes, uint, 0644);
 +MODULE_PARM_DESC(pt_nodes, "Mask of pass-through nodes to prime and release (0: none)");
 +
++static uint wake_clk;
++module_param(wake_clk, uint, 0644);
++MODULE_PARM_DESC(wake_clk, "CRMB clock vote (COMMIT|VALID|MHz, e.g. 0x60000013) to wake the sequencer if votes alone do not; 0: none");
++
 +static uint pt_prime = 0x60000001;
 +module_param(pt_prime, uint, 0644);
 +MODULE_PARM_DESC(pt_prime, "Pass-through priming vote for nodes other than ACV");
@@ -125,6 +152,7 @@ collapse. Off unless sm8750_disp_cesta.enable is set.
 +	struct device *dev;
 +	void __iomem *rscc, *wrap, *crm, *gdsc;
 +	bool left_hw;
++	u32 mask;
 +	bool rpm_held;
 +	char log[LOG_SIZE];
 +	size_t len;
@@ -210,6 +238,21 @@ collapse. Off unless sm8750_disp_cesta.enable is set.
 +		clog(c, "GDSC did not collapse under software control (cfg %x)", v);
 +}
 +
++static int disp_cesta_prime(struct disp_cesta *c, u32 mask)
++{
++	int i, node;
++
++	for (i = 0; i < ARRAY_SIZE(pt_order); i++) {
++		node = pt_order[i];
++		if (!(mask & BIT(node)))
++			continue;
++		if (disp_cesta_pt(c, node, node == 4 ? PT_VOTE_ZERO : pt_prime))
++			return -ETIMEDOUT;
++		qcom_suspend_trail_stage(ST_PRIME | node);
++	}
++	return 0;
++}
++
 +static int disp_cesta_suspend_noirq(struct device *dev)
 +{
 +	struct disp_cesta *c = dev_get_drvdata(dev);
@@ -220,7 +263,9 @@ collapse. Off unless sm8750_disp_cesta.enable is set.
 +	if (!enable || !c->rpm_held)
 +		return 0;
 +
++	qcom_suspend_trail_stage(ST_SUSPEND);
 +	c->len = 0;
++	c->mask = mask;
 +	clog(c, "pt_nodes %#x pt_prime %#x", mask, pt_prime);
 +	disp_cesta_dump(c, "pre");
 +
@@ -242,39 +287,47 @@ collapse. Off unless sm8750_disp_cesta.enable is set.
 +	writel(1, c->crm + CRM_SW0_PT_IRQ_EN);
 +
 +	if (disp_cesta_aoss(c, 4))
-+		goto out;
-+	for (i = 0; i < ARRAY_SIZE(pt_order); i++)
-+		if ((mask & BIT(pt_order[i])) &&
-+		    disp_cesta_pt(c, pt_order[i], pt_order[i] == 4 ? PT_VOTE_ZERO : pt_prime))
-+			goto out_busy;
++		return 0;
++	qcom_suspend_trail_stage(ST_AOSS_UP);
++	if (disp_cesta_prime(c, mask))
++		goto out_busy;
 +
 +	/* Hand the GDSC to the display RSC sequencer */
 +	v = readl(c->gdsc + GDSCR);
 +	writel((v & ~GDSC_SW_COLLAPSE) | GDSC_HW_CONTROL, c->gdsc + GDSCR);
 +	ret = readl_poll_timeout_atomic(c->gdsc + GDSC_CFG, v, v & GDSC_CFG_UP, 10, POLL_US);
++	qcom_suspend_trail_stage(ST_GDSC_HW);
 +	disp_cesta_dump(c, ret ? "hw (not up)" : "hw (up)");
 +
-+	for (i = 0; i < ARRAY_SIZE(pt_order); i++)
-+		if ((mask & BIT(pt_order[i])) && disp_cesta_pt(c, pt_order[i], PT_VOTE_ZERO)) {
++	for (i = 0; i < ARRAY_SIZE(pt_order); i++) {
++		if (!(mask & BIT(pt_order[i])))
++			continue;
++		if (disp_cesta_pt(c, pt_order[i], PT_VOTE_ZERO)) {
 +			disp_cesta_dump(c, "wedged");
 +			disp_cesta_gdsc_sw_collapse(c);
 +			goto out_busy;
 +		}
++		qcom_suspend_trail_stage(ST_RELEASE | pt_order[i]);
++	}
 +	disp_cesta_aoss(c, 0);
++	qcom_suspend_trail_stage(ST_AOSS_DOWN);
 +
 +	ret = readl_poll_timeout_atomic(c->rscc + RSCC_SEQ_PWR_CTRL_STATUS, st,
 +					st & RSCC_MODE2, 10, POLL_US);
++	qcom_suspend_trail_stage(ret ? ST_NO_MODE2 : ST_MODE2);
 +	clog(c, "mode2 %s (rscc %x)", ret ? "NOT reached" : "reached", st);
 +	disp_cesta_dump(c, "post");
 +
-+	if (!ret)
++	if (!ret) {
 +		c->left_hw = true;
-+	else
-+		disp_cesta_gdsc_sw_collapse(c);
-+out:
++		return 0;
++	}
++	disp_cesta_gdsc_sw_collapse(c);
++	qcom_suspend_trail_stage(ST_SW_COLLAPSED);
 +	return 0;
 +
 +out_busy:
++	qcom_suspend_trail_stage(ST_BUSY);
 +	dev_warn(dev, "aborting suspend\n");
 +	return -EBUSY;
 +}
@@ -282,14 +335,40 @@ collapse. Off unless sm8750_disp_cesta.enable is set.
 +static int disp_cesta_resume_noirq(struct device *dev)
 +{
 +	struct disp_cesta *c = dev_get_drvdata(dev);
++	u32 v, st = 0;
++	int ret;
 +
 +	if (!c->left_hw)
 +		return 0;
 +
-+	/* Back under software control, collapsed, as genpd left it */
++	qcom_suspend_trail_stage(ST_RESUME);
 +	disp_cesta_dump(c, "resume");
++
++	/* Wake the sequencer out of mode2: it powers the GDSC back up */
++	disp_cesta_aoss(c, 4);
++	disp_cesta_prime(c, c->mask);
++	qcom_suspend_trail_stage(ST_WAKE_VOTED);
++	ret = readl_poll_timeout_atomic(c->gdsc + GDSC_CFG, v, v & GDSC_CFG_UP, 10, POLL_US);
++	if (ret && wake_clk) {
++		qcom_suspend_trail_stage(ST_WAKE_CLK);
++		writel(BIT(31) | wake_clk, c->crm + CRM_SW0_CLK_ACTIVE);
++		writel(wake_clk, c->crm + CRM_SW0_CLK_SLEEP);
++		writel(wake_clk, c->crm + CRM_SW0_CLK_WAKE);
++		ret = readl_poll_timeout_atomic(c->gdsc + GDSC_CFG, v, v & GDSC_CFG_UP,
++						10, POLL_US);
++	}
++	readl_poll_timeout_atomic(c->rscc + RSCC_SEQ_PWR_CTRL_STATUS, st,
++				  !(st & RSCC_MODE2), 10, POLL_US);
++	qcom_suspend_trail_stage(ret ? ST_WAKE_NOT_UP : ST_WAKE_UP);
++	clog(c, "wake: GDSC %s, rscc %x", ret ? "NOT up" : "up", st);
++	disp_cesta_dump(c, "woken");
++
++	/* Back under software control, collapsed, as genpd left it */
 +	disp_cesta_gdsc_sw_collapse(c);
++	qcom_suspend_trail_stage(ST_SW_BACK);
++	disp_cesta_dump(c, "sw");
 +	c->left_hw = false;
++	qcom_suspend_trail_stage(ST_RESUME_DONE);
 +
 +	return 0;
 +}
@@ -307,9 +386,12 @@ collapse. Off unless sm8750_disp_cesta.enable is set.
 +{
 +	struct disp_cesta *c = dev_get_drvdata(dev);
 +
-+	if (c->rpm_held)
-+		pm_runtime_put(dev);
++	if (!c->rpm_held)
++		return;
++	qcom_suspend_trail_stage(ST_COMPLETE);
++	pm_runtime_put_sync(dev);
 +	c->rpm_held = false;
++	qcom_suspend_trail_stage(ST_COMPLETE_DONE);
 +}
 +
 +static const struct dev_pm_ops disp_cesta_pm_ops = {

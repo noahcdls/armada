@@ -1,0 +1,62 @@
+From: Armada <noreply@armada.local>
+Subject: [PATCH] TEST: soc: qcom: suspend-trail: let drivers record step codes
+
+Add qcom_suspend_trail_stage(), which records a driver step (0-0x7f) as
+SDAM ring code 0x80 | step from suspend prepare to post-suspend, so a
+driver under test can show how far it got before a reset.
+---
+--- a/drivers/soc/qcom/suspend-trail.c
++++ b/drivers/soc/qcom/suspend-trail.c
+@@ -166,6 +166,13 @@
+ 		trail_record(ev, x, a, b);
+ }
+ 
++/* Driver step marker, recorded from suspend prepare to post-suspend */
++void qcom_suspend_trail_stage(u8 step)
++{
++	if (READ_ONCE(trail_armed))
++		trail_record(QST_EV_STAGE, 0, step, 0);
++}
++
+ static void probe_suspend_resume(void *data, const char *action, int val,
+ 				 bool start)
+ {
+@@ -257,6 +264,9 @@
+ 	case QST_EV_IRQ:
+ 		code = 0x60;
+ 		break;
++	case QST_EV_STAGE:
++		code = 0x80 | (a & 0x7f);
++		break;
+ 	case QST_EV_TCS:
+ 		/* Only count the sleep/wake sets; they land at flush time. */
+ 		if ((x & 0x3) == RPMH_SLEEP_STATE)
+@@ -339,6 +349,10 @@
+ 	}
+ 	if (code == 0x60)
+ 		return "irq";
++	if (code & 0x80) {
++		snprintf(buf, len, "stage-%#x", code & 0x7f);
++		return buf;
++	}
+ 	snprintf(buf, len, "code-%#x", code);
+ 	return buf;
+ }
+--- a/include/soc/qcom/suspend-trail.h
++++ b/include/soc/qcom/suspend-trail.h
+@@ -14,12 +14,15 @@
+ 	QST_EV_TX_DONE,
+ 	QST_EV_IRQ,
+ 	QST_EV_RSC_PD,
++	QST_EV_STAGE,		/* driver step marker, a = step (0-0x7f) */
+ };
+ 
+ #if IS_ENABLED(CONFIG_QCOM_SUSPEND_TRAIL)
+ void qcom_suspend_trail_late(u8 ev, u16 x, u32 a, u32 b);
++void qcom_suspend_trail_stage(u8 step);
+ #else
+ static inline void qcom_suspend_trail_late(u8 ev, u16 x, u32 a, u32 b) { }
++static inline void qcom_suspend_trail_stage(u8 step) { }
+ #endif
+ 
+ #endif /* __SOC_QCOM_SUSPEND_TRAIL_H__ */
