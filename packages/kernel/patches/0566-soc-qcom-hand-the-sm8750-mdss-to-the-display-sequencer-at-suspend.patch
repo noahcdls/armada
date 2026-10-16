@@ -14,7 +14,10 @@ prime the software client's AOSS and pass-through votes, hand the GDSC to
 hardware control, release the votes and wait for mode2, as the downstream
 display driver does at display off. On resume, vote again so the
 sequencer powers the GDSC back up, and return it to software control
-before msm resumes. The votes stay up while awake.
+before msm resumes. The votes stay up while awake. Any failure with the
+GDSC under hardware control votes again and returns the GDSC to software
+control; sleep is refused only if the CRM's pass-through state machine
+has stalled, since that hangs the next CX collapse.
 
 On the Odin 3, together with the PCIe state manager override (0561), the
 SoC reaches AOSS deep sleep for the whole of s2idle.
@@ -31,7 +34,7 @@ SoC reaches AOSS deep sleep for the whole of s2idle.
  obj-$(CONFIG_QCOM_SMEM) +=	qcom_smem.o
 --- /dev/null
 +++ b/drivers/soc/qcom/sm8750-disp-cesta.c
-@@ -0,0 +1,371 @@
+@@ -0,0 +1,420 @@
 +// SPDX-License-Identifier: GPL-2.0-only
 +/*
 + * SM8750 display CESTA sleep handoff.
@@ -115,6 +118,8 @@ SoC reaches AOSS deep sleep for the whole of s2idle.
 +#define GDSC_CFG_POWER_DOWN_COMPLETE	BIT(15)
 +
 +#define TIMEOUT_US			5000
++/* Downstream waits this long after mode2 before letting MMCX go */
++#define MODE2_SETTLE_US			500
 +
 +static bool enable = true;
 +module_param(enable, bool, 0644);
@@ -217,16 +222,48 @@ SoC reaches AOSS deep sleep for the whole of s2idle.
 +	writel(1, c->crm + CRM_SW0_PT_IRQ_EN);
 +}
 +
++/* Software control, collapsed: the state genpd left the GDSC in */
 +static void disp_cesta_gdsc_to_sw(struct disp_cesta *c)
 +{
-+	u32 val = readl(c->gdsc + GDSCR) & ~GDSC_HW_CONTROL;
++	u32 val = readl(c->gdsc + GDSCR);
 +
-+	writel(val, c->gdsc + GDSCR);
++	/* Leaving hardware control with SW_COLLAPSE clear powers it on first */
++	writel(val & ~(GDSC_HW_CONTROL | GDSC_SW_COLLAPSE), c->gdsc + GDSCR);
 +	udelay(1);
-+	writel(val | GDSC_SW_COLLAPSE, c->gdsc + GDSCR);
 +	if (readl_poll_timeout_atomic(c->gdsc + GDSC_CFG, val,
-+				      val & GDSC_CFG_POWER_DOWN_COMPLETE, 10, TIMEOUT_US))
-+		dev_err(c->dev, "MDSS GDSC did not collapse (cfg %#x)\n", val);
++				      val & GDSC_CFG_POWER_UP_COMPLETE, 10, TIMEOUT_US))
++		dev_err(c->dev, "MDSS GDSC did not power up (cfg %#x)\n", val);
++
++	val = readl(c->gdsc + GDSCR);
++	writel(val | GDSC_SW_COLLAPSE, c->gdsc + GDSCR);
++	if (readl_poll_timeout_atomic(c->gdsc + GDSCR, val, !(val & GDSC_PWR_ON),
++				      10, TIMEOUT_US))
++		dev_err(c->dev, "MDSS GDSC did not collapse (gdscr %#x)\n", val);
++}
++
++static bool disp_cesta_stalled(struct disp_cesta *c)
++{
++	u32 fsm = readl(c->crm + CRMB_PT_FSM);
++
++	if (fsm)
++		dev_err_ratelimited(c->dev,
++				    "display CRM stalled (fsm %#x); sleep is refused until reboot\n",
++				    fsm);
++	return fsm;
++}
++
++/*
++ * Something failed with the GDSC under hardware control: vote so the
++ * sequencer treats the display as active again, and give the GDSC back to
++ * software control. Refuse to sleep only if the CRM itself has stalled.
++ */
++static int disp_cesta_recover(struct disp_cesta *c)
++{
++	if (disp_cesta_vote(c))
++		disp_cesta_vote(c);
++	disp_cesta_gdsc_to_sw(c);
++
++	return disp_cesta_stalled(c) ? -EBUSY : 0;
 +}
 +
 +static int disp_cesta_suspend_noirq(struct device *dev)
@@ -239,42 +276,43 @@ SoC reaches AOSS deep sleep for the whole of s2idle.
 +	if (!enable || !c->rpm_held)
 +		return 0;
 +
++	/* A stalled CRM hangs the next CX collapse, whatever else happens */
++	if (disp_cesta_stalled(c))
++		return -EBUSY;
++
 +	if (readl(c->gdsc + GDSCR) & GDSC_PWR_ON) {
 +		dev_dbg(dev, "display still powered, skipping\n");
 +		return 0;
 +	}
 +
-+	if (readl(c->crm + CRMB_PT_FSM)) {
-+		dev_err(dev, "CRM pass-through state machine stalled, refusing to sleep\n");
-+		return -EBUSY;
-+	}
-+
 +	disp_cesta_hw_init(c);
 +
-+	ret = disp_cesta_vote(c);
-+	if (ret)
-+		return ret == -ETIMEDOUT && !readl(c->crm + CRMB_PT_FSM) ? 0 : -EBUSY;
++	/* The GDSC is still under software control: a failure here is harmless */
++	if (disp_cesta_vote(c))
++		return disp_cesta_stalled(c) ? -EBUSY : 0;
 +
 +	/* Hand the GDSC to the sequencer; it powers it up while the votes stand */
 +	val = readl(c->gdsc + GDSCR);
 +	writel((val & ~GDSC_SW_COLLAPSE) | GDSC_HW_CONTROL, c->gdsc + GDSCR);
-+
-+	if (disp_cesta_release(c)) {
-+		disp_cesta_gdsc_to_sw(c);
-+		return -EBUSY;
++	if (readl_poll_timeout_atomic(c->gdsc + GDSC_CFG, val,
++				      val & GDSC_CFG_POWER_UP_COMPLETE, 10, TIMEOUT_US)) {
++		dev_warn(dev, "display sequencer did not power the MDSS up (cfg %#x)\n", val);
++		return disp_cesta_recover(c);
 +	}
++
++	if (disp_cesta_release(c))
++		return disp_cesta_recover(c);
 +
 +	ret = readl_poll_timeout_atomic(c->rscc + RSCC_SEQ_PWR_CTRL_STATUS, val,
 +					val & RSCC_MODE2, 10, TIMEOUT_US);
 +	if (ret) {
 +		dev_warn(dev, "display sequencer did not collapse the MDSS (status %#x)\n", val);
-+		/* Back to the state msm expects: votes up, GDSC under software control */
-+		disp_cesta_vote(c);
-+		disp_cesta_gdsc_to_sw(c);
-+		return 0;
++		return disp_cesta_recover(c);
 +	}
 +
++	udelay(MODE2_SETTLE_US);
 +	c->mode2 = true;
++
 +	return 0;
 +}
 +
@@ -288,7 +326,8 @@ SoC reaches AOSS deep sleep for the whole of s2idle.
 +	c->mode2 = false;
 +
 +	/* Wake the sequencer: it powers the GDSC back up and leaves mode2 */
-+	disp_cesta_vote(c);
++	if (disp_cesta_vote(c))
++		disp_cesta_vote(c);
 +	if (readl_poll_timeout_atomic(c->gdsc + GDSC_CFG, val,
 +				      val & GDSC_CFG_POWER_UP_COMPLETE, 10, TIMEOUT_US))
 +		dev_err(dev, "display sequencer did not power the MDSS back up (cfg %#x)\n", val);
@@ -296,7 +335,6 @@ SoC reaches AOSS deep sleep for the whole of s2idle.
 +				      !(val & RSCC_MODE2), 10, TIMEOUT_US))
 +		dev_err(dev, "display sequencer did not leave mode2 (status %#x)\n", val);
 +
-+	/* Collapsed under software control, as genpd left it */
 +	disp_cesta_gdsc_to_sw(c);
 +
 +	return 0;
@@ -324,7 +362,9 @@ SoC reaches AOSS deep sleep for the whole of s2idle.
 +static const struct dev_pm_ops disp_cesta_pm_ops = {
 +	.prepare = disp_cesta_prepare,
 +	.complete = disp_cesta_complete,
-+	NOIRQ_SYSTEM_SLEEP_PM_OPS(disp_cesta_suspend_noirq, disp_cesta_resume_noirq)
++	/* Suspend to idle only: a hibernation image must not carry mode2 */
++	.suspend_noirq = disp_cesta_suspend_noirq,
++	.resume_noirq = disp_cesta_resume_noirq,
 +};
 +
 +static void __iomem *disp_cesta_map(struct platform_device *pdev, const char *name)
@@ -345,6 +385,7 @@ SoC reaches AOSS deep sleep for the whole of s2idle.
 +	struct platform_device *mdss;
 +	struct device_node *np;
 +	struct disp_cesta *c;
++	int ret;
 +
 +	c = devm_kzalloc(dev, sizeof(*c), GFP_KERNEL);
 +	if (!c)
@@ -381,7 +422,18 @@ SoC reaches AOSS deep sleep for the whole of s2idle.
 +
 +	platform_set_drvdata(pdev, c);
 +
-+	return devm_pm_runtime_enable(dev);
++	ret = devm_pm_runtime_enable(dev);
++	if (ret)
++		return ret;
++
++	/* Program the SCCs as downstream does at bind; this also drops the attach-time MMCX vote */
++	ret = pm_runtime_resume_and_get(dev);
++	if (ret)
++		return ret;
++	disp_cesta_hw_init(c);
++	pm_runtime_put(dev);
++
++	return 0;
 +}
 +
 +static const struct of_device_id disp_cesta_match[] = {
