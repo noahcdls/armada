@@ -13,7 +13,7 @@ Subject: [PATCH] arm64: dts: qcom: odin3: enable DPU dithering, codec and WCN ra
  	reset-gpios = <&tlmm 98 GPIO_ACTIVE_LOW>;
  
  	vddio-supply = <&vreg_l12b_1p8>;
-@@ -350,3 +353,122 @@
+@@ -350,3 +353,114 @@
  		};
  	};
  };
@@ -123,14 +123,6 @@ Subject: [PATCH] arm64: dts: qcom: odin3: enable DPU dithering, codec and WCN ra
 +		interrupts-extended = <&sleepstate_smp2p_in 0 IRQ_TYPE_EDGE_BOTH>;
 +		interrupt-names = "smp2p-sleepstate-in";
 +	};
-+};
-+/* TEST: GPU and GMU off, to see whether the GPU's RPMh voter holds MX in sleep */
-+&gpu {
-+	status = "disabled";
-+};
-+
-+&gmu {
-+	status = "disabled";
 +};
 +/* Replaces the bootloader's early SoCCP image, which blocks SoC deep sleep */
 +&remoteproc_soccp {
