@@ -1,0 +1,82 @@
+From: Armada <noreply@armada.local>
+Subject: [PATCH] clk: qcom: gdsc: test knob to leave a GDSC to hardware collapse
+
+Add a hw_collapse_gdsc module parameter naming one HW_CTRL GDSC (for example
+"mdss_gdsc"). On disable it is left under hardware control instead of being
+collapsed by software, so its hardware collapses it itself; on enable, a
+GDSC still under hardware control is taken back first. Downstream on SM8750
+the display driver hands mdss_gdsc to hardware control and waits for the
+display RSC sequencer to collapse it ("mode2"), which mainline never lets
+happen; the AOP's AOSS monitor keeps reporting the DISPLAY requestor busy.
+
+Test only, empty by default.
+---
+--- a/drivers/clk/qcom/gdsc.c
++++ b/drivers/clk/qcom/gdsc.c
+@@ -11,6 +11,7 @@
+ #include <linux/jiffies.h>
+ #include <linux/kernel.h>
+ #include <linux/ktime.h>
++#include <linux/moduleparam.h>
+ #include <linux/pm_domain.h>
+ #include <linux/regmap.h>
+ #include <linux/regulator/consumer.h>
+@@ -282,14 +283,40 @@
+ 	regmap_update_bits(sc->regmap, sc->gdscr, mask, mask);
+ }
+ 
++/*
++ * Test knob: name of one HW_CTRL GDSC (e.g. "mdss_gdsc") that is left under
++ * hardware control on disable instead of being collapsed by software, so its
++ * hardware (for MDSS, the display RSC sequencer) collapses it itself, as the
++ * downstream display driver does on SM8750.
++ */
++static char *hw_collapse_gdsc = "";
++module_param(hw_collapse_gdsc, charp, 0644);
++MODULE_PARM_DESC(hw_collapse_gdsc, "HW_CTRL GDSC left to hardware collapse on disable (test)");
++
++static bool gdsc_hw_collapse(struct gdsc *sc)
++{
++	return (sc->flags & HW_CTRL) && hw_collapse_gdsc && *hw_collapse_gdsc &&
++	       !strcmp(sc->pd.name, hw_collapse_gdsc);
++}
++
+ static int gdsc_enable(struct generic_pm_domain *domain)
+ {
+ 	struct gdsc *sc = domain_to_gdsc(domain);
++	u32 val;
+ 	int ret;
+ 
+ 	if (sc->pwrsts == PWRSTS_ON)
+ 		return gdsc_deassert_reset(sc);
+ 
++	/* Left under hardware control by a hw_collapse disable: take it back */
++	if ((sc->flags & HW_CTRL) && !regmap_read(sc->regmap, sc->gdscr, &val) &&
++	    (val & HW_CONTROL_MASK)) {
++		ret = gdsc_hwctrl(sc, false);
++		if (ret < 0)
++			return ret;
++		udelay(1);
++	}
++
+ 	if (sc->flags & SW_RESET) {
+ 		gdsc_assert_reset(sc);
+ 		udelay(1);
+@@ -348,6 +375,17 @@
+ 	if (sc->pwrsts == PWRSTS_ON)
+ 		return gdsc_assert_reset(sc);
+ 
++	if (gdsc_hw_collapse(sc)) {
++		u32 val = 0;
++
++		/* Keep (or put) it under hardware control and let HW collapse it */
++		ret = gdsc_hwctrl(sc, true);
++		regmap_read(sc->regmap, sc->gdscr, &val);
++		pr_info("gdsc: %s left to hardware collapse (GDSCR %#x)\n",
++			sc->pd.name, val);
++		return ret;
++	}
++
+ 	/* Turn off HW trigger mode if supported */
+ 	if (sc->flags & HW_CTRL) {
+ 		ret = gdsc_hwctrl(sc, false);
