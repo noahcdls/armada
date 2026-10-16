@@ -1,0 +1,151 @@
+From: Armada <noreply@armada.local>
+Subject: [PATCH] soc: qcom: report the APPS sleep state to the ADSP over SMP2P
+
+The Qualcomm downstream kernel clears bit 12 of an outbound "sleepstate"
+SMP2P entry to the ADSP on PM_SUSPEND_PREPARE and sets it again on
+PM_POST_SUSPEND (smp2p_sleepstate.c, sun.dtsi qcom,smp2p_sleepstate), so
+the sensors framework on the ADSP knows APPS is asleep and can stop work
+meant for it. Mainline never tells the ADSP, which may leave near-term
+timers that keep the SM8750 out of AOSS deep sleep. Port it as a small
+built-in driver, bound by a qcom,smp2p-sleepstate node.
+
+Test patch for the AOSS sleep investigation.
+---
+--- a/drivers/soc/qcom/Makefile
++++ b/drivers/soc/qcom/Makefile
+@@ -23,6 +23,7 @@
+ qcom_rpmh-y			+= rpmh-rsc.o
+ qcom_rpmh-y			+= rpmh.o
+ obj-$(CONFIG_QCOM_SUSPEND_TRAIL)	+= suspend-trail.o
++obj-$(CONFIG_QCOM_RPMH)		+= smp2p-sleepstate.o
+ obj-$(CONFIG_QCOM_SMD_RPM)	+= rpm-proc.o smd-rpm.o
+ qcom_smem-y			+= smem.o smem_dramc.o
+ obj-$(CONFIG_QCOM_SMEM) +=	qcom_smem.o
+--- /dev/null
++++ b/drivers/soc/qcom/smp2p-sleepstate.c
+@@ -0,0 +1,125 @@
++// SPDX-License-Identifier: GPL-2.0-only
++/*
++ * Tell the ADSP whether the APPS processor is suspended through the
++ * "sleepstate" SMP2P entry that the Qualcomm downstream kernel drives
++ * (smp2p_sleepstate.c): bit 12 is set while APPS is awake, cleared on
++ * PM_SUSPEND_PREPARE and set again on PM_POST_SUSPEND, so the sensors
++ * framework on the ADSP can stop work meant for APPS. The ADSP raises the
++ * inbound "sleepstate_see" entry when it needs APPS; treat that as a wakeup.
++ */
++
++#include <linux/interrupt.h>
++#include <linux/module.h>
++#include <linux/of.h>
++#include <linux/of_irq.h>
++#include <linux/platform_device.h>
++#include <linux/pm_wakeup.h>
++#include <linux/soc/qcom/smem_state.h>
++#include <linux/suspend.h>
++
++#define SLEEPSTATE_AWAKE	BIT(12)
++
++struct smp2p_sleepstate {
++	struct device *dev;
++	struct qcom_smem_state *state;
++	struct notifier_block pm_nb;
++};
++
++static int smp2p_sleepstate_pm_notify(struct notifier_block *nb,
++				      unsigned long event, void *unused)
++{
++	struct smp2p_sleepstate *ss = container_of(nb, struct smp2p_sleepstate, pm_nb);
++
++	switch (event) {
++	case PM_SUSPEND_PREPARE:
++		qcom_smem_state_update_bits(ss->state, SLEEPSTATE_AWAKE, 0);
++		break;
++	case PM_POST_SUSPEND:
++		qcom_smem_state_update_bits(ss->state, SLEEPSTATE_AWAKE,
++					    SLEEPSTATE_AWAKE);
++		break;
++	}
++
++	return NOTIFY_DONE;
++}
++
++static irqreturn_t smp2p_sleepstate_irq(int irq, void *data)
++{
++	struct smp2p_sleepstate *ss = data;
++
++	pm_wakeup_dev_event(ss->dev, 200, true);
++
++	return IRQ_HANDLED;
++}
++
++static void smp2p_sleepstate_unregister(void *data)
++{
++	struct smp2p_sleepstate *ss = data;
++
++	unregister_pm_notifier(&ss->pm_nb);
++}
++
++static int smp2p_sleepstate_probe(struct platform_device *pdev)
++{
++	struct device *dev = &pdev->dev;
++	struct smp2p_sleepstate *ss;
++	unsigned int bit;
++	int irq, ret;
++
++	ss = devm_kzalloc(dev, sizeof(*ss), GFP_KERNEL);
++	if (!ss)
++		return -ENOMEM;
++	ss->dev = dev;
++
++	ss->state = devm_qcom_smem_state_get(dev, NULL, &bit);
++	if (IS_ERR(ss->state))
++		return dev_err_probe(dev, PTR_ERR(ss->state),
++				     "failed to get the sleepstate entry\n");
++
++	qcom_smem_state_update_bits(ss->state, SLEEPSTATE_AWAKE, SLEEPSTATE_AWAKE);
++
++	ss->pm_nb.notifier_call = smp2p_sleepstate_pm_notify;
++	ss->pm_nb.priority = INT_MAX;
++	ret = register_pm_notifier(&ss->pm_nb);
++	if (ret)
++		return ret;
++	ret = devm_add_action_or_reset(dev, smp2p_sleepstate_unregister, ss);
++	if (ret)
++		return ret;
++
++	device_init_wakeup(dev, true);
++
++	irq = of_irq_get_byname(dev->of_node, "smp2p-sleepstate-in");
++	if (irq == -EPROBE_DEFER)
++		return irq;
++	if (irq > 0) {
++		ret = devm_request_threaded_irq(dev, irq, NULL, smp2p_sleepstate_irq,
++						IRQF_ONESHOT | IRQF_NO_SUSPEND,
++						"smp2p_sleepstate", ss);
++		if (ret)
++			return ret;
++	}
++
++	dev_info(dev, "APPS sleep state reported to the ADSP (in irq %d)\n", irq);
++
++	return 0;
++}
++
++static const struct of_device_id smp2p_sleepstate_match[] = {
++	{ .compatible = "qcom,smp2p-sleepstate" },
++	{}
++};
++MODULE_DEVICE_TABLE(of, smp2p_sleepstate_match);
++
++static struct platform_driver smp2p_sleepstate_driver = {
++	.probe = smp2p_sleepstate_probe,
++	.driver = {
++		.name = "smp2p-sleepstate",
++		.of_match_table = smp2p_sleepstate_match,
++		.suppress_bind_attrs = true,
++	},
++};
++module_platform_driver(smp2p_sleepstate_driver);
++
++MODULE_DESCRIPTION("Qualcomm SMP2P APPS sleep state");
++MODULE_LICENSE("GPL");
