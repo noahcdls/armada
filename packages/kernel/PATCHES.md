@@ -861,6 +861,14 @@ no equivalent submission was found, or a permanent URL to the upstream submissio
   source: armada
   upstream: local
   notes: Fixes the SM8750 s2idle wake hang at its cause and replaces the SN4 sleep keepalive (and the 0521 PCIe suspend OPP floor before it). The bootloader's early SoCCP image sits in D0 behind the system NoC with no bus vote; the driver reloads soccp.mbn, which parks itself in D3, and the SoC then also reaches CX shutdown and DDR low power in suspend. Until the TCSR D-state register shows D3 the driver holds the SoCCP's path to DDR itself, so a board without soccp.mbn (Pocket FIT Elite today) still wakes, without the deeper sleep. Odin 3 firmware: `qcom/sm8750/ayn/odin3/soccp.mbn`, from the device's modem partition.
+- `patches/0561-soc-qcom-override-the-sm8750-pcie-state-manager-power-control.patch`
+  source: armada
+  upstream: local
+  notes: The SM8750 PCIe state managers (CESTA) report a power state to the AOSS. Downstream pci-msm sets their PWR_CTRL/PWR_CTRL_MASK override at init and only clears it once it runs the state manager program, which pcie-qcom never does; without the override the PCI0_CESTA requestor stays busy in suspend and blocks AOSS deep sleep. Set once at boot on SM8750.
+- `patches/0566-soc-qcom-hand-the-sm8750-mdss-to-the-display-sequencer-at-suspend.patch`
+  source: armada
+  upstream: local
+  notes: The display RSC/CESTA keeps reporting the display active (DISPLAY requestor busy, no AOSS deep sleep) until its CRM software client releases its pass-through votes with the MDSS GDSC under hardware control; then the sequencer collapses the GDSC itself ("mode2"). Replays the downstream display-off handoff at system suspend (after the MDSS, MMCX held) and wakes the sequencer again on resume before msm. Bound by an `armada,sm8750-disp-cesta` node (Odin 3 DTS). With 0561, the Odin 3 reaches AOSS deep sleep for all of s2idle. Writing pass-through votes with the display running stalls the CRM and hangs the next CX collapse, so they are only written with the display suspended.
 - `patches/0700-wifi-mac80211-fix-unauthorised-port-check-for-encap-.patch`
   source: https://git.kernel.org/next/linux-next/c/d59b9bf7df49367e01b06e82dd0f6e7ad3be493c
   upstream: https://patch.msgid.link/20260802105818.dd5da579813d.I51ed0121154bb652bebc97bb0597b1fae9ac978f@changeid

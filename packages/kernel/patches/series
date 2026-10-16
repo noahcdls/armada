@@ -128,6 +128,8 @@
 0525-regulator-core-log-missing-suspend-configuration-at-debug.patch
 0526-regulator-apply-state-mem-in-s2idle-only-for-opted-in-drivers.patch
 0541-soc-qcom-add-a-suspend-breadcrumb-trail.patch
+0561-soc-qcom-override-the-sm8750-pcie-state-manager-power-control.patch
+0566-soc-qcom-hand-the-sm8750-mdss-to-the-display-sequencer-at-suspend.patch
 0514-PCI-qcom-honor-iommu-map-cell-count.patch
 0514a-of-property-honor-iommu-cells-in-iommu-map-devlinks.patch
 
