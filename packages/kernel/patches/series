@@ -130,6 +130,7 @@
 0541-soc-qcom-add-a-suspend-breadcrumb-trail.patch
 0558-soc-qcom-rpmh-rsc-debug-file-for-raw-requests.patch
 0559-soc-qcom-report-the-apps-sleep-state-to-the-adsp.patch
+0560-remoteproc-qcom-pas-soccp-d-state-test-interface.patch
 0514-PCI-qcom-honor-iommu-map-cell-count.patch
 0514a-of-property-honor-iommu-cells-in-iommu-map-devlinks.patch
 

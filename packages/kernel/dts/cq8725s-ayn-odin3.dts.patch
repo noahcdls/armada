@@ -13,7 +13,7 @@ Subject: [PATCH] arm64: dts: qcom: odin3: enable DPU dithering, codec and WCN ra
  	reset-gpios = <&tlmm 98 GPIO_ACTIVE_LOW>;
  
  	vddio-supply = <&vreg_l12b_1p8>;
-@@ -350,3 +353,114 @@
+@@ -350,3 +353,120 @@
  		};
  	};
  };
@@ -127,4 +127,10 @@ Subject: [PATCH] arm64: dts: qcom: odin3: enable DPU dithering, codec and WCN ra
 +/* Replaces the bootloader's early SoCCP image, which blocks SoC deep sleep */
 +&remoteproc_soccp {
 +	firmware-name = "qcom/sm8750/ayn/odin3/soccp.mbn";
++
++	/* Test: downstream D0/D3 request bits, for the soccp_dstate file (0560) */
++	qcom,smem-states = <&soccp_smp2p_out 0>,
++			   <&soccp_smp2p_out 10>,
++			   <&soccp_smp2p_out 9>;
++	qcom,smem-state-names = "stop", "wakeup", "sleep";
 +};

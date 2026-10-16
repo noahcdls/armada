@@ -1,0 +1,130 @@
+From: Armada <noreply@armada.local>
+Subject: [PATCH] remoteproc: qcom: pas: SoCCP D-state test interface
+
+Add a soccp_dstate sysfs file to the SM8750 SoCCP PAS device when its node
+names the downstream "wakeup" and "sleep" SMP2P states. Writing "d0" votes
+the SoCCP's path to DDR and raises the wakeup bit; "d3" raises the sleep
+bit, waits up to 500 ms for the TCSR D-state register to show D3 and then
+drops the vote, as the downstream rproc_set_state() does. Reading returns
+the register.
+
+Test patch for the AOSS sleep investigation: the SoCCP publishes no sleep
+stats, and the D-state register reads 0x1 after a CX collapse, so an
+explicit D0 -> D3 cycle before suspend is the only way to be sure it is
+parked.
+---
+--- a/drivers/remoteproc/qcom_q6v5_pas.c
++++ b/drivers/remoteproc/qcom_q6v5_pas.c
+@@ -133,6 +133,12 @@
+ 	struct regmap *dstate;
+ 	u32 dstate_reg;
+ 	bool boot_voted;
++
++	/* Test interface: downstream SMP2P "wakeup"/"sleep" D-state requests */
++	struct qcom_smem_state *wake_state;
++	struct qcom_smem_state *sleep_state;
++	unsigned int wake_bit;
++	unsigned int sleep_bit;
+ };
+ 
+ static void qcom_pas_segment_dump(struct rproc *rproc,
+@@ -458,6 +464,68 @@
+ 	return true;
+ }
+ 
++#define SOCCP_DSTATE_REQ_POLL_US	(500 * USEC_PER_MSEC)
++
++/*
++ * Test interface for the AOSS sleep investigation, modelled on the downstream
++ * rproc_set_state(): "d0" votes the SoCCP's path to DDR and raises the
++ * "wakeup" SMP2P bit, "d3" raises the "sleep" bit, waits for the D-state
++ * register to show D3 and drops the vote. Reading returns the register.
++ */
++static ssize_t soccp_dstate_show(struct device *dev, struct device_attribute *attr,
++				 char *buf)
++{
++	struct qcom_pas *pas = dev_get_drvdata(dev);
++	u32 val = 0;
++	int ret;
++
++	if (!pas->dstate)
++		return -ENODEV;
++
++	ret = regmap_read(pas->dstate, pas->dstate_reg, &val);
++	if (ret)
++		return ret;
++
++	return sysfs_emit(buf, "%#x\n", val);
++}
++
++static ssize_t soccp_dstate_store(struct device *dev, struct device_attribute *attr,
++				  const char *buf, size_t count)
++{
++	struct qcom_pas *pas = dev_get_drvdata(dev);
++	u32 mask = BIT(pas->wake_bit) | BIT(pas->sleep_bit);
++	u32 val = 0;
++	int ret;
++
++	if (sysfs_streq(buf, "d0")) {
++		ret = icc_set_bw(pas->boot_path, SOCCP_BOOT_KBPS, SOCCP_BOOT_KBPS);
++		if (ret)
++			return ret;
++		pas->boot_voted = true;
++		ret = qcom_smem_state_update_bits(pas->wake_state, mask,
++						  BIT(pas->wake_bit));
++	} else if (sysfs_streq(buf, "d3")) {
++		ret = qcom_smem_state_update_bits(pas->sleep_state, mask,
++						  BIT(pas->sleep_bit));
++		if (!ret && pas->dstate)
++			ret = regmap_read_poll_timeout(pas->dstate, pas->dstate_reg, val,
++						       val & SOCCP_DSTATE_D3, 1000,
++						       SOCCP_DSTATE_REQ_POLL_US);
++		if (!ret && !qcom_pas_boot_vote_release(pas))
++			ret = -ETIMEDOUT;
++	} else {
++		return -EINVAL;
++	}
++
++	if (pas->dstate)
++		regmap_read(pas->dstate, pas->dstate_reg, &val);
++	dev_info(dev, "D-state request %s: %d, register %#x\n",
++		 sysfs_streq(buf, "d0") ? "d0" : "d3", ret, val);
++
++	return ret ? ret : count;
++}
++static DEVICE_ATTR_RW(soccp_dstate);
++
+ static void qcom_pas_handover(struct qcom_q6v5 *q6v5)
+ {
+ 	struct qcom_pas *pas = container_of(q6v5, struct qcom_pas, q6v5);
+@@ -986,6 +1054,22 @@
+ 			goto detach_proxy_pds;
+ 	}
+ 
++	if (desc->boot_bus_vote &&
++	    of_property_match_string(pdev->dev.of_node, "qcom,smem-state-names",
++				     "wakeup") >= 0) {
++		pas->wake_state = devm_qcom_smem_state_get(&pdev->dev, "wakeup",
++							   &pas->wake_bit);
++		pas->sleep_state = devm_qcom_smem_state_get(&pdev->dev, "sleep",
++							    &pas->sleep_bit);
++		if (pas->wake_state == ERR_PTR(-EPROBE_DEFER) ||
++		    pas->sleep_state == ERR_PTR(-EPROBE_DEFER)) {
++			ret = -EPROBE_DEFER;
++			goto detach_proxy_pds;
++		}
++		if (!IS_ERR(pas->wake_state) && !IS_ERR(pas->sleep_state))
++			device_create_file(&pdev->dev, &dev_attr_soccp_dstate);
++	}
++
+ 	ret = qcom_q6v5_init(&pas->q6v5, pdev, rproc, desc->crash_reason_smem,
+ 			     desc->load_state, qcom_pas_handover);
+ 	if (ret)
+@@ -1044,6 +1128,7 @@
+ 	if (pas->bam_dmux)
+ 		of_platform_device_destroy(&pas->bam_dmux->dev, NULL);
+ 
++	device_remove_file(&pdev->dev, &dev_attr_soccp_dstate);
+ 	rproc_del(pas->rproc);
+ 
+ 	qcom_q6v5_deinit(&pas->q6v5);
