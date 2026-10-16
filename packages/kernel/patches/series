@@ -133,6 +133,7 @@
 0560-remoteproc-qcom-pas-soccp-d-state-test-interface.patch
 0561-soc-qcom-override-the-sm8750-pcie-state-manager-power-control.patch
 0562-clk-qcom-gdsc-test-knob-to-leave-a-gdsc-to-hardware-collapse.patch
+0566-soc-qcom-test-the-sm8750-display-cesta-idle-sequence.patch
 0514-PCI-qcom-honor-iommu-map-cell-count.patch
 0514a-of-property-honor-iommu-cells-in-iommu-map-devlinks.patch
 

@@ -1,0 +1,292 @@
+From: Armada <noreply@armada.local>
+Subject: [PATCH] TEST: soc: qcom: replay the SM8750 display CESTA idle sequence at suspend
+
+The AOP's AOSS-sleep monitor keeps reporting the DISPLAY requestor busy
+with the display suspended, which keeps the SoC out of AOSS deep sleep.
+Downstream, the display RSC sequencer power-collapses the MDSS GDSC itself
+("mode2") after the SCCs are disabled and the display CRM's AOSS vote has
+been primed and released.
+
+Replay that from suspend_noirq, after the MDSS is suspended and while MMCX
+is held, without pass-through bandwidth votes (those wedge the CRM). Off
+unless sm8750_disp_cesta.enable is set; the outcome is logged and kept in
+/sys/kernel/debug/disp_cesta.
+---
+--- a/drivers/soc/qcom/Makefile
++++ b/drivers/soc/qcom/Makefile
+@@ -25,6 +25,7 @@
+ obj-$(CONFIG_QCOM_SUSPEND_TRAIL)	+= suspend-trail.o
+ obj-$(CONFIG_QCOM_RPMH)		+= smp2p-sleepstate.o
+ obj-$(CONFIG_QCOM_RPMH)		+= sm8750-pcie-sm.o
++obj-$(CONFIG_QCOM_RPMH)		+= sm8750-disp-cesta.o
+ obj-$(CONFIG_QCOM_SMD_RPM)	+= rpm-proc.o smd-rpm.o
+ qcom_smem-y			+= smem.o smem_dramc.o
+ obj-$(CONFIG_QCOM_SMEM) +=	qcom_smem.o
+--- /dev/null
++++ b/drivers/soc/qcom/sm8750-disp-cesta.c
+@@ -0,0 +1,265 @@
++// SPDX-License-Identifier: GPL-2.0-only
++/*
++ * SM8750 display CESTA idle test.
++ *
++ * The AOP's AOSS-sleep monitor reports the DISPLAY requestor busy on mainline
++ * even with the display off, which keeps the SoC out of AOSS deep sleep. The
++ * downstream display driver makes it idle by letting the display RSC
++ * sequencer power-collapse the MDSS GDSC itself ("mode2", RSCC status bit
++ * 12): it initialises the CESTA SCCs, primes the display CRM's AOSS vote,
++ * releases it and leaves the GDSC under hardware control.
++ *
++ * Replay that at system suspend, after the display has been suspended and
++ * while MMCX is still powered, and report whether mode2 is reached. Pass-
++ * through bandwidth votes are deliberately not used. Off unless the "enable"
++ * parameter is set; on any timeout the GDSC goes back to software control.
++ */
++
++#include <linux/debugfs.h>
++#include <linux/delay.h>
++#include <linux/device.h>
++#include <linux/io.h>
++#include <linux/iopoll.h>
++#include <linux/module.h>
++#include <linux/of.h>
++#include <linux/of_platform.h>
++#include <linux/platform_device.h>
++#include <linux/pm_runtime.h>
++#include <linux/seq_file.h>
++
++#define RSCC_SEQ_PWR_CTRL_STATUS	0x2d0
++#define RSCC_MODE2			BIT(12)
++
++#define WRAP_SCC_CLK_GATE_ALLOW(i)	(0x40 + 4 * (i))
++#define WRAP_SCC(i)			(0x1000 + 0x1000 * (i))
++#define SCC_CTRL			0x0
++#define SCC_OVERRIDE			0x4
++#define SCC_CLK_GATE_SEL		0x8
++#define SCC_NUM				6
++
++#define CRM_HW_DRV_CHN_BEHAVE(n)	(0x1000 * (n) + 0xa8)
++#define CRM_CHN_SWITCH_CTRL		BIT(1)
++#define CRM_HW_DRV_NUM			6
++#define CRM_SW0				0xe0
++#define CRM_SW0_AOSS			(CRM_SW0 + 0x0)
++#define CRM_SW0_AOSS_IRQ_STATUS		(CRM_SW0 + 0x10)
++#define CRM_SW0_AOSS_IRQ_CLEAR		(CRM_SW0 + 0x14)
++#define CRM_SW0_AOSS_IRQ_EN		(CRM_SW0 + 0x18)
++#define CRM_CRMB_PT_FSM			0x647c
++
++#define GDSCR				0x0
++#define GDSC_CFG			0x4
++#define GDSC_SW_COLLAPSE		BIT(0)
++#define GDSC_HW_CONTROL			BIT(1)
++#define GDSC_CFG_UP			BIT(16)
++#define GDSC_CFG_DOWN			BIT(15)
++
++#define POLL_US				5000
++
++static bool enable;
++module_param(enable, bool, 0644);
++MODULE_PARM_DESC(enable, "Replay the display CESTA idle sequence at system suspend");
++
++struct disp_cesta {
++	struct device *dev;
++	void __iomem *rscc, *wrap, *crm, *gdsc;
++	bool left_hw;
++	bool rpm_held;
++	char log[256];
++};
++
++static int disp_cesta_aoss(struct disp_cesta *c, u32 level)
++{
++	u32 v;
++	int ret;
++
++	writel(level, c->crm + CRM_SW0_AOSS);
++	ret = readl_poll_timeout_atomic(c->crm + CRM_SW0_AOSS_IRQ_STATUS, v, v, 10, POLL_US);
++	writel(1, c->crm + CRM_SW0_AOSS_IRQ_CLEAR);
++	return ret;
++}
++
++static int disp_cesta_suspend_noirq(struct device *dev)
++{
++	struct disp_cesta *c = dev_get_drvdata(dev);
++	u32 fsm, gdscr, cfg, st = 0, v;
++	int i, ret;
++
++	c->left_hw = false;
++	if (!enable || !c->rpm_held)
++		return 0;
++
++	fsm = readl(c->crm + CRM_CRMB_PT_FSM);
++	gdscr = readl(c->gdsc + GDSCR);
++	cfg = readl(c->gdsc + GDSC_CFG);
++	if (fsm) {
++		scnprintf(c->log, sizeof(c->log), "skipped: CRMB_PT fsm %#x", fsm);
++		dev_warn(dev, "%s\n", c->log);
++		return 0;
++	}
++
++	for (i = 0; i < SCC_NUM; i++) {
++		writel(1, c->wrap + WRAP_SCC(i) + SCC_CLK_GATE_SEL);
++		writel(1, c->wrap + WRAP_SCC_CLK_GATE_ALLOW(i));
++		writel(0xf0, c->wrap + WRAP_SCC(i) + SCC_CTRL);
++		writel(1, c->wrap + WRAP_SCC(i) + SCC_OVERRIDE);
++	}
++	for (i = 0; i < CRM_HW_DRV_NUM; i++)
++		writel(CRM_CHN_SWITCH_CTRL, c->crm + CRM_HW_DRV_CHN_BEHAVE(i));
++	writel(1, c->crm + CRM_SW0_AOSS_IRQ_EN);
++
++	ret = disp_cesta_aoss(c, 4);
++	if (!ret)
++		ret = disp_cesta_aoss(c, 0);
++	if (ret) {
++		scnprintf(c->log, sizeof(c->log), "AOSS vote timed out (gdscr %#x)", gdscr);
++		dev_warn(dev, "%s\n", c->log);
++		return 0;
++	}
++
++	/* Hand the GDSC to the display RSC sequencer */
++	v = readl(c->gdsc + GDSCR);
++	v = (v & ~GDSC_SW_COLLAPSE) | GDSC_HW_CONTROL;
++	writel(v, c->gdsc + GDSCR);
++
++	ret = readl_poll_timeout_atomic(c->rscc + RSCC_SEQ_PWR_CTRL_STATUS, st,
++					st & RSCC_MODE2, 10, POLL_US);
++	scnprintf(c->log, sizeof(c->log),
++		  "mode2 %s: rscc %#x, gdscr %#x -> %#x, cfg %#x -> %#x",
++		  ret ? "NOT reached" : "reached", st, gdscr,
++		  readl(c->gdsc + GDSCR), cfg, readl(c->gdsc + GDSC_CFG));
++	dev_info(dev, "%s\n", c->log);
++
++	if (!ret) {
++		c->left_hw = true;
++		return 0;
++	}
++
++	/* Back to software control, collapsed, as genpd left it */
++	v = readl(c->gdsc + GDSCR) & ~GDSC_HW_CONTROL;
++	writel(v, c->gdsc + GDSCR);
++	udelay(1);
++	writel(v | GDSC_SW_COLLAPSE, c->gdsc + GDSCR);
++	readl_poll_timeout_atomic(c->gdsc + GDSC_CFG, v, v & GDSC_CFG_DOWN, 10, POLL_US);
++
++	return 0;
++}
++
++static int disp_cesta_resume_noirq(struct device *dev)
++{
++	struct disp_cesta *c = dev_get_drvdata(dev);
++	u32 v;
++
++	if (!c->left_hw)
++		return 0;
++
++	v = readl(c->gdsc + GDSCR) & ~GDSC_HW_CONTROL;
++	writel(v | GDSC_SW_COLLAPSE, c->gdsc + GDSCR);
++	if (readl_poll_timeout_atomic(c->gdsc + GDSC_CFG, v, v & GDSC_CFG_DOWN, 10, POLL_US))
++		dev_warn(dev, "GDSC did not report collapsed after taking it back (cfg %#x)\n", v);
++	c->left_hw = false;
++
++	return 0;
++}
++
++static int disp_cesta_prepare(struct device *dev)
++{
++	struct disp_cesta *c = dev_get_drvdata(dev);
++
++	/* Keep MMCX powered until our suspend_noirq has run */
++	c->rpm_held = enable && !pm_runtime_resume_and_get(dev);
++	return 0;
++}
++
++static void disp_cesta_complete(struct device *dev)
++{
++	struct disp_cesta *c = dev_get_drvdata(dev);
++
++	if (c->rpm_held)
++		pm_runtime_put(dev);
++	c->rpm_held = false;
++}
++
++static const struct dev_pm_ops disp_cesta_pm_ops = {
++	.prepare = disp_cesta_prepare,
++	.complete = disp_cesta_complete,
++	NOIRQ_SYSTEM_SLEEP_PM_OPS(disp_cesta_suspend_noirq, disp_cesta_resume_noirq)
++};
++
++static int disp_cesta_log_show(struct seq_file *s, void *unused)
++{
++	struct disp_cesta *c = s->private;
++
++	seq_printf(s, "%s\n", c->log[0] ? c->log : "no suspend yet");
++	return 0;
++}
++DEFINE_SHOW_ATTRIBUTE(disp_cesta_log);
++
++static void __iomem *disp_cesta_map(struct platform_device *pdev, const char *name)
++{
++	struct resource *res = platform_get_resource_byname(pdev, IORESOURCE_MEM, name);
++
++	/* These overlap regions other drivers have claimed; map without requesting */
++	return res ? devm_ioremap(&pdev->dev, res->start, resource_size(res)) : NULL;
++}
++
++static int disp_cesta_probe(struct platform_device *pdev)
++{
++	struct device *dev = &pdev->dev;
++	struct device_node *np;
++	struct platform_device *mdss;
++	struct disp_cesta *c;
++	int ret;
++
++	c = devm_kzalloc(dev, sizeof(*c), GFP_KERNEL);
++	if (!c)
++		return -ENOMEM;
++	c->dev = dev;
++
++	c->rscc = disp_cesta_map(pdev, "rscc");
++	c->wrap = disp_cesta_map(pdev, "wrapper");
++	c->crm = disp_cesta_map(pdev, "crm");
++	c->gdsc = disp_cesta_map(pdev, "gdsc");
++	if (!c->rscc || !c->wrap || !c->crm || !c->gdsc)
++		return -ENOMEM;
++
++	np = of_parse_phandle(dev->of_node, "qcom,mdss", 0);
++	if (!np)
++		return -EINVAL;
++	mdss = of_find_device_by_node(np);
++	of_node_put(np);
++	if (!mdss)
++		return -EPROBE_DEFER;
++	/* Suspend after the display, resume before it */
++	if (!device_link_add(&mdss->dev, dev, DL_FLAG_STATELESS))
++		dev_warn(dev, "no device link to the MDSS\n");
++	put_device(&mdss->dev);
++
++	platform_set_drvdata(pdev, c);
++	ret = devm_pm_runtime_enable(dev);
++	if (ret)
++		return ret;
++	debugfs_create_file("disp_cesta", 0400, NULL, c, &disp_cesta_log_fops);
++
++	return 0;
++}
++
++static const struct of_device_id disp_cesta_match[] = {
++	{ .compatible = "armada,sm8750-disp-cesta" },
++	{}
++};
++MODULE_DEVICE_TABLE(of, disp_cesta_match);
++
++static struct platform_driver disp_cesta_driver = {
++	.probe = disp_cesta_probe,
++	.driver = {
++		.name = "sm8750-disp-cesta",
++		.of_match_table = disp_cesta_match,
++		.pm = pm_sleep_ptr(&disp_cesta_pm_ops),
++		.suppress_bind_attrs = true,
++	},
++};
++module_platform_driver(disp_cesta_driver);
++
++MODULE_DESCRIPTION("SM8750 display CESTA idle test");
++MODULE_LICENSE("GPL");
