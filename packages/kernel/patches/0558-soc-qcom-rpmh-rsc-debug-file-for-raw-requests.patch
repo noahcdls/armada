@@ -22,6 +22,9 @@ compare values (writing "disarm" clears CNTP_CTL on every CPU), captured
 at the PRE_OFF too once a manual read succeeded, to check for an EL1
 physical timer the boot chain left armed.
 
+"r <addr>" reads the APPS DRV's current setting back with rpmh_read() and
+logs it, to inventory votes left by the bootloader.
+
 Test only. A wrong request can take the board down.
 ---
 --- a/drivers/soc/qcom/rpmh-rsc.c
@@ -236,13 +239,14 @@ Test only. A wrong request can take the board down.
  
  	qcom_suspend_trail_late(QST_EV_RSC_PD, drv->id, action, ret);
  	if (ret)
-@@ -1056,6 +1234,95 @@
+@@ -1056,6 +1234,109 @@
  	return 0;
  }
  
 +/*
 + * Debug only: "<a|s|w> <addr> <data>" sends one raw request in the active,
-+ * sleep or wake state, for clearing or testing votes that no driver owns.
++ * sleep or wake state, for clearing or testing votes that no driver owns;
++ * "r <addr>" reads this DRV's current setting back (rpmh_read()).
 + * An active request waits for its completion; sleep and wake requests are
 + * cached and written at the next flush.
 + */
@@ -255,7 +259,7 @@ Test only. A wrong request can take the board down.
 +	struct device *child;
 +	u32 addr, data;
 +	char buf[40], st;
-+	int ret;
++	int ret, n;
 +
 +	if (count >= sizeof(buf))
 +		return -EINVAL;
@@ -263,8 +267,21 @@ Test only. A wrong request can take the board down.
 +		return -EFAULT;
 +	buf[count] = '\0';
 +
-+	if (sscanf(buf, "%c %x %x", &st, &addr, &data) != 3)
++	n = sscanf(buf, "%c %x %x", &st, &addr, &data);
++	if (n < 2 || (n < 3 && st != 'r'))
 +		return -EINVAL;
++
++	if (st == 'r') {
++		/* Read back this DRV's current setting for one resource */
++		child = device_find_any_child(drv->dev);
++		if (!child)
++			return -ENODEV;
++		cmd.addr = addr;
++		ret = rpmh_read(child, &cmd);
++		put_device(child);
++		pr_info("rpmh-rsc: read %#x = %#x (%d)\n", addr, cmd.data, ret);
++		return ret ? ret : count;
++	}
 +
 +	switch (st) {
 +	case 'a':
@@ -332,7 +349,7 @@ Test only. A wrong request can take the board down.
  static int rpmh_rsc_probe(struct platform_device *pdev)
  {
  	struct device_node *dn = pdev->dev.of_node;
-@@ -1158,6 +1425,13 @@
+@@ -1158,6 +1439,13 @@
  	dev_set_drvdata(&pdev->dev, drv);
  	drv->dev = &pdev->dev;
  
