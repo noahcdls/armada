@@ -8,9 +8,11 @@ Downstream, the display RSC sequencer power-collapses the MDSS GDSC itself
 been primed and released.
 
 Replay that from suspend_noirq, after the MDSS is suspended and while MMCX
-is held, without pass-through bandwidth votes (those wedge the CRM). Off
-unless sm8750_disp_cesta.enable is set; the outcome is logged and kept in
-/sys/kernel/debug/disp_cesta.
+is held: SCC init, AOSS vote, optional pass-through priming (pt_nodes),
+GDSC to hardware control, release, then poll for mode2. The CRM state is
+logged at each step and kept in /sys/kernel/debug/disp_cesta. A wedged
+pass-through FSM aborts the suspend rather than hanging the next CX
+collapse. Off unless sm8750_disp_cesta.enable is set.
 ---
 --- a/drivers/soc/qcom/Makefile
 +++ b/drivers/soc/qcom/Makefile
@@ -24,7 +26,7 @@ unless sm8750_disp_cesta.enable is set; the outcome is logged and kept in
  obj-$(CONFIG_QCOM_SMEM) +=	qcom_smem.o
 --- /dev/null
 +++ b/drivers/soc/qcom/sm8750-disp-cesta.c
-@@ -0,0 +1,265 @@
+@@ -0,0 +1,379 @@
 +// SPDX-License-Identifier: GPL-2.0-only
 +/*
 + * SM8750 display CESTA idle test.
@@ -33,13 +35,14 @@ unless sm8750_disp_cesta.enable is set; the outcome is logged and kept in
 + * even with the display off, which keeps the SoC out of AOSS deep sleep. The
 + * downstream display driver makes it idle by letting the display RSC
 + * sequencer power-collapse the MDSS GDSC itself ("mode2", RSCC status bit
-+ * 12): it initialises the CESTA SCCs, primes the display CRM's AOSS vote,
-+ * releases it and leaves the GDSC under hardware control.
++ * 12): it initialises the CESTA SCCs, primes the display CRM's AOSS and
++ * pass-through bandwidth votes, leaves the GDSC under hardware control and
++ * releases the votes.
 + *
 + * Replay that at system suspend, after the display has been suspended and
-+ * while MMCX is still powered, and report whether mode2 is reached. Pass-
-+ * through bandwidth votes are deliberately not used. Off unless the "enable"
-+ * parameter is set; on any timeout the GDSC goes back to software control.
++ * while MMCX is held, and log the CRM state at each step. Off unless the
++ * "enable" parameter is set; pass-through nodes are only used when set in
++ * "pt_nodes". If the GDSC is not collapsed it goes back to software control.
 + */
 +
 +#include <linux/debugfs.h>
@@ -53,18 +56,23 @@ unless sm8750_disp_cesta.enable is set; the outcome is logged and kept in
 +#include <linux/platform_device.h>
 +#include <linux/pm_runtime.h>
 +#include <linux/seq_file.h>
++#include <linux/stdarg.h>
 +
 +#define RSCC_SEQ_PWR_CTRL_STATUS	0x2d0
 +#define RSCC_MODE2			BIT(12)
 +
++#define WRAP_PWR_CTRL			0x24
 +#define WRAP_SCC_CLK_GATE_ALLOW(i)	(0x40 + 4 * (i))
 +#define WRAP_SCC(i)			(0x1000 + 0x1000 * (i))
 +#define SCC_CTRL			0x0
 +#define SCC_OVERRIDE			0x4
 +#define SCC_CLK_GATE_SEL		0x8
++#define SCC_HW_STATE			0x10
 +#define SCC_NUM				6
 +
++/* Display CRM; HW DRV n at 0x1000 * n, SW DRV0 at 0xe0 */
 +#define CRM_HW_DRV_CHN_BEHAVE(n)	(0x1000 * (n) + 0xa8)
++#define CRM_HW_DRV_PT(n, node)		(0x1000 * (n) + 0x38 + 0x14 * (node))
 +#define CRM_CHN_SWITCH_CTRL		BIT(1)
 +#define CRM_HW_DRV_NUM			6
 +#define CRM_SW0				0xe0
@@ -72,7 +80,24 @@ unless sm8750_disp_cesta.enable is set; the outcome is logged and kept in
 +#define CRM_SW0_AOSS_IRQ_STATUS		(CRM_SW0 + 0x10)
 +#define CRM_SW0_AOSS_IRQ_CLEAR		(CRM_SW0 + 0x14)
 +#define CRM_SW0_AOSS_IRQ_EN		(CRM_SW0 + 0x18)
-+#define CRM_CRMB_PT_FSM			0x647c
++#define CRM_SW0_PT(node)		(CRM_SW0 + 0x30 + 0x10 * (node))
++#define CRM_SW0_PT_IRQ_STATUS		(CRM_SW0 + 0xa0)
++#define CRM_SW0_PT_IRQ_CLEAR		(CRM_SW0 + 0xa4)
++#define CRM_SW0_PT_IRQ_EN		(CRM_SW0 + 0xa8)
++#define CRM_SW0_PT_TRIGGER		(CRM_SW0 + 0x100)
++#define CRMB_PT_DATA(node)		(0x6400 + 0x14 * (node))
++#define CRMB_PT_STATUS(node)		(0x6400 + 0x14 * (node) + 0xc)
++#define CRMB_PT_FSM			0x647c
++#define CRMC_VCD0_PERF_OL		0x6818
++#define CRMC_VCD0_SEQ_STATUS		0x6840
++#define CRMC_VCD1_PERF_OL		0x6a80
++#define CRMC_VCD1_SEQ_STATUS		0x6aa8
++#define CRM_PT_NODES			6
++
++/* PT vote: RESP_REQ is ACTIVE only, COMMIT and VALID always */
++#define PT_VOTE_ZERO			0x60000000
++/* Prime in the vendor order: MM0, SH1, SH0, MC0, then ACV */
++static const u8 pt_order[] = { 3, 2, 1, 0, 4 };
 +
 +#define GDSCR				0x0
 +#define GDSC_CFG			0x4
@@ -82,47 +107,127 @@ unless sm8750_disp_cesta.enable is set; the outcome is logged and kept in
 +#define GDSC_CFG_DOWN			BIT(15)
 +
 +#define POLL_US				5000
++#define LOG_SIZE			2048
 +
 +static bool enable;
 +module_param(enable, bool, 0644);
 +MODULE_PARM_DESC(enable, "Replay the display CESTA idle sequence at system suspend");
++
++static uint pt_nodes;
++module_param(pt_nodes, uint, 0644);
++MODULE_PARM_DESC(pt_nodes, "Mask of pass-through nodes to prime and release (0: none)");
++
++static uint pt_prime = 0x60000001;
++module_param(pt_prime, uint, 0644);
++MODULE_PARM_DESC(pt_prime, "Pass-through priming vote for nodes other than ACV");
 +
 +struct disp_cesta {
 +	struct device *dev;
 +	void __iomem *rscc, *wrap, *crm, *gdsc;
 +	bool left_hw;
 +	bool rpm_held;
-+	char log[256];
++	char log[LOG_SIZE];
++	size_t len;
 +};
++
++static __printf(2, 3) void clog(struct disp_cesta *c, const char *fmt, ...)
++{
++	char *line = c->log + c->len;
++	va_list args;
++
++	va_start(args, fmt);
++	c->len += vscnprintf(line, LOG_SIZE - c->len, fmt, args);
++	va_end(args);
++	dev_info(c->dev, "%s\n", line);
++	c->len += scnprintf(c->log + c->len, LOG_SIZE - c->len, "\n");
++}
++
++static void disp_cesta_dump(struct disp_cesta *c, const char *tag)
++{
++	char pt[128], hw[320];
++	int n, d, p = 0, h = 0;
++
++	for (n = 0; n < CRM_PT_NODES; n++)
++		p += scnprintf(pt + p, sizeof(pt) - p, " %x/%x",
++			       readl(c->crm + CRMB_PT_DATA(n)),
++			       readl(c->crm + CRMB_PT_STATUS(n)));
++	for (d = 0; d < CRM_HW_DRV_NUM; d++)
++		for (n = 0; n < 5; n++)
++			h += scnprintf(hw + h, sizeof(hw) - h, "%s%x",
++				       n ? "," : " ", readl(c->crm + CRM_HW_DRV_PT(d, n)));
++
++	clog(c, "%s: fsm %x rscc %x pwr %x gdscr %x cfg %x perf_ol %x/%x seq %x/%x scc0 %x",
++	     tag, readl(c->crm + CRMB_PT_FSM),
++	     readl(c->rscc + RSCC_SEQ_PWR_CTRL_STATUS), readl(c->wrap + WRAP_PWR_CTRL),
++	     readl(c->gdsc + GDSCR), readl(c->gdsc + GDSC_CFG),
++	     readl(c->crm + CRMC_VCD0_PERF_OL), readl(c->crm + CRMC_VCD1_PERF_OL),
++	     readl(c->crm + CRMC_VCD0_SEQ_STATUS), readl(c->crm + CRMC_VCD1_SEQ_STATUS),
++	     readl(c->wrap + WRAP_SCC(0) + SCC_HW_STATE));
++	clog(c, "%s: pt%s", tag, pt);
++	clog(c, "%s: hw%s", tag, hw);
++}
 +
 +static int disp_cesta_aoss(struct disp_cesta *c, u32 level)
 +{
 +	u32 v;
 +	int ret;
 +
++	writel(1, c->crm + CRM_SW0_AOSS_IRQ_CLEAR);
 +	writel(level, c->crm + CRM_SW0_AOSS);
 +	ret = readl_poll_timeout_atomic(c->crm + CRM_SW0_AOSS_IRQ_STATUS, v, v, 10, POLL_US);
 +	writel(1, c->crm + CRM_SW0_AOSS_IRQ_CLEAR);
++	if (ret)
++		clog(c, "aoss %u timed out", level);
 +	return ret;
++}
++
++static int disp_cesta_pt(struct disp_cesta *c, int node, u32 data)
++{
++	u32 v;
++	int ret;
++
++	writel(1, c->crm + CRM_SW0_PT_IRQ_CLEAR);
++	writel(data, c->crm + CRM_SW0_PT(node));
++	writel(1, c->crm + CRM_SW0_PT_TRIGGER);
++	udelay(1);
++	writel(0, c->crm + CRM_SW0_PT_TRIGGER);
++	ret = readl_poll_timeout_atomic(c->crm + CRM_SW0_PT_IRQ_STATUS, v, v, 10, POLL_US);
++	writel(1, c->crm + CRM_SW0_PT_IRQ_CLEAR);
++	if (ret)
++		clog(c, "pt node %d %#x timed out: fsm %x data %x", node, data,
++		     readl(c->crm + CRMB_PT_FSM), readl(c->crm + CRMB_PT_DATA(node)));
++	return ret;
++}
++
++static void disp_cesta_gdsc_sw_collapse(struct disp_cesta *c)
++{
++	u32 v = readl(c->gdsc + GDSCR) & ~GDSC_HW_CONTROL;
++
++	writel(v, c->gdsc + GDSCR);
++	udelay(1);
++	writel(v | GDSC_SW_COLLAPSE, c->gdsc + GDSCR);
++	if (readl_poll_timeout_atomic(c->gdsc + GDSC_CFG, v, v & GDSC_CFG_DOWN, 10, POLL_US))
++		clog(c, "GDSC did not collapse under software control (cfg %x)", v);
 +}
 +
 +static int disp_cesta_suspend_noirq(struct device *dev)
 +{
 +	struct disp_cesta *c = dev_get_drvdata(dev);
-+	u32 fsm, gdscr, cfg, st = 0, v;
++	u32 mask = pt_nodes, st = 0, v;
 +	int i, ret;
 +
 +	c->left_hw = false;
 +	if (!enable || !c->rpm_held)
 +		return 0;
 +
-+	fsm = readl(c->crm + CRM_CRMB_PT_FSM);
-+	gdscr = readl(c->gdsc + GDSCR);
-+	cfg = readl(c->gdsc + GDSC_CFG);
-+	if (fsm) {
-+		scnprintf(c->log, sizeof(c->log), "skipped: CRMB_PT fsm %#x", fsm);
-+		dev_warn(dev, "%s\n", c->log);
-+		return 0;
++	c->len = 0;
++	clog(c, "pt_nodes %#x pt_prime %#x", mask, pt_prime);
++	disp_cesta_dump(c, "pre");
++
++	if (readl(c->crm + CRMB_PT_FSM)) {
++		/* A wedged pass-through FSM hangs the next CX collapse; refuse it */
++		clog(c, "CRMB_PT FSM busy, aborting suspend");
++		goto out_busy;
 +	}
 +
 +	for (i = 0; i < SCC_NUM; i++) {
@@ -134,56 +239,56 @@ unless sm8750_disp_cesta.enable is set; the outcome is logged and kept in
 +	for (i = 0; i < CRM_HW_DRV_NUM; i++)
 +		writel(CRM_CHN_SWITCH_CTRL, c->crm + CRM_HW_DRV_CHN_BEHAVE(i));
 +	writel(1, c->crm + CRM_SW0_AOSS_IRQ_EN);
++	writel(1, c->crm + CRM_SW0_PT_IRQ_EN);
 +
-+	ret = disp_cesta_aoss(c, 4);
-+	if (!ret)
-+		ret = disp_cesta_aoss(c, 0);
-+	if (ret) {
-+		scnprintf(c->log, sizeof(c->log), "AOSS vote timed out (gdscr %#x)", gdscr);
-+		dev_warn(dev, "%s\n", c->log);
-+		return 0;
-+	}
++	if (disp_cesta_aoss(c, 4))
++		goto out;
++	for (i = 0; i < ARRAY_SIZE(pt_order); i++)
++		if ((mask & BIT(pt_order[i])) &&
++		    disp_cesta_pt(c, pt_order[i], pt_order[i] == 4 ? PT_VOTE_ZERO : pt_prime))
++			goto out_busy;
 +
 +	/* Hand the GDSC to the display RSC sequencer */
 +	v = readl(c->gdsc + GDSCR);
-+	v = (v & ~GDSC_SW_COLLAPSE) | GDSC_HW_CONTROL;
-+	writel(v, c->gdsc + GDSCR);
++	writel((v & ~GDSC_SW_COLLAPSE) | GDSC_HW_CONTROL, c->gdsc + GDSCR);
++	ret = readl_poll_timeout_atomic(c->gdsc + GDSC_CFG, v, v & GDSC_CFG_UP, 10, POLL_US);
++	disp_cesta_dump(c, ret ? "hw (not up)" : "hw (up)");
++
++	for (i = 0; i < ARRAY_SIZE(pt_order); i++)
++		if ((mask & BIT(pt_order[i])) && disp_cesta_pt(c, pt_order[i], PT_VOTE_ZERO)) {
++			disp_cesta_dump(c, "wedged");
++			disp_cesta_gdsc_sw_collapse(c);
++			goto out_busy;
++		}
++	disp_cesta_aoss(c, 0);
 +
 +	ret = readl_poll_timeout_atomic(c->rscc + RSCC_SEQ_PWR_CTRL_STATUS, st,
 +					st & RSCC_MODE2, 10, POLL_US);
-+	scnprintf(c->log, sizeof(c->log),
-+		  "mode2 %s: rscc %#x, gdscr %#x -> %#x, cfg %#x -> %#x",
-+		  ret ? "NOT reached" : "reached", st, gdscr,
-+		  readl(c->gdsc + GDSCR), cfg, readl(c->gdsc + GDSC_CFG));
-+	dev_info(dev, "%s\n", c->log);
++	clog(c, "mode2 %s (rscc %x)", ret ? "NOT reached" : "reached", st);
++	disp_cesta_dump(c, "post");
 +
-+	if (!ret) {
++	if (!ret)
 +		c->left_hw = true;
-+		return 0;
-+	}
-+
-+	/* Back to software control, collapsed, as genpd left it */
-+	v = readl(c->gdsc + GDSCR) & ~GDSC_HW_CONTROL;
-+	writel(v, c->gdsc + GDSCR);
-+	udelay(1);
-+	writel(v | GDSC_SW_COLLAPSE, c->gdsc + GDSCR);
-+	readl_poll_timeout_atomic(c->gdsc + GDSC_CFG, v, v & GDSC_CFG_DOWN, 10, POLL_US);
-+
++	else
++		disp_cesta_gdsc_sw_collapse(c);
++out:
 +	return 0;
++
++out_busy:
++	dev_warn(dev, "aborting suspend\n");
++	return -EBUSY;
 +}
 +
 +static int disp_cesta_resume_noirq(struct device *dev)
 +{
 +	struct disp_cesta *c = dev_get_drvdata(dev);
-+	u32 v;
 +
 +	if (!c->left_hw)
 +		return 0;
 +
-+	v = readl(c->gdsc + GDSCR) & ~GDSC_HW_CONTROL;
-+	writel(v | GDSC_SW_COLLAPSE, c->gdsc + GDSCR);
-+	if (readl_poll_timeout_atomic(c->gdsc + GDSC_CFG, v, v & GDSC_CFG_DOWN, 10, POLL_US))
-+		dev_warn(dev, "GDSC did not report collapsed after taking it back (cfg %#x)\n", v);
++	/* Back under software control, collapsed, as genpd left it */
++	disp_cesta_dump(c, "resume");
++	disp_cesta_gdsc_sw_collapse(c);
 +	c->left_hw = false;
 +
 +	return 0;
@@ -216,8 +321,19 @@ unless sm8750_disp_cesta.enable is set; the outcome is logged and kept in
 +static int disp_cesta_log_show(struct seq_file *s, void *unused)
 +{
 +	struct disp_cesta *c = s->private;
++	size_t len = c->len;
 +
-+	seq_printf(s, "%s\n", c->log[0] ? c->log : "no suspend yet");
++	seq_printf(s, "%s", len ? c->log : "no suspend yet\n");
++
++	/* Live state, with MMCX held */
++	if (pm_runtime_resume_and_get(c->dev))
++		return 0;
++	disp_cesta_dump(c, "now");
++	seq_printf(s, "%s", c->log + len);
++	c->len = len;
++	c->log[len] = '\0';
++	pm_runtime_put(c->dev);
++
 +	return 0;
 +}
 +DEFINE_SHOW_ATTRIBUTE(disp_cesta_log);
