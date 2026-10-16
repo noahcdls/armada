@@ -12,6 +12,11 @@ Also add /sys/kernel/debug/qcom_pas_shutdown: writing a PAS id calls
 qcom_scm_pas_shutdown() for it, to test whether a subsystem the bootloader
 started and Linux never manages (the SPSS, PAS 14) blocks AOSS sleep.
 
+Also add /sys/kernel/debug/rsc_suspend_snapshot (SM8750 only): at the
+last-CPU PRE_OFF of an s2idle cycle, snapshot the GCC GDSC status
+registers and the SoCCP TCSR D-state, to catch a domain the kernel thinks
+is off but the hardware keeps on (as the PCIe GDSCs were with 0044).
+
 Test only. A wrong request can take the board down.
 ---
 --- a/drivers/soc/qcom/rpmh-rsc.c
@@ -25,10 +30,11 @@ Test only. A wrong request can take the board down.
  #include <linux/delay.h>
  #include <linux/interrupt.h>
  #include <linux/io.h>
-@@ -25,10 +27,12 @@
+@@ -25,10 +27,13 @@
  #include <linux/pm_runtime.h>
  #include <linux/slab.h>
  #include <linux/spinlock.h>
++#include <linux/suspend.h>
 +#include <linux/uaccess.h>
  #include <linux/wait.h>
  
@@ -38,7 +44,98 @@ Test only. A wrong request can take the board down.
  #include <soc/qcom/suspend-trail.h>
  #include <soc/qcom/tcs.h>
  #include <dt-bindings/soc/qcom,rpmh-rsc.h>
-@@ -1056,6 +1060,95 @@
+@@ -941,6 +946,81 @@
+  * * NOTIFY_OK          - success
+  * * NOTIFY_BAD         - failure
+  */
++/*
++ * Debug only (SM8750): hardware power status at the last-CPU PRE_OFF of an
++ * s2idle cycle, to catch domains the kernel believes are off but the hardware
++ * keeps on (a retention-only GDSC, or one another voter still holds). Only
++ * GCC and TCSR registers, which are readable whenever the CPUs run.
++ */
++static const struct {
++	const char *name;
++	phys_addr_t pa;
++} rsc_snap_regs[] = {
++	{ "gcc_pcie_0_gdsc",          0x0016b004 },
++	{ "gcc_pcie_0_gdsc_cfg",      0x0016b008 },
++	{ "gcc_pcie_0_phy_gdsc",      0x0016c000 },
++	{ "gcc_pcie_0_phy_gdsc_cfg",  0x0016c004 },
++	{ "gcc_ufs_mem_phy_gdsc",     0x0019e000 },
++	{ "gcc_ufs_mem_phy_gdsc_cfg", 0x0019e004 },
++	{ "gcc_ufs_phy_gdsc",         0x00177004 },
++	{ "gcc_ufs_phy_gdsc_cfg",     0x00177008 },
++	{ "gcc_usb30_prim_gdsc",      0x00139004 },
++	{ "gcc_usb30_prim_gdsc_cfg",  0x00139008 },
++	{ "gcc_usb3_phy_gdsc",        0x00150018 },
++	{ "gcc_usb3_phy_gdsc_cfg",    0x0015001c },
++	{ "soccp_tcsr_dstate",        0x01fda000 },
++};
++
++static void __iomem *rsc_snap_base[ARRAY_SIZE(rsc_snap_regs)];
++static u32 rsc_snap_val[ARRAY_SIZE(rsc_snap_regs)];
++static unsigned int rsc_snap_count;
++static bool rsc_snap_ready;
++
++static void rpmh_rsc_snap(void)
++{
++	int i;
++
++	if (!rsc_snap_ready || pm_suspend_target_state != PM_SUSPEND_TO_IDLE)
++		return;
++
++	for (i = 0; i < ARRAY_SIZE(rsc_snap_regs); i++)
++		rsc_snap_val[i] = readl_relaxed(rsc_snap_base[i]);
++	rsc_snap_count++;
++}
++
++static int rpmh_rsc_snap_show(struct seq_file *m, void *unused)
++{
++	int i;
++
++	seq_printf(m, "s2idle PRE_OFF snapshots: %u (GDSCR bit 31 = power on)\n",
++		   rsc_snap_count);
++	for (i = 0; i < ARRAY_SIZE(rsc_snap_regs); i++)
++		seq_printf(m, "%-26s %#010x  %08x%s\n", rsc_snap_regs[i].name,
++			   (u32)rsc_snap_regs[i].pa, rsc_snap_val[i],
++			   strstr(rsc_snap_regs[i].name, "gdsc") &&
++			   !strstr(rsc_snap_regs[i].name, "_cfg") &&
++			   (rsc_snap_val[i] & BIT(31)) ? "  ON" : "");
++
++	return 0;
++}
++DEFINE_SHOW_ATTRIBUTE(rpmh_rsc_snap);
++
++static void rpmh_rsc_snap_init(void)
++{
++	int i;
++
++	if (rsc_snap_ready || !of_machine_is_compatible("qcom,sm8750"))
++		return;
++
++	for (i = 0; i < ARRAY_SIZE(rsc_snap_regs); i++) {
++		rsc_snap_base[i] = ioremap(rsc_snap_regs[i].pa, 4);
++		if (!rsc_snap_base[i])
++			return;
++	}
++	rsc_snap_ready = true;
++	debugfs_create_file("rsc_suspend_snapshot", 0400, NULL, NULL, &rpmh_rsc_snap_fops);
++}
++
+ static int rpmh_rsc_pd_callback(struct notifier_block *nfb,
+ 				unsigned long action, void *v)
+ {
+@@ -951,6 +1031,8 @@
+ 	if (action == GENPD_NOTIFY_PRE_OFF)
+ 		ret = rpmh_rsc_ctrlr_is_busy(drv) ? -EAGAIN :
+ 		      rpmh_flush(&drv->client);
++	if (action == GENPD_NOTIFY_PRE_OFF && !ret)
++		rpmh_rsc_snap();
+ 
+ 	qcom_suspend_trail_late(QST_EV_RSC_PD, drv->id, action, ret);
+ 	if (ret)
+@@ -1056,6 +1138,95 @@
  	return 0;
  }
  
@@ -134,12 +231,13 @@ Test only. A wrong request can take the board down.
  static int rpmh_rsc_probe(struct platform_device *pdev)
  {
  	struct device_node *dn = pdev->dev.of_node;
-@@ -1158,6 +1249,12 @@
+@@ -1158,6 +1329,13 @@
  	dev_set_drvdata(&pdev->dev, drv);
  	drv->dev = &pdev->dev;
  
 +	debugfs_create_file(devm_kasprintf(&pdev->dev, GFP_KERNEL, "%s_raw", drv->name) ?: "rsc_raw",
 +			    0200, NULL, drv, &rpmh_rsc_raw_fops);
++	rpmh_rsc_snap_init();
 +	if (!pas_shutdown_file)
 +		pas_shutdown_file = debugfs_create_file("qcom_pas_shutdown", 0200, NULL, NULL,
 +							&rpmh_rsc_pas_shutdown_fops);
