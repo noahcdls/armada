@@ -132,6 +132,7 @@
 0541-soc-qcom-add-a-suspend-breadcrumb-trail.patch
 0561-soc-qcom-override-the-sm8750-pcie-state-manager-power-control.patch
 0566-soc-qcom-hand-the-sm8750-mdss-to-the-display-sequencer-at-suspend.patch
+0567-PCI-don-t-arm-WAKE-for-a-port-with-nothing-below-it-to-wake.patch
 0514-PCI-qcom-honor-iommu-map-cell-count.patch
 0514a-of-property-honor-iommu-cells-in-iommu-map-devlinks.patch
 

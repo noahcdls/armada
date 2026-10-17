@@ -9,7 +9,9 @@ the SLEEP set and additionally forces specific rails off in sleep.
 
 Implement regulator-state-mem support:
 
- * set_suspend_enable/disable place an enable vote in the SLEEP set and
+ * set_suspend_enable keeps a rail that is in use on through sleep (it
+   votes the current state, so an unused rail is never powered up for the
+   sleep); set_suspend_disable places a disable vote in the SLEEP set and
    the current active-set contribution in the WAKE set, so the AOP wake
    set replay restores exactly the pre-suspend state before the kernel
    resumes.  rpmh's is_req_valid() prunes equal sleep/wake pairs, so a
@@ -62,7 +64,7 @@ Active-set votes are never modified.
  }
  
  static int _rpmh_regulator_vrm_set_voltage_sel(struct regulator_dev *rdev,
-@@ -344,6 +357,141 @@
+@@ -344,6 +357,149 @@
  }
  
  /**
@@ -103,9 +105,17 @@ Active-set votes are never modified.
 +static int rpmh_regulator_set_suspend_enable(struct regulator_dev *rdev)
 +{
 +	struct rpmh_vreg *vreg = rdev_get_drvdata(rdev);
++	u32 on = vreg->enabled == 1;
 +
++	/*
++	 * "On in suspend" keeps a rail that is in use powered through sleep;
++	 * it must not power up a rail with no APPS enable vote.  Vote the
++	 * current state, so an unused rail stays off (the pair is pruned)
++	 * and a later disable still re-aligns the sleep vote via the
++	 * active-set mirror.
++	 */
 +	return rpmh_regulator_send_sleep_wake_request(vreg,
-+			RPMH_REGULATOR_REG_ENABLE, 1, vreg->enabled == 1);
++			RPMH_REGULATOR_REG_ENABLE, on, on);
 +}
 +
 +static int rpmh_regulator_set_suspend_disable(struct regulator_dev *rdev)
@@ -204,7 +214,7 @@ Active-set votes are never modified.
   * rpmh_regulator_vrm_get_optimum_mode() - get the mode based on the  load
   * @rdev:		Regulator device pointer for the rpmh-regulator
   * @input_uV:		Input voltage
-@@ -401,6 +549,10 @@
+@@ -401,6 +557,10 @@
  	.list_voltage		= regulator_list_voltage_linear_range,
  	.set_mode		= rpmh_regulator_vrm_set_mode,
  	.get_mode		= rpmh_regulator_vrm_get_mode,
@@ -215,7 +225,7 @@ Active-set votes are never modified.
  };
  
  static const struct regulator_ops rpmh_regulator_vrm_drms_ops = {
-@@ -413,6 +565,10 @@
+@@ -413,6 +573,10 @@
  	.set_mode		= rpmh_regulator_vrm_set_mode,
  	.get_mode		= rpmh_regulator_vrm_get_mode,
  	.get_optimum_mode	= rpmh_regulator_vrm_get_optimum_mode,
@@ -226,7 +236,7 @@ Active-set votes are never modified.
  };
  
  static const struct regulator_ops rpmh_regulator_vrm_bypass_ops = {
-@@ -426,12 +582,19 @@
+@@ -426,12 +590,19 @@
  	.get_mode		= rpmh_regulator_vrm_get_mode,
  	.set_bypass		= rpmh_regulator_vrm_set_bypass,
  	.get_bypass		= rpmh_regulator_vrm_get_bypass,

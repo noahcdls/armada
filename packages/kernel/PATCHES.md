@@ -348,7 +348,7 @@ no equivalent submission was found, or a permanent URL to the upstream submissio
 - `patches/0523-regulator-qcom-rpmh-add-suspend-state-support.patch`
   source: https://github.com/thorch-os/thorch/blob/82e7472e6cad5c08a55c3aef92ef5be218621b2c/packages/linux-thorch/patches/0218-regulator-qcom-rpmh-add-suspend-state-support.patch
   upstream: unknown
-  notes: Uses the PMIC's own bypass mode (`pmic_bypass_mode`) instead of `PMIC4_BOB_MODE_PASS`, which is wrong on PMIC5.
+  notes: Uses the PMIC's own bypass mode (`pmic_bypass_mode`) instead of `PMIC4_BOB_MODE_PASS`, which is wrong on PMIC5. Armada also makes `set_suspend_enable` vote the rail's current state instead of a forced on, so `regulator-on-in-suspend` keeps an in-use rail on (in its suspend mode) but never powers up a rail no consumer holds.
 - `patches/0524-regulator-core-apply-mem-state-for-s2idle.patch`
   source: https://github.com/thorch-os/thorch/blob/82e7472e6cad5c08a55c3aef92ef5be218621b2c/packages/linux-thorch/patches/0219-regulator-core-apply-mem-state-for-s2idle.patch
   upstream: unknown
@@ -884,6 +884,10 @@ no equivalent submission was found, or a permanent URL to the upstream submissio
   source: armada
   upstream: local
   notes: The display RSC/CESTA keeps reporting the display active (DISPLAY requestor busy, no AOSS deep sleep) until its CRM software client releases its pass-through votes with the MDSS GDSC under hardware control; then the sequencer collapses the GDSC itself ("mode2"). Replays the downstream display-off handoff at system suspend (after the MDSS, MMCX held) and wakes the sequencer again on resume before msm. Bound by an `armada,sm8750-disp-cesta` node (Odin 3 DTS). With 0561, the Odin 3 reaches AOSS deep sleep for all of s2idle. Writing pass-through votes with the display running stalls the CRM and hangs the next CX collapse, so they are only written with the display suspended.
+- `patches/0567-PCI-don-t-arm-WAKE-for-a-port-with-nothing-below-it-to-wake.patch`
+  source: armada
+  upstream: local
+  notes: A port with an OF WAKE# GPIO is a wakeup source, so WAKE# is armed for every sleep. On the Odin 3, once the WCN7860 PMU rails are no longer pinned on, pcie-qcom's pwrctrl power-off in suspend_noirq leaves the chip unpowered, it pulls WAKE# low and the level-low wake IRQ aborts the sleep. Drop the port's wakeup in ->prepare() when nothing below it may wake, restore it in ->complete(). A wake-enabled endpoint keeps WAKE# armed (and pcie-qcom then keeps it powered).
 - `patches/0700-wifi-mac80211-fix-unauthorised-port-check-for-encap-.patch`
   source: https://git.kernel.org/next/linux-next/c/d59b9bf7df49367e01b06e82dd0f6e7ad3be493c
   upstream: https://patch.msgid.link/20260802105818.dd5da579813d.I51ed0121154bb652bebc97bb0597b1fae9ac978f@changeid
