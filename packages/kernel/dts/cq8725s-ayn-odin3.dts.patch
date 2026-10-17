@@ -13,7 +13,7 @@ Subject: [PATCH] arm64: dts: qcom: odin3: enable DPU dithering, codec and WCN ra
  	reset-gpios = <&tlmm 98 GPIO_ACTIVE_LOW>;
  
  	vddio-supply = <&vreg_l12b_1p8>;
-@@ -350,3 +353,103 @@
+@@ -350,3 +353,104 @@
  		};
  	};
  };
@@ -35,7 +35,8 @@ Subject: [PATCH] arm64: dts: qcom: odin3: enable DPU dithering, codec and WCN ra
 +
 +&vreg_l2i_1p2 {
 +	regulator-state-mem {
-+		regulator-on-in-suspend;
++		/* Trial: drop the codec-only APPS enable vote in s2idle. */
++		regulator-off-in-suspend;
 +		regulator-mode = <RPMH_REGULATOR_MODE_LPM>;
 +	};
 +};
