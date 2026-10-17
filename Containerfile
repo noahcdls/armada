@@ -7,6 +7,7 @@ ARG BASE_IMAGE=quay.io/fedora/fedora-bootc:44
 
 ARG STEAM_BOOTSTRAP_REF
 ARG FEX_REF
+ARG FEX_ROOTFS_ARCHLINUX_REF
 ARG MESA_REF
 ARG MANGOHUD_REF
 ARG GAMESCOPE_REF
@@ -15,6 +16,7 @@ ARG GAMESCOPE_SESSION_STEAM_REF
 ARG KWIN_REF
 ARG PLASMA_MOBILE_REF
 ARG POWERDEVIL_REF
+ARG PROTON_CACHYOS_REF
 ARG PROTONTRICKS_REF
 ARG KERNEL_REF
 ARG INPUTPLUMBER_REF
@@ -34,6 +36,7 @@ ARG UMTP_RESPONDER_REF
 
 FROM ${STEAM_BOOTSTRAP_REF} AS steam-bootstrap
 FROM ${FEX_REF} AS fex
+FROM ${FEX_ROOTFS_ARCHLINUX_REF} AS fex-rootfs-archlinux
 FROM ${MESA_REF} AS mesa
 FROM ${MANGOHUD_REF} AS mangohud
 FROM ${GAMESCOPE_REF} AS gamescope
@@ -42,6 +45,7 @@ FROM ${GAMESCOPE_SESSION_STEAM_REF} AS gamescope-session-steam
 FROM ${KWIN_REF} AS kwin
 FROM ${PLASMA_MOBILE_REF} AS plasma-mobile
 FROM ${POWERDEVIL_REF} AS powerdevil
+FROM ${PROTON_CACHYOS_REF} AS proton-cachyos
 FROM ${PROTONTRICKS_REF} AS protontricks
 FROM ${KERNEL_REF} AS kernel
 FROM ${INPUTPLUMBER_REF} AS inputplumber
@@ -84,6 +88,7 @@ LABEL org.opencontainers.image.version="${ARMADA_VERSION}"
 RUN --mount=type=bind,from=ctx,source=/,target=/ctx \
     --mount=type=bind,from=steam-bootstrap,source=/steam-bootstrap,target=/packages/steam-bootstrap \
     --mount=type=bind,from=fex,source=/rpms,target=/packages/fex \
+    --mount=type=bind,from=fex-rootfs-archlinux,source=/rpms,target=/packages/fex-rootfs-archlinux \
     --mount=type=bind,from=mesa,source=/rpms,target=/packages/mesa \
     --mount=type=bind,from=mangohud,source=/rpms,target=/packages/mangohud \
     --mount=type=bind,from=gamescope,source=/rpms,target=/packages/gamescope \
@@ -92,6 +97,7 @@ RUN --mount=type=bind,from=ctx,source=/,target=/ctx \
     --mount=type=bind,from=kwin,source=/rpms,target=/packages/kwin \
     --mount=type=bind,from=plasma-mobile,source=/rpms,target=/packages/plasma-mobile \
     --mount=type=bind,from=powerdevil,source=/rpms,target=/packages/powerdevil \
+    --mount=type=bind,from=proton-cachyos,source=/,target=/packages/proton-cachyos \
     --mount=type=bind,from=protontricks,source=/rpms,target=/packages/protontricks \
     --mount=type=bind,from=kernel,source=/kernel,target=/packages/kernel \
     --mount=type=bind,from=inputplumber,source=/rpms,target=/packages/inputplumber \

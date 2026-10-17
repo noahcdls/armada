@@ -62,6 +62,8 @@
 # ============== Input / Gamepad ==============
 0058-input-joystick-add-ayaneo-mcu-joystick.patch
 0069-input-misc-add-konkr-sysbtn-MCU-system-buttons.patch
+0069a-input-konkr-sysbtn-add-pocket-fit-mcu.patch
+0541-input-joystick-mcu-joystick-power-the-mcu-off-in-suspend.patch
 0031_input--Add-driver-for-RSInput-Gamepad.patch
 0508-input-rsinput-add-pm-resume-to-reinit-mcu-after-suspend.patch
 0504-Enable-64-bit-processes-to-use-compat-input-syscalls.patch
@@ -146,6 +148,10 @@
 # ============== WiFi ==============
 1020-wifi-ath12k-send-the-computed-scan-priority-to-the-f.patch
 1021-wifi-ath12k-convert-scan-timeout-to-wiphy-delayed-work.patch
+
+# ============== Video decode ==============
+1030-media-iris-send-the-stream-POC-type.patch
+1031-media-iris-stop-AV1-tier-overwriting-HEVC-tier.patch
 
 # ============== System tweaks ==============
 0500-ROCKNIX-set-boot-fanspeed.patch
@@ -273,3 +279,6 @@
 0730-soundwire-qcom-disable-the-interrupt-before-gating-the-clock.patch
 0731-Bluetooth-hci_qca-reset-the-in-band-sleep-state-on-power-off.patch
 0732-arm64-dts-qcom-disable-the-qce-crypto-engine.patch
+1021-wifi-ath12k-fix-single-pdev-frequency-ranges.patch
+1022-wifi-ath12k-split-WCN7860-scans-by-firmware-ranges.patch
+1023-wifi-ath12k-protect-TX-during-associated-range-scans.patch
