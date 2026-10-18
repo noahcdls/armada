@@ -208,6 +208,7 @@
 0037-arm64-dts-qcom-sm8750-add-CPU-thermal-cooling.patch
 0542-arm64-dts-qcom-sm8750-describe-the-tcsr-download-mode-cookie.patch
 0557-arm64-dts-qcom-sm8750-add-the-soccp.patch
+0558-soc-qcom-stats-expose-adsp-dsppm-smem.patch
 0049-drm-msm-a8xx-add-adreno-830-catalog.patch
 0039-wifi-ath12k-add-initial-hardware-definition-for-WCN7.patch
 0040-wifi-ath12k-send-QDSS-config-when-CNSS_QDSS_CFG_MISS.patch

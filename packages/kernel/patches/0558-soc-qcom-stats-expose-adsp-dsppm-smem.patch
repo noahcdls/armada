@@ -1,0 +1,103 @@
+From: Armada <noreply@armada.local>
+Subject: [PATCH] soc: qcom: stats: expose ADSP DSPPM aggregate stats
+
+The ADSP LPI residency counter remains zero while system AOSD is active.
+Expose the SM8750 ADSP DSPPM aggregate data from SMEM item 624 through
+qcom_stats debugfs so the active power-domain client counts can be checked
+without changing ADSP state.
+
+The item layout follows OnePlus's SM8750 ADSP sleep monitor. It reports
+aggregate counts, not client identities; the client-list RPMsg query is a
+separate diagnostic and is intentionally not enabled here.
+---
+diff --git a/drivers/soc/qcom/qcom_stats.c b/drivers/soc/qcom/qcom_stats.c
+--- a/drivers/soc/qcom/qcom_stats.c
++++ b/drivers/soc/qcom/qcom_stats.c
+@@ -28,6 +28,10 @@
+ #define DDR_STATS_TYPE(data)		FIELD_GET(GENMASK(15, 8), data)
+ #define DDR_STATS_FREQ(data)		FIELD_GET(GENMASK(31, 16), data)
+ 
++#define ADSP_DSPPM_STATS_SMEM_ID	624
++#define ADSP_DSPPM_STATS_PID		2
++#define ADSP_DSPPM_STATS_NUM_PD		5
++
+ static struct qmp *qcom_stats_qmp;
+ 
+ struct subsystem_data {
+@@ -92,6 +96,18 @@ struct appended_stats {
+ 	u32 reserved[3];
+ };
+ 
++struct adsp_dsppm_pd_clients {
++	u32 pid;
++	u32 num_active;
++};
++
++struct adsp_dsppm_stats {
++	u32 version;
++	u32 latency_us;
++	u32 timestamp;
++	struct adsp_dsppm_pd_clients pd[ADSP_DSPPM_STATS_NUM_PD];
++};
++
+ static void qcom_print_stats(struct seq_file *s, const struct sleep_stats *stat)
+ {
+ 	u64 accumulated = stat->accumulated;
+@@ -124,6 +139,40 @@ static int qcom_subsystem_sleep_stats_show(struct seq_file *s, void *unused)
+ 	return 0;
+ }
+ 
++static int qcom_adsp_dsppm_stats_show(struct seq_file *s, void *unused)
++{
++	struct adsp_dsppm_stats stats;
++	struct adsp_dsppm_stats *smem;
++	size_t size;
++	int i;
++
++	smem = qcom_smem_get(ADSP_DSPPM_STATS_PID,
++			     ADSP_DSPPM_STATS_SMEM_ID, &size);
++	if (IS_ERR(smem))
++		return PTR_ERR(smem);
++	if (size < sizeof(*smem))
++		return -EINVAL;
++
++	/* DSPPM updates this shared item asynchronously; take a best-effort snapshot. */
++	stats.version = READ_ONCE(smem->version);
++	stats.latency_us = READ_ONCE(smem->latency_us);
++	stats.timestamp = READ_ONCE(smem->timestamp);
++	for (i = 0; i < ARRAY_SIZE(stats.pd); i++) {
++		stats.pd[i].pid = READ_ONCE(smem->pd[i].pid);
++		stats.pd[i].num_active = READ_ONCE(smem->pd[i].num_active);
++	}
++
++	seq_printf(s, "SMEM item: %u (DSPPM aggregate; not per-client data)\n",
++		   ADSP_DSPPM_STATS_SMEM_ID);
++	seq_printf(s, "Version: %u\nLatency (us): %u\nTimestamp: %u\n",
++		   stats.version, stats.latency_us, stats.timestamp);
++	for (i = 0; i < ARRAY_SIZE(stats.pd); i++)
++		seq_printf(s, "PD[%d]: pid=%u active_clients=%u\n",
++			   i, stats.pd[i].pid, stats.pd[i].num_active);
++
++	return 0;
++}
++
+ static int qcom_soc_sleep_stats_show(struct seq_file *s, void *unused)
+ {
+ 	struct stats_data *d = s->private;
+@@ -268,5 +318,6 @@ DEFINE_SHOW_ATTRIBUTE(qcom_soc_sleep_stats);
+ DEFINE_SHOW_ATTRIBUTE(qcom_subsystem_sleep_stats);
+ DEFINE_SHOW_ATTRIBUTE(qcom_ddr_stats);
++DEFINE_SHOW_ATTRIBUTE(qcom_adsp_dsppm_stats);
+ 
+ static void qcom_create_ddr_stat_files(struct dentry *root, void __iomem *reg,
+ 				       const struct stats_config *config)
+@@ -341,6 +392,9 @@ static int qcom_stats_probe(struct platform_device *pdev)
+ 	root = debugfs_create_dir("qcom_stats", NULL);
+ 
+ 	qcom_create_subsystem_stat_files(root, config);
++	if (of_machine_is_compatible("qcom,sm8750"))
++		debugfs_create_file("adsp_dsppm", 0400, root, NULL,
++				    &qcom_adsp_dsppm_stats_fops);
+ 	qcom_create_soc_sleep_stat_files(root, reg, d, config);
+ 	qcom_create_ddr_stat_files(root, reg, config);
+ 

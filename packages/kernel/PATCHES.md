@@ -876,6 +876,10 @@ no equivalent submission was found, or a permanent URL to the upstream submissio
   source: armada
   upstream: local
   notes: Fixes the SM8750 s2idle wake hang at its cause and replaces the SN4 sleep keepalive (and the 0521 PCIe suspend OPP floor before it). The bootloader's early SoCCP image sits in D0 behind the system NoC with no bus vote; the driver reloads soccp.mbn, which parks itself in D3, and the SoC then also reaches CX shutdown and DDR low power in suspend. Until the TCSR D-state register shows D3 the driver holds the SoCCP's path to DDR itself, so a board without soccp.mbn (Pocket FIT Elite today) still wakes, without the deeper sleep. Odin 3 firmware: `qcom/sm8750/ayn/odin3/soccp.mbn`, from the device's modem partition.
+- `patches/0558-soc-qcom-stats-expose-adsp-dsppm-smem.patch`
+  source: https://github.com/OnePlusOSS/android_kernel_oneplus_sm8750/blob/6028f47faddaa27700f8dd3a1d83906ea8f27170/drivers/soc/qcom/adsp_sleepmon.c
+  upstream: local
+  notes: Read-only SM8750 diagnostic exposing DSPPM aggregate SMEM item 624 at /sys/kernel/debug/qcom_stats/adsp_dsppm. The five PD rows report aggregate active-client counts, not client identities; it does not send RPMsg requests or alter ADSP state.
 - `patches/0561-soc-qcom-override-the-sm8750-pcie-state-manager-power-control.patch`
   source: armada
   upstream: local
