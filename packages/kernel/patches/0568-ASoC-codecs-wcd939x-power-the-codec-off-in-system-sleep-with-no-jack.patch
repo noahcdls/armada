@@ -1,0 +1,234 @@
+From: Armada <noreply@armada.local>
+Subject: [PATCH] ASoC: codecs: wcd939x: power the codec off in system sleep with no jack
+
+With nothing plugged in, the codec still runs jack detection through
+s2idle: analog bias and MBHC clock on, the chip out of reset and all five
+supplies enabled. The plug interrupt cannot wake the SoC from SoundWire
+clock stop on SM8750 anyway (0603). Assert reset and release the supplies
+at suspend when no jack is reported and no stream is active.
+
+The TX SoundWire device rewrites its register cache when the codec
+re-attaches, so mark the cache dirty and cache-only at suspend; on
+resume, power up, pulse reset and let the bus re-enumerate it, then
+repeat the analog bias pre-charge once it has attached. The device link
+from the codec to its TX device orders this inside the SoundWire
+controller's own suspend/resume.
+
+power_off_in_suspend (module parameter, default on) switches it off.
+---
+--- a/sound/soc/codecs/wcd939x.c
++++ b/sound/soc/codecs/wcd939x.c
+@@ -26,6 +26,8 @@
+ #include <sound/soc.h>
+ #include <sound/soc-dapm.h>
+ #include <linux/regulator/consumer.h>
++#include <linux/soundwire/sdw.h>
++#include <linux/workqueue.h>
+ #include <linux/usb/typec_mux.h>
+ #include <linux/usb/typec_altmode.h>
+ 
+@@ -35,6 +37,7 @@
+ #include "wcd939x.h"
+ 
+ #define WCD939X_MAX_MICBIAS		(4)
++#define WCD939X_MAX_SUPPLY		(5)
+ #define WCD939X_MBHC_MAX_BUTTONS	(8)
+ #define TX_ADC_MAX			(4)
+ #define WCD_MBHC_HS_V_MAX		1600
+@@ -207,6 +210,10 @@
+ 	u32 tx_mode[TX_ADC_MAX];
+ 	int variant;
+ 	struct gpio_desc *reset_gpio;
++	struct regulator_bulk_data supplies[WCD939X_MAX_SUPPLY];
++	/* powered off for system sleep */
++	bool powered_off;
++	struct work_struct resume_work;
+ 	int hphr_pdm_wd_int;
+ 	int hphl_pdm_wd_int;
+ 	int ear_pdm_wd_int;
+@@ -220,6 +227,11 @@
+ 	"vdd-rxtx", "vdd-io", "vdd-buck", "vdd-mic-bias", "vdd-px",
+ };
+ 
++static bool power_off_in_suspend = true;
++module_param(power_off_in_suspend, bool, 0644);
++MODULE_PARM_DESC(power_off_in_suspend,
++		 "Power the codec off in system sleep while no jack is plugged in");
++
+ static const SNDRV_CTL_TLVD_DECLARE_DB_MINMAX(ear_pa_gain, 600, -1800);
+ static const DECLARE_TLV_DB_SCALE(line_gain, 0, 7, 1);
+ static const DECLARE_TLV_DB_SCALE(analog_gain, 0, 25, 1);
+@@ -3385,6 +3397,8 @@
+ {
+ 	struct wcd939x_priv *wcd = dev_get_drvdata(comp->dev);
+ 
++	wcd->jack = jack;
++
+ 	if (jack) {
+ 		/*
+ 		 * MBHC reports through the TX SoundWire device. Once that link
+@@ -3471,23 +3485,44 @@
+ }
+ #endif /* CONFIG_TYPEC */
+ 
++static void wcd939x_disable_supplies(void *data)
++{
++	struct wcd939x_priv *wcd939x = data;
++
++	if (!wcd939x->powered_off)
++		regulator_bulk_disable(ARRAY_SIZE(wcd939x_supplies),
++				       wcd939x->supplies);
++}
++
+ static int wcd939x_populate_dt_data(struct wcd939x_priv *wcd939x, struct device *dev)
+ {
+ 	struct wcd_mbhc_config *cfg = &wcd939x->mbhc_cfg;
+ #if IS_ENABLED(CONFIG_TYPEC)
+ 	struct device_node *np;
+ #endif /* CONFIG_TYPEC */
+-	int ret;
++	int ret, i;
+ 
+ 	wcd939x->reset_gpio = devm_gpiod_get(dev, "reset", GPIOD_OUT_LOW);
+ 	if (IS_ERR(wcd939x->reset_gpio))
+ 		return dev_err_probe(dev, PTR_ERR(wcd939x->reset_gpio),
+ 				     "Failed to get reset gpio\n");
+ 
+-	ret = devm_regulator_bulk_get_enable(dev, ARRAY_SIZE(wcd939x_supplies),
+-					     wcd939x_supplies);
++	for (i = 0; i < ARRAY_SIZE(wcd939x_supplies); i++)
++		wcd939x->supplies[i].supply = wcd939x_supplies[i];
++
++	ret = devm_regulator_bulk_get(dev, ARRAY_SIZE(wcd939x_supplies),
++				      wcd939x->supplies);
++	if (ret)
++		return dev_err_probe(dev, ret, "Failed to get supplies\n");
++
++	ret = regulator_bulk_enable(ARRAY_SIZE(wcd939x_supplies),
++				    wcd939x->supplies);
++	if (ret)
++		return dev_err_probe(dev, ret, "Failed to enable supplies\n");
++
++	ret = devm_add_action_or_reset(dev, wcd939x_disable_supplies, wcd939x);
+ 	if (ret)
+-		return dev_err_probe(dev, ret, "Failed to get and enable supplies\n");
++		return ret;
+ 
+ 	ret = wcd_dt_parse_micbias_info(&wcd939x->common);
+ 	if (ret)
+@@ -3850,6 +3885,89 @@
+ 	return 0;
+ }
+ 
++/*
++ * With nothing plugged in, the codec only runs jack detection, which keeps
++ * its analog bias and MBHC clock running and all five supplies enabled
++ * through s2idle, while the plug interrupt it would raise cannot wake the
++ * SoC (see wcd939x_codec_set_jack()). Power it off for system sleep instead
++ * and let it re-attach on resume: the TX SoundWire device rewrites the
++ * register cache when it attaches, which restores jack detection.
++ */
++static int wcd939x_suspend(struct device *dev)
++{
++	struct wcd939x_priv *wcd939x = dev_get_drvdata(dev);
++	struct snd_soc_component *component;
++
++	if (!power_off_in_suspend || !wcd939x->regmap || !wcd939x->tx_sdw_dev)
++		return 0;
++
++	component = snd_soc_lookup_component(dev, NULL);
++	if (!component || snd_soc_component_active(component))
++		return 0;
++
++	if (wcd939x->jack && wcd939x->jack->status)
++		return 0;
++
++	flush_work(&wcd939x->resume_work);
++
++	regcache_cache_only(wcd939x->regmap, true);
++	regcache_mark_dirty(wcd939x->regmap);
++
++	gpiod_set_value(wcd939x->reset_gpio, 1);
++	regulator_bulk_disable(ARRAY_SIZE(wcd939x_supplies), wcd939x->supplies);
++
++	/* Wait for the re-attach on resume, not the attach from boot */
++	reinit_completion(&wcd939x->tx_sdw_dev->initialization_complete);
++	wcd939x->powered_off = true;
++
++	return 0;
++}
++
++static void wcd939x_resume_work(struct work_struct *work)
++{
++	struct wcd939x_priv *wcd939x = container_of(work, struct wcd939x_priv,
++						    resume_work);
++
++	if (sdw_slave_wait_for_init(wcd939x->tx_sdw_dev, 2000))
++		return;
++
++	/*
++	 * The cache sync restores the analog bias already enabled; repeat
++	 * the pre-charge from wcd939x_io_init().
++	 */
++	regmap_update_bits(wcd939x->regmap, WCD939X_ANA_BIAS,
++			   WCD939X_BIAS_PRECHRG_EN, WCD939X_BIAS_PRECHRG_EN);
++	usleep_range(10000, 10010);
++	regmap_update_bits(wcd939x->regmap, WCD939X_ANA_BIAS,
++			   WCD939X_BIAS_PRECHRG_EN, 0);
++}
++
++static int wcd939x_resume(struct device *dev)
++{
++	struct wcd939x_priv *wcd939x = dev_get_drvdata(dev);
++	int ret;
++
++	if (!wcd939x->powered_off)
++		return 0;
++
++	ret = regulator_bulk_enable(ARRAY_SIZE(wcd939x_supplies),
++				    wcd939x->supplies);
++	if (ret) {
++		dev_err(dev, "Failed to enable supplies: %d\n", ret);
++		return ret;
++	}
++
++	wcd939x->powered_off = false;
++	wcd939x_reset(wcd939x);
++
++	/* The SoundWire link is back up; finish once the codec re-attaches */
++	schedule_work(&wcd939x->resume_work);
++
++	return 0;
++}
++
++static DEFINE_SIMPLE_DEV_PM_OPS(wcd939x_pm_ops, wcd939x_suspend, wcd939x_resume);
++
+ static int wcd939x_probe(struct platform_device *pdev)
+ {
+ 	struct component_match *match = NULL;
+@@ -3864,6 +3982,7 @@
+ 
+ 	dev_set_drvdata(dev, wcd939x);
+ 	mutex_init(&wcd939x->micb_lock);
++	INIT_WORK(&wcd939x->resume_work, wcd939x_resume_work);
+ 	wcd939x->common.dev = dev;
+ 	wcd939x->common.max_bias = 4;
+ 
+@@ -3900,7 +4019,9 @@
+ static void wcd939x_remove(struct platform_device *pdev)
+ {
+ 	struct device *dev = &pdev->dev;
++	struct wcd939x_priv *wcd939x = dev_get_drvdata(dev);
+ 
++	cancel_work_sync(&wcd939x->resume_work);
+ 	component_master_del(dev, &wcd939x_comp_ops);
+ 
+ 	pm_runtime_disable(dev);
+@@ -3923,6 +4044,7 @@
+ 	.driver = {
+ 		.name = "wcd939x_codec",
+ 		.of_match_table = of_match_ptr(wcd939x_dt_match),
++		.pm = pm_sleep_ptr(&wcd939x_pm_ops),
+ 		.suppress_bind_attrs = true,
+ 	},
+ };

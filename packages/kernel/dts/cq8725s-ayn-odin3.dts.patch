@@ -13,7 +13,7 @@ Subject: [PATCH] arm64: dts: qcom: odin3: enable DPU dithering, codec and WCN ra
  	reset-gpios = <&tlmm 98 GPIO_ACTIVE_LOW>;
  
  	vddio-supply = <&vreg_l12b_1p8>;
-@@ -350,3 +353,104 @@
+@@ -350,3 +353,207 @@
  		};
  	};
  };
@@ -93,6 +93,109 @@ Subject: [PATCH] arm64: dts: qcom: odin3: enable DPU dithering, codec and WCN ra
 +		regulator-on-in-suspend;
 +		regulator-mode = <RPMH_REGULATOR_MODE_LPM>;
 +	};
++};
++
++/*
++ * Nothing in Linux uses these; the vendor DT has them on in LPM, while the
++ * bootloader leaves them in HPM. A rail Linux never votes on keeps that
++ * vote through s2idle, so own them: on in LPM while awake, off while asleep.
++ * l2j is the SPSS sensors supply; SPSS is not loaded here.
++ */
++&vreg_l1b_1p8 {
++	regulator-always-on;
++	regulator-initial-mode = <RPMH_REGULATOR_MODE_LPM>;
++
++	regulator-state-mem {
++		regulator-off-in-suspend;
++	};
++};
++
++&vreg_l2b_3p0 {
++	regulator-always-on;
++	regulator-initial-mode = <RPMH_REGULATOR_MODE_LPM>;
++
++	regulator-state-mem {
++		regulator-off-in-suspend;
++	};
++};
++
++&vreg_l2j_1p2 {
++	regulator-always-on;
++	regulator-initial-mode = <RPMH_REGULATOR_MODE_LPM>;
++
++	regulator-state-mem {
++		regulator-off-in-suspend;
++	};
++};
++
++/*
++ * Pins that would feed powered-off parts or fight their own pull through
++ * s2idle: the gamepad MCU UART (its 3.3 V rail is cut in suspend, while
++ * TX idles high), and outputs whose default pull opposes the level driven
++ * (panel rail enables, speaker amp resets).
++ */
++&tlmm {
++	qup_uart15_sleep: qup-uart15-sleep-state {
++		pins = "gpio30", "gpio31";
++		function = "gpio";
++		drive-strength = <2>;
++		bias-pull-down;
++		input-enable;
++	};
++
++	bl_en_default: bl-en-default-state {
++		pins = "gpio56";
++		function = "gpio";
++		drive-strength = <2>;
++		bias-disable;
++	};
++
++	disp_en_default: disp-en-default-state {
++		pins = "gpio97";
++		function = "gpio";
++		drive-strength = <2>;
++		bias-disable;
++	};
++
++	spk_amp_l_rst_default: spk-amp-l-rst-default-state {
++		pins = "gpio128";
++		function = "gpio";
++		drive-strength = <2>;
++		bias-disable;
++	};
++
++	spk_amp_r_rst_default: spk-amp-r-rst-default-state {
++		pins = "gpio126";
++		function = "gpio";
++		drive-strength = <2>;
++		bias-disable;
++	};
++};
++
++&uart15 {
++	pinctrl-0 = <&qup_uart15_default>;
++	pinctrl-1 = <&qup_uart15_sleep>;
++	pinctrl-names = "default", "sleep";
++};
++
++&vdd_bl_5v0 {
++	pinctrl-0 = <&bl_en_default>;
++	pinctrl-names = "default";
++};
++
++&vdd_disp_2v8 {
++	pinctrl-0 = <&disp_en_default>;
++	pinctrl-names = "default";
++};
++
++&spk_amp_l {
++	pinctrl-0 = <&spk_amp_l_rst_default>;
++	pinctrl-names = "default";
++};
++
++&spk_amp_r {
++	pinctrl-0 = <&spk_amp_r_rst_default>;
++	pinctrl-names = "default";
 +};
 +
 +/* Replaces the bootloader's early SoCCP image, which blocks SoC deep sleep */

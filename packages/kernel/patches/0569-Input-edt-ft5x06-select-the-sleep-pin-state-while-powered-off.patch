@@ -1,0 +1,42 @@
+From: Armada <noreply@armada.local>
+Subject: [PATCH] Input: edt-ft5x06 - select the sleep pin state while powered off
+
+In power-off suspend the driver cuts vcc and iovcc but leaves the pins in
+their default state, so pull-ups on the reset and interrupt lines feed
+the unpowered controller through s2idle. Select the "sleep" pin state
+after the supplies are off and the default state again before powering
+up. Boards without a sleep state are unaffected.
+---
+--- a/drivers/input/touchscreen/edt-ft5x06.c
++++ b/drivers/input/touchscreen/edt-ft5x06.c
+@@ -25,6 +25,7 @@
+ #include <linux/irq.h>
+ #include <linux/kernel.h>
+ #include <linux/module.h>
++#include <linux/pinctrl/consumer.h>
+ #include <linux/property.h>
+ #include <linux/ratelimit.h>
+ #include <linux/regmap.h>
+@@ -1426,6 +1427,13 @@
+ 	if (ret)
+ 		dev_warn(dev, "Failed to disable iovcc\n");
+ 
++	/*
++	 * With both supplies off, the default pin state's pull-ups on the
++	 * reset and interrupt lines feed the unpowered controller; switch
++	 * to the "sleep" pin state if the board provides one.
++	 */
++	pinctrl_pm_select_sleep_state(dev);
++
+ 	return 0;
+ }
+ 
+@@ -1444,6 +1452,8 @@
+ 	if (tsdata->suspend_mode == EDT_PMODE_POWEROFF) {
+ 		struct gpio_desc *reset_gpio = tsdata->reset_gpio;
+ 
++		pinctrl_pm_select_default_state(dev);
++
+ 		/*
+ 		 * We can't check if the regulator is a dummy or a real
+ 		 * regulator. So we need to specify the 5ms reset time (T_rst)

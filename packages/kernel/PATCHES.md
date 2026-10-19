@@ -756,7 +756,7 @@ no equivalent submission was found, or a permanent URL to the upstream submissio
   notes: Armada extracted this DTS from the cited ROCKNIX patch and then applied later ROCKNIX DTS updates.
 - `dts/cq8725s-ayn-odin3.dts.patch`
   source: armada
-  notes: Armada enables DPU dithering and codec-rail LPM sleep states after copying `dts/cq8725s-ayn-odin3.dts`.
+  notes: Armada enables DPU dithering and codec-rail LPM sleep states after copying `dts/cq8725s-ayn-odin3.dts`. It also owns l1b/l2b/l2j, which nothing in Linux uses but the bootloader leaves on in HPM (a rail Linux never votes on keeps that vote through s2idle): LPM while awake as in the vendor DT, off in s2idle. Pin states stop the gamepad UART feeding the powered-off MCU in suspend and drop pulls that fight the panel-rail enables and speaker-amp resets.
 - `dts/cq8725s-ayn-common.dtsi.patch`
   source: armada
   notes: Armada keeps volume-up from waking the system, marks Odin 3's RSInput node as connected to the Qualcomm haptics device, supplies the device's 1024 range, and marks PCIe WAKE# active-low. The four switched WCN7860 PMU rails are no longer pinned always-on: the resume hang that was attributed to them was the early SoCCP image (fixed by 0556), so they now turn off whenever Wi-Fi and Bluetooth have both released the PMU. The 70-count `axis-deadzone` (an unmeasured ROCKNIX bring-up value) was dropped; like the RP6 and every other RSInput device the Odin 3 now passes its stick value through, leaving deadzone policy to Steam Input and the game.
@@ -892,6 +892,14 @@ no equivalent submission was found, or a permanent URL to the upstream submissio
   source: armada
   upstream: local
   notes: A port with an OF WAKE# GPIO is a wakeup source, so WAKE# is armed for every sleep. On the Odin 3, once the WCN7860 PMU rails are no longer pinned on, pcie-qcom's pwrctrl power-off in suspend_noirq leaves the chip unpowered, it pulls WAKE# low and the level-low wake IRQ aborts the sleep. Drop the port's wakeup in ->prepare() when nothing below it may wake, restore it in ->complete(). A wake-enabled endpoint keeps WAKE# armed (and pcie-qcom then keeps it powered).
+- `patches/0568-ASoC-codecs-wcd939x-power-the-codec-off-in-system-sleep-with-no-jack.patch`
+  source: armada
+  upstream: local
+  notes: With no jack reported and no stream active, assert reset and release the five supplies at system suspend instead of running MBHC (bias and clock) through s2idle; its plug interrupt cannot wake SM8750 from SoundWire clock stop anyway (0603). The TX regmap is marked dirty and cache-only, the codec re-enumerates on resume and the attach rewrites the cache; the analog bias pre-charge is repeated after the attach. `snd_soc_wcd939x.power_off_in_suspend=0` (or the module parameter at runtime) keeps the old behaviour.
+- `patches/0569-Input-edt-ft5x06-select-the-sleep-pin-state-while-powered-off.patch`
+  source: armada
+  upstream: local
+  notes: Power-off suspend cut both supplies but kept the default pull-ups on reset/INT into the unpowered controller; the Odin 3 DT already describes a "sleep" state that was never selected.
 - `patches/0700-wifi-mac80211-fix-unauthorised-port-check-for-encap-.patch`
   source: https://git.kernel.org/next/linux-next/c/d59b9bf7df49367e01b06e82dd0f6e7ad3be493c
   upstream: https://patch.msgid.link/20260802105818.dd5da579813d.I51ed0121154bb652bebc97bb0597b1fae9ac978f@changeid
