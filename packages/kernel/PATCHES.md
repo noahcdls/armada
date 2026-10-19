@@ -900,6 +900,10 @@ no equivalent submission was found, or a permanent URL to the upstream submissio
   source: armada
   upstream: local
   notes: Power-off suspend cut both supplies but kept the default pull-ups on reset/INT into the unpowered controller; the Odin 3 DT already describes a "sleep" state that was never selected.
+- `patches/0562-armada-runtime-switches-to-bisect-s2idle-drain.patch`
+  source: armada
+  upstream: local
+  notes: Debug only. Module parameters (default = current behaviour) to switch off regulator-off-in-suspend for rpmh rails, the GENI "sleep" pin state and the edt-ft5x06 "sleep" pin state at runtime, to bisect the Odin 3 s2idle drain without rebuilding. Drop once settled.
 - `patches/0700-wifi-mac80211-fix-unauthorised-port-check-for-encap-.patch`
   source: https://git.kernel.org/next/linux-next/c/d59b9bf7df49367e01b06e82dd0f6e7ad3be493c
   upstream: https://patch.msgid.link/20260802105818.dd5da579813d.I51ed0121154bb652bebc97bb0597b1fae9ac978f@changeid

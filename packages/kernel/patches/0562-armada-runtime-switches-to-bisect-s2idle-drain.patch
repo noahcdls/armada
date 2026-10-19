@@ -1,0 +1,90 @@
+From: Armada <noreply@armada.local>
+Subject: [PATCH] armada: runtime switches to bisect the Odin 3 s2idle drain
+
+Debug-only module parameters, all defaulting to the current behaviour,
+so each sleep-state change can be measured without a rebuild:
+
+  qcom_rpmh_regulator.suspend_off   N: keep regulator-off-in-suspend rails
+                                       on (l1b/l2b/l2j/l2i on the Odin 3)
+  qcom_geni_se.sleep_pinctrl        N: no "sleep" pin state for serial
+                                       engines (the gamepad UART)
+  edt_ft5x06.sleep_pinctrl          N: no "sleep" pin state for the touch
+                                       controller while powered off
+
+Each takes effect at the next suspend. snd_soc_wcd939x.power_off_in_suspend
+(0568) covers the codec.
+---
+--- a/drivers/regulator/qcom-rpmh-regulator.c
++++ b/drivers/regulator/qcom-rpmh-regulator.c
+@@ -454,10 +454,18 @@
+ 			RPMH_REGULATOR_REG_ENABLE, on, on);
+ }
+ 
++/* s2idle bisect switch: N keeps regulator-off-in-suspend rails on */
++static bool suspend_off = true;
++module_param(suspend_off, bool, 0644);
++MODULE_PARM_DESC(suspend_off, "Honour regulator-off-in-suspend (takes effect at the next suspend)");
++
+ static int rpmh_regulator_set_suspend_disable(struct regulator_dev *rdev)
+ {
+ 	struct rpmh_vreg *vreg = rdev_get_drvdata(rdev);
+ 
++	if (!suspend_off)
++		return rpmh_regulator_set_suspend_enable(rdev);
++
+ 	/*
+ 	 * WAKE restores the current active-set contribution: 1 only if an
+ 	 * APPS enable vote is in place right now.  If no enable request has
+--- a/drivers/soc/qcom/qcom-geni-se.c
++++ b/drivers/soc/qcom/qcom-geni-se.c
+@@ -596,6 +596,11 @@
+ 	clk_disable_unprepare(se->core_clk);
+ }
+ 
++/* s2idle bisect switch: N leaves serial engines in their default pin state */
++static bool sleep_pinctrl = true;
++module_param(sleep_pinctrl, bool, 0644);
++MODULE_PARM_DESC(sleep_pinctrl, "Select the \"sleep\" pin state when a serial engine powers off");
++
+ /**
+  * geni_se_resources_off() - Turn off resources associated with the serial
+  *                           engine
+@@ -610,9 +615,11 @@
+ 	if (has_acpi_companion(se->dev))
+ 		return 0;
+ 
+-	ret = pinctrl_pm_select_sleep_state(se->dev);
+-	if (ret)
+-		return ret;
++	if (sleep_pinctrl) {
++		ret = pinctrl_pm_select_sleep_state(se->dev);
++		if (ret)
++			return ret;
++	}
+ 
+ 	geni_se_clks_off(se);
+ 	return 0;
+--- a/drivers/input/touchscreen/edt-ft5x06.c
++++ b/drivers/input/touchscreen/edt-ft5x06.c
+@@ -1387,6 +1387,11 @@
+ 	edt_ft5x06_ts_teardown_debugfs(tsdata);
+ }
+ 
++/* s2idle bisect switch: N keeps the default pin state while powered off */
++static bool sleep_pinctrl = true;
++module_param(sleep_pinctrl, bool, 0644);
++MODULE_PARM_DESC(sleep_pinctrl, "Select the \"sleep\" pin state while powered off in suspend");
++
+ static int edt_ft5x06_ts_suspend(struct device *dev)
+ {
+ 	struct i2c_client *client = to_i2c_client(dev);
+@@ -1432,7 +1437,8 @@
+ 	 * reset and interrupt lines feed the unpowered controller; switch
+ 	 * to the "sleep" pin state if the board provides one.
+ 	 */
+-	pinctrl_pm_select_sleep_state(dev);
++	if (sleep_pinctrl)
++		pinctrl_pm_select_sleep_state(dev);
+ 
+ 	return 0;
+ }

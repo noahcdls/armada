@@ -134,6 +134,7 @@
 0566-soc-qcom-hand-the-sm8750-mdss-to-the-display-sequencer-at-suspend.patch
 0567-PCI-don-t-arm-WAKE-for-a-port-with-nothing-below-it-to-wake.patch
 0569-Input-edt-ft5x06-select-the-sleep-pin-state-while-powered-off.patch
+0562-armada-runtime-switches-to-bisect-s2idle-drain.patch
 0514-PCI-qcom-honor-iommu-map-cell-count.patch
 0514a-of-property-honor-iommu-cells-in-iommu-map-devlinks.patch
 
