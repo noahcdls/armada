@@ -14,7 +14,7 @@ repeat the analog bias pre-charge once it has attached. The device link
 from the codec to its TX device orders this inside the SoundWire
 controller's own suspend/resume.
 
-power_off_in_suspend (module parameter, default on) switches it off.
+power_off_in_suspend (module parameter, default off) switches it on.
 ---
 --- a/sound/soc/codecs/wcd939x.c
 +++ b/sound/soc/codecs/wcd939x.c
@@ -50,7 +50,7 @@ power_off_in_suspend (module parameter, default on) switches it off.
  	"vdd-rxtx", "vdd-io", "vdd-buck", "vdd-mic-bias", "vdd-px",
  };
  
-+static bool power_off_in_suspend = true;
++static bool power_off_in_suspend;
 +module_param(power_off_in_suspend, bool, 0644);
 +MODULE_PARM_DESC(power_off_in_suspend,
 +		 "Power the codec off in system sleep while no jack is plugged in");

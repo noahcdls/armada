@@ -1,18 +1,22 @@
 From: Armada <noreply@armada.local>
 Subject: [PATCH] armada: runtime switches to bisect the Odin 3 s2idle drain
 
-Debug-only module parameters, all defaulting to the current behaviour,
-so each sleep-state change can be measured without a rebuild:
+Debug-only module parameters, so each sleep-state change can be measured
+without a rebuild:
 
   qcom_rpmh_regulator.suspend_off   N: keep regulator-off-in-suspend rails
                                        on (l1b/l2b/l2j/l2i on the Odin 3)
   qcom_geni_se.sleep_pinctrl        N: no "sleep" pin state for serial
-                                       engines (the gamepad UART)
-  edt_ft5x06.sleep_pinctrl          N: no "sleep" pin state for the touch
+                                       engines (UARTs and I2C buses)
+  qcom_geni_se.sleep_pinctrl_skip   comma-separated device names that
+                                       keep their default pin state
+  edt_ft5x06.sleep_pinctrl          Y: "sleep" pin state for the touch
                                        controller while powered off
+                                       (default N: it measured worse)
 
-Each takes effect at the next suspend. snd_soc_wcd939x.power_off_in_suspend
-(0568) covers the codec.
+Each takes effect at the next suspend (the GENI ones at the next runtime
+suspend of that engine). snd_soc_wcd939x.power_off_in_suspend (0568)
+covers the codec.
 ---
 --- a/drivers/regulator/qcom-rpmh-regulator.c
 +++ b/drivers/regulator/qcom-rpmh-regulator.c
@@ -37,26 +41,60 @@ Each takes effect at the next suspend. snd_soc_wcd939x.power_off_in_suspend
  	 * APPS enable vote is in place right now.  If no enable request has
 --- a/drivers/soc/qcom/qcom-geni-se.c
 +++ b/drivers/soc/qcom/qcom-geni-se.c
-@@ -596,6 +596,11 @@
+@@ -17,6 +17,7 @@
+ #include <linux/clk.h>
+ #include <linux/firmware.h>
+ #include <linux/slab.h>
++#include <linux/string.h>
+ #include <linux/dma-mapping.h>
+ #include <linux/io.h>
+ #include <linux/module.h>
+@@ -596,6 +597,37 @@
  	clk_disable_unprepare(se->core_clk);
  }
  
-+/* s2idle bisect switch: N leaves serial engines in their default pin state */
++/*
++ * s2idle bisect switches: N leaves serial engines in their default pin
++ * state; sleep_pinctrl_skip lists device names (or parts of them, comma
++ * separated, e.g. "898000,a90000") that keep it.
++ */
 +static bool sleep_pinctrl = true;
 +module_param(sleep_pinctrl, bool, 0644);
 +MODULE_PARM_DESC(sleep_pinctrl, "Select the \"sleep\" pin state when a serial engine powers off");
 +
++static char sleep_pinctrl_skip[128];
++module_param_string(sleep_pinctrl_skip, sleep_pinctrl_skip,
++		    sizeof(sleep_pinctrl_skip), 0644);
++MODULE_PARM_DESC(sleep_pinctrl_skip, "Comma-separated device names that keep their default pin state");
++
++static bool geni_se_use_sleep_pinctrl(struct geni_se *se)
++{
++	const char *name = dev_name(se->dev);
++	char buf[sizeof(sleep_pinctrl_skip)], *p = buf, *tok;
++
++	if (!sleep_pinctrl)
++		return false;
++
++	strscpy(buf, sleep_pinctrl_skip, sizeof(buf));
++	while ((tok = strsep(&p, ",\n"))) {
++		if (*tok && strstr(name, tok))
++			return false;
++	}
++
++	return true;
++}
++
  /**
   * geni_se_resources_off() - Turn off resources associated with the serial
   *                           engine
-@@ -610,9 +615,11 @@
+@@ -610,9 +642,11 @@
  	if (has_acpi_companion(se->dev))
  		return 0;
  
 -	ret = pinctrl_pm_select_sleep_state(se->dev);
 -	if (ret)
 -		return ret;
-+	if (sleep_pinctrl) {
++	if (geni_se_use_sleep_pinctrl(se)) {
 +		ret = pinctrl_pm_select_sleep_state(se->dev);
 +		if (ret)
 +			return ret;
@@ -70,8 +108,8 @@ Each takes effect at the next suspend. snd_soc_wcd939x.power_off_in_suspend
  	edt_ft5x06_ts_teardown_debugfs(tsdata);
  }
  
-+/* s2idle bisect switch: N keeps the default pin state while powered off */
-+static bool sleep_pinctrl = true;
++/* s2idle bisect switch: Y selects the sleep pin state while powered off */
++static bool sleep_pinctrl;
 +module_param(sleep_pinctrl, bool, 0644);
 +MODULE_PARM_DESC(sleep_pinctrl, "Select the \"sleep\" pin state while powered off in suspend");
 +

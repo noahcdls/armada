@@ -13,7 +13,7 @@ Subject: [PATCH] arm64: dts: qcom: odin3: enable DPU dithering, codec and WCN ra
  	reset-gpios = <&tlmm 98 GPIO_ACTIVE_LOW>;
  
  	vddio-supply = <&vreg_l12b_1p8>;
-@@ -350,3 +353,207 @@
+@@ -350,3 +353,269 @@
  		};
  	};
  };
@@ -135,6 +135,44 @@ Subject: [PATCH] arm64: dts: qcom: odin3: enable DPU dithering, codec and WCN ra
 + * (panel rail enables, speaker amp resets).
 + */
 +&tlmm {
++	/*
++	 * Bluetooth UART: TX idles high into the WCN7860, which is unpowered
++	 * in suspend while Bluetooth is off. Hold both lines with pull-ups
++	 * instead of driving them, so a powered chip still sees an idle line.
++	 */
++	qup_uart14_sleep: qup-uart14-sleep-state {
++		pins = "gpio26", "gpio27";
++		function = "gpio";
++		drive-strength = <2>;
++		bias-pull-up;
++		input-enable;
++	};
++
++	/* No pull-ups into the touch controller and LED drivers once unpowered */
++	qup_i2c4_sleep: qup-i2c4-sleep-state {
++		pins = "gpio48", "gpio49";
++		function = "gpio";
++		drive-strength = <2>;
++		bias-disable;
++		input-enable;
++	};
++
++	hub_i2c3_sleep: hub-i2c3-sleep-state {
++		pins = "gpio70", "gpio71";
++		function = "gpio";
++		drive-strength = <2>;
++		bias-disable;
++		input-enable;
++	};
++
++	hub_i2c4_sleep: hub-i2c4-sleep-state {
++		pins = "gpio72", "gpio73";
++		function = "gpio";
++		drive-strength = <2>;
++		bias-disable;
++		input-enable;
++	};
++
 +	qup_uart15_sleep: qup-uart15-sleep-state {
 +		pins = "gpio30", "gpio31";
 +		function = "gpio";
@@ -170,6 +208,30 @@ Subject: [PATCH] arm64: dts: qcom: odin3: enable DPU dithering, codec and WCN ra
 +		drive-strength = <2>;
 +		bias-disable;
 +	};
++};
++
++&uart14 {
++	pinctrl-0 = <&qup_uart14_default>;
++	pinctrl-1 = <&qup_uart14_sleep>;
++	pinctrl-names = "default", "sleep";
++};
++
++&i2c4 {
++	pinctrl-0 = <&qup_i2c4_data_clk>;
++	pinctrl-1 = <&qup_i2c4_sleep>;
++	pinctrl-names = "default", "sleep";
++};
++
++&i2c_hub_3 {
++	pinctrl-0 = <&hub_i2c3_data_clk>;
++	pinctrl-1 = <&hub_i2c3_sleep>;
++	pinctrl-names = "default", "sleep";
++};
++
++&i2c_hub_4 {
++	pinctrl-0 = <&hub_i2c4_data_clk>;
++	pinctrl-1 = <&hub_i2c4_sleep>;
++	pinctrl-names = "default", "sleep";
 +};
 +
 +&uart15 {
