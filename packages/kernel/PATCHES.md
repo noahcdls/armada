@@ -951,9 +951,6 @@ no equivalent submission was found, or a permanent URL to the upstream submissio
 - `patches/0719-firmware-qcom_scm-handle-empty-PAS-resource-table.patch`
   source: https://git.kernel.org/next/linux-next/c/abb698e1a973869a3f82a604d5ef7c6066f60725
   upstream: https://patch.msgid.link/20260921195636.1925869-2-mukesh.ojha@oss.qualcomm.com
-- `patches/0721-pinctrl-qcom-spmi-gpio-make-direction-changes-exclus.patch`
-  source: https://git.kernel.org/next/linux-next/c/19fc4240358be2a25ce8e0a49a2819588ed61c5d
-  upstream: https://patch.msgid.link/20260927010913.1212600-1-shengchao.guo@oss.qualcomm.com
 - `patches/0722-drm-msm-a6xx-Honor-perfmode_bw-threshold-on-A8x.patch`
   source: https://git.kernel.org/next/linux-next/c/db6a2e4a7ebd4378d03a97f4bef22f8c157240ad
   upstream: https://lore.kernel.org/r/20260923-hawi-gpu-v1-1-0c3c79a1a470@oss.qualcomm.com

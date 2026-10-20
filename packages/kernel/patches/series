@@ -276,7 +276,6 @@ v9_20260801_sachin_garg_media_iris_cache_work_mode_in_iris_set_stage.patch
 0717-clk-qcom-rcg2-Clear-force-enable-after-rate-failure.patch
 0718-clk-qcom-rcg2-Propagate-force-enable-status-errors.patch
 0719-firmware-qcom_scm-handle-empty-PAS-resource-table.patch
-0721-pinctrl-qcom-spmi-gpio-make-direction-changes-exclus.patch
 0722-drm-msm-a6xx-Honor-perfmode_bw-threshold-on-A8x.patch
 0723-drm-msm-a6xx-Fix-RPMH-dependency-votes.patch
 0724-drm-msm-a6xx-Fix-secondary-rail-vote-in-ARC-votes.patch
