@@ -30,9 +30,6 @@ no equivalent submission was found, or a permanent URL to the upstream submissio
   source: https://github.com/ROCKNIX/distribution/blob/60bb58c1db053255b700f3953b72d619ec5aa85d/projects/ROCKNIX/devices/SM8550/patches/linux/0066-drm-msm-dpu-enable-sm8550-inline-rotation.patch
   upstream: unknown
   notes: Armada merged the ROCKNIX SM8550, SM8650 and SM8750 patches into one for the combined kernel, with one shared feature mask and rotation config.
-- `patches/0067-drm-msm-dpu-enable-qseed-detail-enhancer.patch`
-  source: https://github.com/ROCKNIX/distribution/blob/60bb58c1db053255b700f3953b72d619ec5aa85d/projects/ROCKNIX/devices/SM8550/patches/linux/0067-drm-msm-dpu-enable-qseed-detail-enhancer.patch
-  upstream: unknown
 - `patches/0068-drm-msm-dpu-lutdma-dspp-igc-gamut.patch`
   source: armada
   upstream: local
@@ -335,6 +332,16 @@ no equivalent submission was found, or a permanent URL to the upstream submissio
 - `patches/0537-usb-xhci-pci-renesas-let-the-controller-power-off-in-suspend.patch`
   source: armada
   upstream: local
+- `patches/0566-clk-qcom-gcc-sm8550-let-the-pcie-gdscs-collapse-in-suspend.patch`
+  source: armada
+  upstream: local
+- `patches/0567-clk-qcom-gcc-sm8650-let-the-pcie-gdscs-collapse-in-suspend.patch`
+  source: armada
+  upstream: local
+- `patches/0568-arm64-dts-qcom-sm8250-cpu-ddr-votes-active-only.patch`
+  source: https://github.com/kettlelinux/kettlelinux/blob/c2849b95b3af9bf6d1d52cefa1e66167a22c86b4/kernel/patches/21-sm8250/0114-arm64-dts-qcom-sm8250-cpu-ddr-votes-active-only.patch
+  upstream: unknown
+  notes: Context refreshed for the 7.3 includes.
 - `patches/0512-PCI-qcom-skip-L23-ready-poll-on-SM8550.patch`
   source: armada
   upstream: local
@@ -377,16 +384,6 @@ no equivalent submission was found, or a permanent URL to the upstream submissio
 - `patches/0001-pcie-update-sm8550-dtsi.patch`
   source: https://github.com/ROCKNIX/distribution/blob/bcf3b5bc574990b96543484575b06f912153a715/projects/ROCKNIX/devices/SM8550/patches/linux/0001-pcie-update-sm8550-dtsi.patch
   upstream: https://lore.kernel.org/r/20260611-wake-v2-33-2744251b1181@oss.qualcomm.com
-- `patches/0520-arm64-dts-qcom-sm8550-add-a-pcie-suspend-opp.patch`
-  source: armada
-  upstream: not submitted
-  notes: Companion DT for 0513. `opp-hz` is synthetic and `opp-level` is omitted so the OPP can never be selected for a trained link by either match in `qcom_pcie_icc_opp_update()`. pcie1 is disabled in the SM8550 board DTS files that use this table and gets no suspend OPP.
-- `patches/0521-arm64-dts-qcom-sm8750-add-a-pcie-suspend-opp.patch`
-  source: armada
-  upstream: local
-- `patches/0527-arm64-dts-qcom-sm8650-add-a-pcie-suspend-opp.patch`
-  source: armada
-  upstream: local
 - `patches/0120-20250728_konradybcio_gpu_cc_power_requirements_reality_check.patch`
   source: https://github.com/ROCKNIX/distribution/blob/ef264a238d5e2ba960145e3fda663dc27de49a80/projects/ROCKNIX/devices/SM8550/patches/linux/0120-20250728_konradybcio_gpu_cc_power_requirements_reality_check.patch
   upstream: https://lore.kernel.org/r/20250728-topic-gpucc_power_plumbing-v1-22-09c2480fe3e6@oss.qualcomm.com
@@ -413,6 +410,30 @@ no equivalent submission was found, or a permanent URL to the upstream submissio
 - `patches/1031-media-iris-stop-AV1-tier-overwriting-HEVC-tier.patch`
   source: armada
   upstream: local
+- `patches/v9_20260801_sachin_garg_media_iris_cache_work_mode_in_iris_set_stage.patch`
+  source: https://lore.kernel.org/r/20260801-iris_multi_slice-v9-1-bddf1449c280@oss.qualcomm.com
+  upstream: https://lore.kernel.org/r/20260801-iris_multi_slice-v9-1-bddf1449c280@oss.qualcomm.com
+- `patches/1032-media-iris-count-CABAC-cost-in-the-decoder-VSP-clock.patch`
+  source: armada
+  upstream: local
+- `patches/1033-media-iris-add-decoder-display-delay-controls.patch`
+  source: armada
+  upstream: local
+- `patches/1034-media-iris-decode-in-stage-1-for-decode-order.patch`
+  source: armada
+  upstream: local
+- `patches/1035-media-iris-run-decode-order-sessions-at-the-highest-clock.patch`
+  source: armada
+  upstream: local
+- `patches/1036-media-iris-only-rescale-decoder-power-on-bitstream-queue.patch`
+  source: armada
+  upstream: local
+- `patches/1037-media-iris-decode-in-stage-1-at-the-top-clock-by-default.patch`
+  source: armada
+  upstream: local
+- `patches/1370-media-iris-a-resolution-change-last-buffer-is-not-an-error.patch`
+  source: https://github.com/kettlelinux/kettlelinux/blob/2b7661b4d937d7efbb487c4bba84f8705be7cc5d/kernel/patches/40-kettle/1370-media-iris-a-resolution-change-last-buffer-is-not-an-error.patch
+  upstream: unknown
 - `patches/0500-ROCKNIX-set-boot-fanspeed.patch`
   source: https://github.com/ROCKNIX/distribution/blob/bcf3b5bc574990b96543484575b06f912153a715/projects/ROCKNIX/devices/SM8550/patches/linux/0500-ROCKNIX-set-boot-fanspeed.patch
   upstream: unknown
@@ -434,10 +455,6 @@ no equivalent submission was found, or a permanent URL to the upstream submissio
 - `patches/0903-power-supply-qcom-battmgr-expose-the-charge-current-limit.patch`
   source: armada
   upstream: local
-- `patches/0900-power-supply-qcom-battmgr-log-usb-adapter-type.patch`
-  source: armada
-  upstream: local
-  notes: Armada wrote this diagnostic patch to log the USB type and Qualcomm firmware's adapter type when either value changes.
 - `patches/0001-pcie-update-sm8650-dtsi.patch`
   source: https://github.com/ROCKNIX/distribution/blob/bcf3b5bc574990b96543484575b06f912153a715/projects/ROCKNIX/devices/SM8650/patches/linux/0001-pcie-update-sm8650-dtsi.patch
   upstream: https://lore.kernel.org/r/20260611-wake-v2-35-2744251b1181@oss.qualcomm.com
@@ -589,10 +606,6 @@ no equivalent submission was found, or a permanent URL to the upstream submissio
 - `patches/0043-power-sequencing-qcom-wcn-add-support-for-WCN7860.patch`
   source: https://github.com/ROCKNIX/distribution/blob/bcf3b5bc574990b96543484575b06f912153a715/projects/ROCKNIX/devices/SM8750/patches/linux/0043-power-sequencing-qcom-wcn-add-support-for-WCN7860.patch
   upstream: unknown
-- `patches/0044-clk-qcom-gcc-sm8750-Do-not-turn-off-PCIe-GDSCs-durin.patch`
-  source: https://github.com/ROCKNIX/distribution/blob/bcf3b5bc574990b96543484575b06f912153a715/projects/ROCKNIX/devices/SM8750/patches/linux/0044-clk-qcom-gcc-sm8750-Do-not-turn-off-PCIe-GDSCs-durin.patch
-  upstream: https://lore.kernel.org/r/20260102-pci_gdsc_fix-v1-3-b17ed3d175bc@oss.qualcomm.com
-  notes: Not applied (commented out in the series). With the PCIe GDSCs left on across suspend (PWRSTS_RET_ON) the controller stays powered on the PCIe NoC, and the SoC hangs on the s2idle wake unless a PCIe bus vote (SN4) is kept in the sleep set, which in turn blocks CX shutdown. Tested on the Odin 3 (7.2.6, SoCCP managed, no keepalive): with this patch the system-level PSCI call never returns; without it the SoC wakes and reaches CX shutdown, and the WCN7860 comes back because pwrctrl powers it off for suspend and the link retrains. Not tested on the Pocket FIT Elite.
 - `patches/0045-Bluetooth-qca-add-WCN7860-support.patch`
   source: https://github.com/ROCKNIX/distribution/blob/bcf3b5bc574990b96543484575b06f912153a715/projects/ROCKNIX/devices/SM8750/patches/linux/0045-Bluetooth-qca-add-WCN7860-support.patch
   upstream: unknown
@@ -747,7 +760,7 @@ no equivalent submission was found, or a permanent URL to the upstream submissio
   source: https://github.com/ROCKNIX/distribution/blob/bcf3b5bc574990b96543484575b06f912153a715/projects/ROCKNIX/devices/SM8750/linux/dts/qcom/sm8750-konkr-pf-elite.dts
 - `dts/sm8750-konkr-pf-elite.dts.patch`
   source: armada
-  notes: Armada adapts the Elite touchscreen node to the full ROCKNIX Chipone fork shared with the SM8650 Pocket FIT, keeps volume-up from waking the system, and adds the DisplayPort playback link required for USB-C DP Alt Mode audio; the touchscreen driver is selected only by those two device-tree nodes. Armada also marks PCIe WAKE# active-low and idles the codec rails in LPM during s2idle.
+  notes: Armada adapts the Elite touchscreen node to the full ROCKNIX Chipone fork shared with the SM8650 Pocket FIT, keeps volume-up from waking the system, and adds the DisplayPort playback link required for USB-C DP Alt Mode audio; the touchscreen driver is selected only by those two device-tree nodes. Armada also marks PCIe WAKE# active-low and idles the codec rails in LPM during s2idle, and points the SoCCP remoteproc at the Elite's own firmware.
 - `dts/cq8725s-ayn-common.dtsi`
   source: https://github.com/ROCKNIX/distribution/blob/bcf3b5bc574990b96543484575b06f912153a715/projects/ROCKNIX/devices/SM8750/patches/linux/0046-arm64-dts-qcom-Add-AYN-CQ8725S-Common.patch
   notes: Armada extracted this DTS from the cited ROCKNIX patch and then applied later ROCKNIX DTS updates, including the Odin 3 haptics nodes from ROCKNIX commit `81a31e3d0f`.
@@ -875,7 +888,7 @@ no equivalent submission was found, or a permanent URL to the upstream submissio
 - `patches/0556-remoteproc-qcom-pas-manage-the-sm8750-soccp.patch`
   source: armada
   upstream: local
-  notes: Fixes the SM8750 s2idle wake hang at its cause and replaces the SN4 sleep keepalive (and the 0521 PCIe suspend OPP floor before it). The bootloader's early SoCCP image sits in D0 behind the system NoC with no bus vote; the driver reloads soccp.mbn, which parks itself in D3, and the SoC then also reaches CX shutdown and DDR low power in suspend. Until the TCSR D-state register shows D3 the driver holds the SoCCP's path to DDR itself, so a board without soccp.mbn (Pocket FIT Elite today) still wakes, without the deeper sleep. Odin 3 firmware: `qcom/sm8750/ayn/odin3/soccp.mbn`, from the device's modem partition.
+  notes: Fixes the SM8750 s2idle wake hang at its cause and replaces the SN4 sleep keepalive (and the 0521 PCIe suspend OPP floor before it). The bootloader's early SoCCP image sits in D0 behind the system NoC with no bus vote; the driver reloads soccp.mbn, which parks itself in D3, and the SoC then also reaches CX shutdown and DDR low power in suspend. Until the TCSR D-state register shows D3 the driver holds the SoCCP's path to DDR itself, so a board without soccp.mbn still wakes, without the deeper sleep. Odin 3 firmware: `qcom/sm8750/ayn/odin3/soccp.mbn`, from the device's modem partition.
 - `patches/0561-soc-qcom-override-the-sm8750-pcie-state-manager-power-control.patch`
   source: armada
   upstream: local

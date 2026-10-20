@@ -118,6 +118,9 @@
 0535-scsi-ufs-core-fast-abort-unsupported-query-idns.patch
 0536-scsi-ufs-core-dynamically-disable-timestamp-on-unsupported-devices.patch
 0537-usb-xhci-pci-renesas-let-the-controller-power-off-in-suspend.patch
+0566-clk-qcom-gcc-sm8550-let-the-pcie-gdscs-collapse-in-suspend.patch
+0567-clk-qcom-gcc-sm8650-let-the-pcie-gdscs-collapse-in-suspend.patch
+0568-arm64-dts-qcom-sm8250-cpu-ddr-votes-active-only.patch
 0512-PCI-qcom-skip-L23-ready-poll-on-SM8550.patch
 0513-PCI-qcom-honour-an-opp-suspend-opp-as-the-non-s2ram-memory-floor.patch
 0543-PCI-qcom-let-the-suspend-opp-floor-be-skipped-for-debugging.patch
@@ -137,9 +140,6 @@
 
 # ============== SM8550 DTSI prerequisites ==============
 0001-pcie-update-sm8550-dtsi.patch
-0520-arm64-dts-qcom-sm8550-add-a-pcie-suspend-opp.patch
-# 0521-arm64-dts-qcom-sm8750-add-a-pcie-suspend-opp.patch  # not needed: the SoCCP is managed (0556, 0557)
-0527-arm64-dts-qcom-sm8650-add-a-pcie-suspend-opp.patch
 0120-20250728_konradybcio_gpu_cc_power_requirements_reality_check.patch
 0121-pmdomain-qcom-rpmhpd-presync-floor-gmu-rails.patch
 0122-interconnect__qcom__sm8550__Enable_QoS_configuration.patch
@@ -152,6 +152,14 @@
 # ============== Video decode ==============
 1030-media-iris-send-the-stream-POC-type.patch
 1031-media-iris-stop-AV1-tier-overwriting-HEVC-tier.patch
+v9_20260801_sachin_garg_media_iris_cache_work_mode_in_iris_set_stage.patch
+1032-media-iris-count-CABAC-cost-in-the-decoder-VSP-clock.patch
+1033-media-iris-add-decoder-display-delay-controls.patch
+1034-media-iris-decode-in-stage-1-for-decode-order.patch
+1035-media-iris-run-decode-order-sessions-at-the-highest-clock.patch
+1036-media-iris-only-rescale-decoder-power-on-bitstream-queue.patch
+1037-media-iris-decode-in-stage-1-at-the-top-clock-by-default.patch
+1370-media-iris-a-resolution-change-last-buffer-is-not-an-error.patch
 
 # ============== System tweaks ==============
 0500-ROCKNIX-set-boot-fanspeed.patch
@@ -213,7 +221,6 @@
 0041-wifi-ath12k-disable-CNSS_QDSS_CFG_MISS_V01-for-the-W.patch
 0042-PCI-pwrctrl-pwrseq-add-support-for-WCN7860.patch
 0043-power-sequencing-qcom-wcn-add-support-for-WCN7860.patch
-# 0044-clk-qcom-gcc-sm8750-Do-not-turn-off-PCIe-GDSCs-durin.patch  # hangs the s2idle wake once no PCIe bus vote is kept, see PATCHES.md
 0045-Bluetooth-qca-add-WCN7860-support.patch
 0066-scsi-ufs-ufs-qcom-add-sm8750-compatible.patch
 0509-soc-qcom-pmic_glink_altmode-defer-until-mux-switch-ready.patch
