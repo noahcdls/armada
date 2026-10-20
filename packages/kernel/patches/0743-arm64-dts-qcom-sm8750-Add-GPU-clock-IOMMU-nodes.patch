@@ -1,32 +1,45 @@
-From cff35555a24bb9be7558c918fc505797eec4e240 Mon Sep 17 00:00:00 2001
-From: ROCKNIX <rocknix@rocknix.org>
-Date: Thu, 9 Jul 2026 00:40:08 +0100
-Subject: [PATCH] arm64: dts: qcom: sm8750: add gpucc/gxclkctl/adreno-smmu
- nodes
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Konrad Dybcio <konrad.dybcio@oss.qualcomm.com>
+Date: Tue, 14 Jul 2026 16:40:01 +0530
+Subject: [PATCH] arm64: dts: qcom: sm8750: Add GPU clock & IOMMU nodes
 
-7.1 upstreamed the GPU/clk drivers but not the SM8750 DTS wiring.
-Carry only the dtsi provider nodes + clock-binding includes (the rest
-of the old 0000_to_0025 enablement is now upstream).
+Add the GPU_CC and GX_CC (brand new! as far as we're concerned, this
+is simply a separate block housing the GX GDSC) nodes, required to
+power up the graphics-related hardware.
+
+Make use of it by enabling the associated IOMMU as well. The GPU itself
+needs some more work and will be enabled later.
+
+Reviewed-by: Abel Vesa <abel.vesa@oss.qualcomm.com>
+Signed-off-by: Konrad Dybcio <konrad.dybcio@oss.qualcomm.com>
+Co-developed-by: Taniya Das <taniya.das@oss.qualcomm.com>
+Signed-off-by: Taniya Das <taniya.das@oss.qualcomm.com>
+Link: https://lore.kernel.org/r/20260714-gpucc_dt_v6-v6-1-16bf5289572d@oss.qualcomm.com
+Signed-off-by: Bjorn Andersson <andersson@kernel.org>
+(cherry picked from commit f695831a7af1f8d39203357572683981ebe4de77)
 ---
  arch/arm64/boot/dts/qcom/sm8750.dtsi | 68 ++++++++++++++++++++++++++++
  1 file changed, 68 insertions(+)
 
 diff --git a/arch/arm64/boot/dts/qcom/sm8750.dtsi b/arch/arm64/boot/dts/qcom/sm8750.dtsi
-index 18fb52c..d5ed070 100644
+index 2bd2d6d2f14b..79f4120160eb 100644
 --- a/arch/arm64/boot/dts/qcom/sm8750.dtsi
 +++ b/arch/arm64/boot/dts/qcom/sm8750.dtsi
-@@ -8,7 +8,9 @@
+@@ -5,10 +5,12 @@
+ 
+ #include <dt-bindings/clock/qcom,dsi-phy-28nm.h>
+ #include <dt-bindings/clock/qcom,rpmh.h>
++#include <dt-bindings/clock/qcom,kaanapali-gxclkctl.h>
  #include <dt-bindings/clock/qcom,sm8750-cambistmclkcc.h>
  #include <dt-bindings/clock/qcom,sm8750-camcc.h>
  #include <dt-bindings/clock/qcom,sm8750-dispcc.h>
-+#include <dt-bindings/clock/qcom,kaanapali-gxclkctl.h>
  #include <dt-bindings/clock/qcom,sm8750-gcc.h>
 +#include <dt-bindings/clock/qcom,sm8750-gpucc.h>
  #include <dt-bindings/clock/qcom,sm8750-tcsr.h>
  #include <dt-bindings/clock/qcom,sm8750-videocc.h>
  #include <dt-bindings/dma/qcom-gpi.h>
-@@ -3436,6 +3438,34 @@ dispcc: clock-controller@af00000 {
- 			#power-domain-cells = <1>;
+@@ -2180,6 +2182,72 @@ tcsr_mutex: hwlock@1f40000 {
+ 			#hwlock-cells = <1>;
  		};
  
 +		gxclkctl: clock-controller@3d64000 {
@@ -57,13 +70,6 @@ index 18fb52c..d5ed070 100644
 +			#power-domain-cells = <1>;
 +		};
 +
- 		pdc: interrupt-controller@b220000 {
- 			compatible = "qcom,sm8750-pdc", "qcom,pdc";
- 			reg = <0x0 0x0b220000 0x0 0x10000>, <0x0 0x164400f0 0x0 0x64>;
-@@ -4998,6 +5028,44 @@ tpdm_swao_out: endpoint {
- 			};
- 		};
- 
 +		adreno_smmu: iommu@3da0000 {
 +			compatible = "qcom,sm8750-smmu-500", "qcom,adreno-smmu",
 +				     "qcom,smmu-500", "arm,mmu-500";
@@ -102,6 +108,9 @@ index 18fb52c..d5ed070 100644
 +			dma-coherent;
 +		};
 +
- 		apps_smmu: iommu@15000000 {
- 			compatible = "qcom,sm8750-smmu-500", "qcom,smmu-500", "arm,mmu-500";
- 			reg = <0x0 0x15000000 0x0 0x100000>;
+ 		remoteproc_mpss: remoteproc@4080000 {
+ 			compatible = "qcom,sm8750-mpss-pas";
+ 			reg = <0x0 0x04080000 0x0 0x10000>;
+-- 
+2.56.0
+

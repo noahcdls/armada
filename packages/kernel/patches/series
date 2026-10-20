@@ -10,6 +10,7 @@
 0049-drm-msm-dpu-panel-opt-in-8bpc-dither.patch
 0066-drm-msm-dpu-enable-inline-rotation.patch
 0068-drm-msm-dpu-lutdma-dspp-igc-gamut.patch
+0733-drm-msm-dpu-Fix-GAMMA-LUT-for-sm8750-related-DPUs.patch
 0069-dt-bindings-display-msm-dpu-lutdma-reg.patch
 0070-arm64-dts-qcom-dpu-lutdma-reg.patch
 0076-drm-msm-dpu-expose-abgr-xbgr-2101010-on-planes.patch
@@ -108,7 +109,14 @@
 0054c-pwm-sn3112-power-down-across-system-suspend.patch
 
 # ============== SoC / Platform ==============
-20260424_neil_armstrong_arm64_dts_qcom_sm8_456_50_add_missing_cx_power_domain_to_gcc.patch
+0734-dt-bindings-clock-qcom-gcc-sm8250-Add-CX-power-domai.patch
+0735-arm64-dts-qcom-sm8250-Add-GCC-CX-power-domain.patch
+0736-dt-bindings-clock-qcom-sm8550-gcc-Add-CX-power-domai.patch
+0737-clk-qcom-gcc-sm8550-Tie-the-CX-power-domain-to-contr.patch
+0738-arm64-dts-qcom-sm8550-Add-GCC-CX-power-domain.patch
+0739-dt-bindings-clock-qcom-sm8650-gcc-Add-CX-power-domai.patch
+0740-clk-qcom-gcc-sm8650-Tie-the-CX-power-domain-to-contr.patch
+0741-arm64-dts-qcom-sm8650-Add-GCC-CX-power-domain.patch
 0504-mailbox-qcom-ipcc-mask-summary-irq-for-suspend-to-ram.patch
 0505-msm_gem-lock-before-put_iova_spaces.patch
 0204-thermal-qcom-tsens-mask-lower-threshold-irqs-across-suspend.patch
@@ -208,14 +216,19 @@ v9_20260801_sachin_garg_media_iris_cache_work_mode_in_iris_set_stage.patch
 # ============== SM8750 (AYN Odin 3, KONKR Pocket FIT Elite) ==============
 0026-dt-bindings-arm-qcom-ids-Add-SoC-ID-for-CQ8725S.patch
 0027-soc-qcom-socinfo-Add-CQ8725S-SoC-ID.patch
-0033-arm64-dts-qcom-sm8750-gpu-clock-controllers.patch
-0038-arm64-dts-qcom-sm8750-add-GPU-nodes.patch
-0038a-arm64-dts-qcom-sm8750-map-A8xx-RSCC-registers.patch
+0742-dt-bindings-display-msm-Document-Adreno-830-GPU-GMU.patch
+0743-arm64-dts-qcom-sm8750-Add-GPU-clock-IOMMU-nodes.patch
+0744-arm64-dts-qcom-sm8750-Add-GPU-and-GMU-nodes.patch
+0745-arm64-dts-qcom-sm8750-Add-GPU-cooling.patch
+0746-dt-bindings-clock-qcom-sm8750-gcc-Add-CX-power-domai.patch
+0747-clk-qcom-gcc-sm8750-Tie-the-CX-power-domain-to-contr.patch
+0748-arm64-dts-qcom-sm8750-Add-GCC-CX-power-domain.patch
 0035-arm64-dts-qcom-sm8750-set-CPU-capacity-dmips-mhz.patch
 0037-arm64-dts-qcom-sm8750-add-CPU-thermal-cooling.patch
 0542-arm64-dts-qcom-sm8750-describe-the-tcsr-download-mode-cookie.patch
 0557-arm64-dts-qcom-sm8750-add-the-soccp.patch
-0049-drm-msm-a8xx-add-adreno-830-catalog.patch
+0749-drm-msm-a8xx-Add-support-for-Adreno-830-GPU.patch
+0750-drm-msm-a8xx-report-the-GMEM-size-of-the-active-slic.patch
 0039-wifi-ath12k-add-initial-hardware-definition-for-WCN7.patch
 0040-wifi-ath12k-send-QDSS-config-when-CNSS_QDSS_CFG_MISS.patch
 0041-wifi-ath12k-disable-CNSS_QDSS_CFG_MISS_V01-for-the-W.patch
@@ -279,7 +292,6 @@ v9_20260801_sachin_garg_media_iris_cache_work_mode_in_iris_set_stage.patch
 0722-drm-msm-a6xx-Honor-perfmode_bw-threshold-on-A8x.patch
 0723-drm-msm-a6xx-Fix-RPMH-dependency-votes.patch
 0724-drm-msm-a6xx-Fix-secondary-rail-vote-in-ARC-votes.patch
-0725-drm-msm-a8xx-enable-the-PC-block-clock-gating-on-Adreno-830.patch
 0726-phy-qualcomm-phy-qcom-eusb2-repeater-Fix-SMB-Power-l.patch
 0727-drm-msm-dsi-fix-AHB-clock-staying-enabled-across-sus.patch
 0730-soundwire-qcom-disable-the-interrupt-before-gating-the-clock.patch
@@ -288,3 +300,25 @@ v9_20260801_sachin_garg_media_iris_cache_work_mode_in_iris_set_stage.patch
 1021-wifi-ath12k-fix-single-pdev-frequency-ranges.patch
 1022-wifi-ath12k-split-WCN7860-scans-by-firmware-ranges.patch
 1023-wifi-ath12k-protect-TX-during-associated-range-scans.patch
+
+# ============== Upstream fixes from linux-next (7.4 merge window) ==============
+0751-ASoC-codecs-lpass-wsa-macro-use-v2.5-Compander1-addr.patch
+0752-drm-msm-dpu-disable-the-slave-encoder-before-the-mas.patch
+0753-drm-msm-dpu-round-up-the-compressed-INTF-width.patch
+0754-PCI-pwrctrl-Power-off-child-devices-on-power-on-fail.patch
+0755-PCI-qcom-Ignore-ENODEV-after-Root-Port-reset.patch
+0756-PCI-qcom-Block-accesses-to-downstream-devices-on-lin.patch
+0757-serial-qcom-geni-Drop-unsafe-rx_buf-realloc-from-set.patch
+0758-usb-typec-ucsi-allow-retries-of-ucsi_resume_work.patch
+0759-media-iris-Fix-power-off-ordering-to-disable-power-d.patch
+0760-media-iris-reject-open-when-the-session-limit-is-rea.patch
+0761-media-iris-reference-count-video-instances.patch
+0762-media-iris-reset-AHB-bridge-before-enabling-HW-mode.patch
+0763-media-iris-avoid-bit-depth-validation-for-capture-fo.patch
+0764-media-iris-Fix-iova-allocation-from-restrict-region.patch
+0765-clk-qcom-alpha-pll-Check-Lucid-Ole-PLL-status-before.patch
+0766-wifi-ath12k-avoid-IDR-mutation-during-vif-mgmt-TX-cl.patch
+0767-wifi-ath12k-avoid-IDR-mutation-during-pending-mgmt-T.patch
+0768-wifi-ath12k-validate-MAC-PHY-capability-count-before.patch
+0769-wifi-ath12k-clear-dangling-channel-pointers-on-error.patch
+0770-wifi-ath12k-Free-allocated-external-IRQs-on-request_.patch

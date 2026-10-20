@@ -33,6 +33,10 @@ no equivalent submission was found, or a permanent URL to the upstream submissio
 - `patches/0068-drm-msm-dpu-lutdma-dspp-igc-gamut.patch`
   source: armada
   upstream: local
+- `patches/0733-drm-msm-dpu-Fix-GAMMA-LUT-for-sm8750-related-DPUs.patch`
+  source: https://git.kernel.org/next/linux-next/c/3389406e6a032b92c4770380c4aeec8dbf38cfae
+  upstream: https://lore.kernel.org/r/20260930152645.22194-1-robin.clark@oss.qualcomm.com
+  notes: Ported onto 0068's SM8750 DSPP block, which now lists GC next to its IGC and gamut; drops 0068's comment that SM8750 GC is a LUT bus block, since upstream drives it through the plain GC registers.
 - `patches/0069-dt-bindings-display-msm-dpu-lutdma-reg.patch`
   source: armada
   upstream: local
@@ -297,9 +301,31 @@ no equivalent submission was found, or a permanent URL to the upstream submissio
 - `patches/0054c-pwm-sn3112-power-down-across-system-suspend.patch`
   source: armada
   upstream: local
-- `patches/20260424_neil_armstrong_arm64_dts_qcom_sm8_456_50_add_missing_cx_power_domain_to_gcc.patch`
-  source: https://github.com/ROCKNIX/distribution/blob/bcf3b5bc574990b96543484575b06f912153a715/projects/ROCKNIX/devices/SM8550/patches/linux/20260424_neil_armstrong_arm64_dts_qcom_sm8_456_50_add_missing_cx_power_domain_to_gcc.patch
-  upstream: https://lore.kernel.org/r/20260615-topic-sm8x50-tie-gcc-to-cx-v2-0-6b5752dd4747@linaro.org
+- `patches/0734-dt-bindings-clock-qcom-gcc-sm8250-Add-CX-power-domai.patch`
+  source: https://git.kernel.org/next/linux-next/c/98e936c9d46a25b4eceacf907fe5d87b3999040e
+  upstream: https://patch.msgid.link/20260924-qcom-tie-cx-to-gcc-v5-3-38732033e5b5@oss.qualcomm.com
+  notes: Replaces Neil Armstrong's earlier DT-only series (20260424) together with 0735-0741 and 0746-0748.
+- `patches/0735-arm64-dts-qcom-sm8250-Add-GCC-CX-power-domain.patch`
+  source: https://git.kernel.org/next/linux-next/c/389a0144c511316cf21d5dc2aa30028de87f9d00
+  upstream: https://patch.msgid.link/20260924-qcom-tie-cx-to-gcc-v5-36-38732033e5b5@oss.qualcomm.com
+- `patches/0736-dt-bindings-clock-qcom-sm8550-gcc-Add-CX-power-domai.patch`
+  source: https://git.kernel.org/next/linux-next/c/5a577a480dd3d764cc2f55a112efc92d59ad59ec
+  upstream: https://patch.msgid.link/20260924-qcom-tie-cx-to-gcc-v5-7-38732033e5b5@oss.qualcomm.com
+- `patches/0737-clk-qcom-gcc-sm8550-Tie-the-CX-power-domain-to-contr.patch`
+  source: https://git.kernel.org/next/linux-next/c/1f15b20e7c78641406746e8a9d6907c312c8d907
+  upstream: https://patch.msgid.link/20260924-qcom-tie-cx-to-gcc-v5-24-38732033e5b5@oss.qualcomm.com
+- `patches/0738-arm64-dts-qcom-sm8550-Add-GCC-CX-power-domain.patch`
+  source: https://git.kernel.org/next/linux-next/c/df50f5c5690a472d750a0e327ac4d05a4a9c8b79
+  upstream: https://patch.msgid.link/20260924-qcom-tie-cx-to-gcc-v5-39-38732033e5b5@oss.qualcomm.com
+- `patches/0739-dt-bindings-clock-qcom-sm8650-gcc-Add-CX-power-domai.patch`
+  source: https://git.kernel.org/next/linux-next/c/76615e10462c425f926e50dce52e9d23bb2f9428
+  upstream: https://patch.msgid.link/20260924-qcom-tie-cx-to-gcc-v5-8-38732033e5b5@oss.qualcomm.com
+- `patches/0740-clk-qcom-gcc-sm8650-Tie-the-CX-power-domain-to-contr.patch`
+  source: https://git.kernel.org/next/linux-next/c/23d9b62d602e5429fd0147fdc0dc2aae15ed932c
+  upstream: https://patch.msgid.link/20260924-qcom-tie-cx-to-gcc-v5-25-38732033e5b5@oss.qualcomm.com
+- `patches/0741-arm64-dts-qcom-sm8650-Add-GCC-CX-power-domain.patch`
+  source: https://git.kernel.org/next/linux-next/c/108a8d51fba8432c5d5253dec1c565ffe7c1edbc
+  upstream: https://patch.msgid.link/20260924-qcom-tie-cx-to-gcc-v5-40-38732033e5b5@oss.qualcomm.com
 - `patches/0504-mailbox-qcom-ipcc-mask-summary-irq-for-suspend-to-ram.patch`
   source: https://github.com/ROCKNIX/distribution/commit/f955f5b6137554253e4d52bbe72f9b4936fb253d
   upstream: not submitted
@@ -563,16 +589,28 @@ no equivalent submission was found, or a permanent URL to the upstream submissio
 - `patches/0027-soc-qcom-socinfo-Add-CQ8725S-SoC-ID.patch`
   source: https://github.com/ROCKNIX/distribution/blob/bcf3b5bc574990b96543484575b06f912153a715/projects/ROCKNIX/devices/SM8750/patches/linux/0027-soc-qcom-socinfo-Add-CQ8725S-SoC-ID.patch
   upstream: https://lore.kernel.org/r/20260605-cq8725s-soc-id-v1-2-bb1ef93de649@gmail.com
-- `patches/0033-arm64-dts-qcom-sm8750-gpu-clock-controllers.patch`
-  source: https://github.com/ROCKNIX/distribution/blob/bcf3b5bc574990b96543484575b06f912153a715/projects/ROCKNIX/devices/SM8750/patches/linux/0033-arm64-dts-qcom-sm8750-gpu-clock-controllers.patch
+- `patches/0742-dt-bindings-display-msm-Document-Adreno-830-GPU-GMU.patch`
+  source: https://git.kernel.org/next/linux-next/c/ab20121e021588b634671958f7caa346bfa69621
+  upstream: https://patch.msgid.link/20260809-pakala-gpu-v1-2-207ad1fac1c7@oss.qualcomm.com
+  notes: 0742-0750 replace the ROCKNIX SM8750 GPU patches (0033, 0038, 0049) and Armada's 0038a and 0725. Upstream maps the GPU registers to `0x6d000` (covering RSCC), uses chip id 0x44050001 (Mesa 0002 matches it), reads the speed-bin fuse and places the GMU at `0x3d6c000`.
+- `patches/0743-arm64-dts-qcom-sm8750-Add-GPU-clock-IOMMU-nodes.patch`
+  source: https://git.kernel.org/next/linux-next/c/f695831a7af1f8d39203357572683981ebe4de77
   upstream: https://lore.kernel.org/r/20260714-gpucc_dt_v6-v6-1-16bf5289572d@oss.qualcomm.com
-- `patches/0038-arm64-dts-qcom-sm8750-add-GPU-nodes.patch`
-  source: https://github.com/ROCKNIX/distribution/blob/bcf3b5bc574990b96543484575b06f912153a715/projects/ROCKNIX/devices/SM8750/patches/linux/0038-arm64-dts-qcom-sm8750-add-GPU-nodes.patch
-  upstream: unknown
-- `patches/0038a-arm64-dts-qcom-sm8750-map-A8xx-RSCC-registers.patch`
-  source: armada
-  upstream: local
-  notes: Armada expands the SM8750 GPU register mapping to `0x6c000` so Linux 7.1's A8xx recovery path can access RSCC at GPU offset `0x50000` without faulting.
+- `patches/0744-arm64-dts-qcom-sm8750-Add-GPU-and-GMU-nodes.patch`
+  source: https://git.kernel.org/next/linux-next/c/9e39531ce39a98a77ddcf58f838a50dbf164092c
+  upstream: https://patch.msgid.link/20260809-pakala-gpu-v1-3-207ad1fac1c7@oss.qualcomm.com
+- `patches/0745-arm64-dts-qcom-sm8750-Add-GPU-cooling.patch`
+  source: https://git.kernel.org/next/linux-next/c/c4dc1775c7723e9ed1ff74b649fe72d8aa741eb1
+  upstream: https://patch.msgid.link/20260809-pakala-gpu-v1-4-207ad1fac1c7@oss.qualcomm.com
+- `patches/0746-dt-bindings-clock-qcom-sm8750-gcc-Add-CX-power-domai.patch`
+  source: https://git.kernel.org/next/linux-next/c/f9c74b6ed57922b1fdb1ed6835665e06b5ba01a5
+  upstream: https://patch.msgid.link/20260924-qcom-tie-cx-to-gcc-v5-9-38732033e5b5@oss.qualcomm.com
+- `patches/0747-clk-qcom-gcc-sm8750-Tie-the-CX-power-domain-to-contr.patch`
+  source: https://git.kernel.org/next/linux-next/c/ff2531978f12b4727d79fd759f8c4b2ea2c63cf8
+  upstream: https://patch.msgid.link/20260924-qcom-tie-cx-to-gcc-v5-26-38732033e5b5@oss.qualcomm.com
+- `patches/0748-arm64-dts-qcom-sm8750-Add-GCC-CX-power-domain.patch`
+  source: https://git.kernel.org/next/linux-next/c/ee35c132956f4797ed6be33c451decb94d1752af
+  upstream: https://patch.msgid.link/20260924-qcom-tie-cx-to-gcc-v5-41-38732033e5b5@oss.qualcomm.com
 - `patches/0035-arm64-dts-qcom-sm8750-set-CPU-capacity-dmips-mhz.patch`
   source: https://github.com/ROCKNIX/distribution/blob/f3e2b6187cd2ae2dc5122edfebe84228a314f2c5/projects/ROCKNIX/devices/SM8750/patches/linux/0076-arm64-dts-qcom-sm8750-set-CPU-capacity-dmips-mhz.patch
   upstream: unknown
@@ -587,9 +625,12 @@ no equivalent submission was found, or a permanent URL to the upstream submissio
   source: armada
   upstream: local
   notes: Companion DT for 0556: the SoCCP remoteproc, its SMP2P edge and the TCSR D-state register (needs the `tcsr` syscon from 0542). Enabled in the SoC file so every SM8750 board gets at least the fallback bus vote; a board sets `firmware-name` to get the reload.
-- `patches/0049-drm-msm-a8xx-add-adreno-830-catalog.patch`
-  source: https://github.com/ROCKNIX/distribution/blob/bcf3b5bc574990b96543484575b06f912153a715/projects/ROCKNIX/devices/SM8750/patches/linux/0049-drm-msm-a8xx-add-adreno-830-catalog.patch
-  upstream: unknown
+- `patches/0749-drm-msm-a8xx-Add-support-for-Adreno-830-GPU.patch`
+  source: https://git.kernel.org/next/linux-next/c/2c94d177a927a25d3eb111fe83694b5f84239069
+  upstream: https://patch.msgid.link/20260809-pakala-gpu-v1-1-207ad1fac1c7@oss.qualcomm.com
+- `patches/0750-drm-msm-a8xx-report-the-GMEM-size-of-the-active-slic.patch`
+  source: https://git.kernel.org/next/linux-next/c/efbda69d92e6a4822c5f2d09910f547872a9498d
+  upstream: https://patch.msgid.link/20260930183840.1171-1-theflyingrahul@gmail.com
 - `patches/0039-wifi-ath12k-add-initial-hardware-definition-for-WCN7.patch`
   source: https://github.com/ROCKNIX/distribution/blob/bcf3b5bc574990b96543484575b06f912153a715/projects/ROCKNIX/devices/SM8750/patches/linux/0039-wifi-ath12k-add-initial-hardware-definition-for-WCN7.patch
   upstream: unknown
@@ -961,10 +1002,6 @@ no equivalent submission was found, or a permanent URL to the upstream submissio
 - `patches/0724-drm-msm-a6xx-Fix-secondary-rail-vote-in-ARC-votes.patch`
   source: https://git.kernel.org/next/linux-next/c/128a0edde50780ed9eb93ab5d2e18ca24c1f1c43
   upstream: https://lore.kernel.org/r/20260923-hawi-gpu-v1-2-0c3c79a1a470@oss.qualcomm.com
-- `patches/0725-drm-msm-a8xx-enable-the-PC-block-clock-gating-on-Adreno-830.patch`
-  source: armada
-  upstream: local
-  notes: Applies the a8xx_gpu.c hunk of upstream's Adreno 830 support (https://git.kernel.org/next/linux-next/c/2c94d177a927a25d3eb111fe83694b5f84239069) to Armada's 0049 catalog entry; drop when 0049 is replaced by the upstream entry.
 - `patches/0726-phy-qualcomm-phy-qcom-eusb2-repeater-Fix-SMB-Power-l.patch`
   source: https://lore.kernel.org/r/20260917-smb-repeater-power-leakage-v1-1-6d7311c3c03e@oss.qualcomm.com
   upstream: https://lore.kernel.org/r/20260917-smb-repeater-power-leakage-v1-1-6d7311c3c03e@oss.qualcomm.com
@@ -998,3 +1035,63 @@ no equivalent submission was found, or a permanent URL to the upstream submissio
   source: armada
   upstream: local
   notes: Uses single-channel associated scans with TX draining and home-channel rest. Tested on KONKR Pocket FIT Elite.
+- `patches/0751-ASoC-codecs-lpass-wsa-macro-use-v2.5-Compander1-addr.patch`
+  source: https://git.kernel.org/next/linux-next/c/233d36a96009682208cc4ca1139b9e5641a8bf09
+  upstream: https://patch.msgid.link/20260908082806.648797-2-srinivas.kandagatla@oss.qualcomm.com
+- `patches/0752-drm-msm-dpu-disable-the-slave-encoder-before-the-mas.patch`
+  source: https://git.kernel.org/next/linux-next/c/32d04280ddebb6eb964990931b0f1001f63b35e7
+  upstream: https://lore.kernel.org/r/20261002130712.50612-1-26rote@gmail.com
+- `patches/0753-drm-msm-dpu-round-up-the-compressed-INTF-width.patch`
+  source: https://git.kernel.org/next/linux-next/c/6b93e8b453fa27a1b6a1d472f3ff8663e6811fae
+  upstream: https://lore.kernel.org/r/20261004102758.84436-1-26rote@gmail.com
+- `patches/0754-PCI-pwrctrl-Power-off-child-devices-on-power-on-fail.patch`
+  source: https://git.kernel.org/next/linux-next/c/e95b940b2114e03d1763a022bfda75d8a15702d8
+  upstream: https://patch.msgid.link/20260909-pwrtctl-power-on-rallback-v1-1-412ef996ba27@oss.qualcomm.com
+- `patches/0755-PCI-qcom-Ignore-ENODEV-after-Root-Port-reset.patch`
+  source: https://git.kernel.org/next/linux-next/c/78f27ea27d9870806f51b6f44db7ef6df62f7891
+  upstream: https://patch.msgid.link/20260916-topic-pcie_portrec_enodev-v1-1-5dc7bde39552@oss.qualcomm.com
+- `patches/0756-PCI-qcom-Block-accesses-to-downstream-devices-on-lin.patch`
+  source: https://git.kernel.org/next/linux-next/c/967a73293ae5f57af68e815942078e110c1f6d08
+  upstream: https://patch.msgid.link/20260819-ecam_blocker-v2-1-e7a8fdc1c5cb@oss.qualcomm.com
+- `patches/0757-serial-qcom-geni-Drop-unsafe-rx_buf-realloc-from-set.patch`
+  source: https://git.kernel.org/next/linux-next/c/16ccb505ff021ebbd1207c66e5f68521f6d7fa4c
+  upstream: https://patch.msgid.link/20260824-drop-unsafe-rx-buf-realloc-from-setup-fifos-v1-1-52d231c840e1@oss.qualcomm.com
+- `patches/0758-usb-typec-ucsi-allow-retries-of-ucsi_resume_work.patch`
+  source: https://git.kernel.org/next/linux-next/c/a2463e239443d7a132624700153f0cb1fab13b2c
+  upstream: https://patch.msgid.link/20260904234124.2336922-1-jthies@google.com
+- `patches/0759-media-iris-Fix-power-off-ordering-to-disable-power-d.patch`
+  source: https://git.kernel.org/next/linux-next/c/9cfae7726a9a9f526e8905dbddde355be2674e3d
+  upstream: unknown
+- `patches/0760-media-iris-reject-open-when-the-session-limit-is-rea.patch`
+  source: https://git.kernel.org/next/linux-next/c/397ebadcbc219f6c20d11c0378d8cb7695d015c2
+  upstream: unknown
+- `patches/0761-media-iris-reference-count-video-instances.patch`
+  source: https://git.kernel.org/next/linux-next/c/af5f7df6c8b33bed714ec0aea15a0a2f48900c0a
+  upstream: unknown
+- `patches/0762-media-iris-reset-AHB-bridge-before-enabling-HW-mode.patch`
+  source: https://git.kernel.org/next/linux-next/c/cc330f5589965bcf99307ee9c66deb8a0a53e0ee
+  upstream: unknown
+- `patches/0763-media-iris-avoid-bit-depth-validation-for-capture-fo.patch`
+  source: https://git.kernel.org/next/linux-next/c/40e9c3b3e35c6d65a3a0d3b1483716ad48b046bd
+  upstream: unknown
+- `patches/0764-media-iris-Fix-iova-allocation-from-restrict-region.patch`
+  source: https://git.kernel.org/next/linux-next/c/200473c198b201c308dfb916fb3233074d9407fa
+  upstream: unknown
+- `patches/0765-clk-qcom-alpha-pll-Check-Lucid-Ole-PLL-status-before.patch`
+  source: https://git.kernel.org/next/linux-next/c/eb34e2804ce4ea56efb741e23d598469274a2f94
+  upstream: https://lore.kernel.org/r/20260713-sm8450-qol-dispcc-v3-3-56fd05822270@proton.me
+- `patches/0766-wifi-ath12k-avoid-IDR-mutation-during-vif-mgmt-TX-cl.patch`
+  source: https://git.kernel.org/next/linux-next/c/4aa45334eb23d40bf31c43405daea9b73469f2a6
+  upstream: https://patch.msgid.link/20261003092104.520135-6-yaojiale02@163.com
+- `patches/0767-wifi-ath12k-avoid-IDR-mutation-during-pending-mgmt-T.patch`
+  source: https://git.kernel.org/next/linux-next/c/94c7b50351fd30e1dfe1b4051197a1445d8547e1
+  upstream: https://patch.msgid.link/20261003092104.520135-5-yaojiale02@163.com
+- `patches/0768-wifi-ath12k-validate-MAC-PHY-capability-count-before.patch`
+  source: https://git.kernel.org/next/linux-next/c/86f2537877d6029487811bc3e0cd9e086a196000
+  upstream: https://patch.msgid.link/20261003101944.596546-1-yaojiale02@163.com
+- `patches/0769-wifi-ath12k-clear-dangling-channel-pointers-on-error.patch`
+  source: https://git.kernel.org/next/linux-next/c/507478f6f93864978a399173d4f54c8a987c8235
+  upstream: https://patch.msgid.link/20260811020523.387433-1-gonglinkai@kylinos.cn
+- `patches/0770-wifi-ath12k-Free-allocated-external-IRQs-on-request_.patch`
+  source: https://git.kernel.org/next/linux-next/c/9a78703ec4a895bd2e99bf43bd18d76683126c19
+  upstream: https://patch.msgid.link/20260819110215.2485514-3-aaradhana.sahu@oss.qualcomm.com

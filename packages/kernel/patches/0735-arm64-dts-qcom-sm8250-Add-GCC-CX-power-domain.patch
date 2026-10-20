@@ -1,0 +1,36 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Abel Vesa <abel.vesa@oss.qualcomm.com>
+Date: Thu, 24 Sep 2026 13:39:52 +0300
+Subject: [PATCH] arm64: dts: qcom: sm8250: Add GCC CX power domain
+
+The GCC GDSCs on SM8250 are backed by the RPMh CX power domain. Without
+describing that parent domain, consumers of GCC-provided GDSCs can enable
+their local domain without causing the required CX vote to be held.
+
+Add the CX power-domain reference to the GCC node so votes from GCC GDSC
+consumers can propagate to RPMh CX.
+
+Reviewed-by: Konrad Dybcio <konrad.dybcio@oss.qualcomm.com>
+Signed-off-by: Abel Vesa <abel.vesa@oss.qualcomm.com>
+Link: https://patch.msgid.link/20260924-qcom-tie-cx-to-gcc-v5-36-38732033e5b5@oss.qualcomm.com
+Signed-off-by: Bjorn Andersson <andersson@kernel.org>
+(cherry picked from commit 389a0144c511316cf21d5dc2aa30028de87f9d00)
+---
+ arch/arm64/boot/dts/qcom/sm8250.dtsi | 1 +
+ 1 file changed, 1 insertion(+)
+
+diff --git a/arch/arm64/boot/dts/qcom/sm8250.dtsi b/arch/arm64/boot/dts/qcom/sm8250.dtsi
+index 90f8b091634e..50790cf1c3ca 100644
+--- a/arch/arm64/boot/dts/qcom/sm8250.dtsi
++++ b/arch/arm64/boot/dts/qcom/sm8250.dtsi
+@@ -971,6 +971,7 @@ gcc: clock-controller@100000 {
+ 			clocks = <&rpmhcc RPMH_CXO_CLK>,
+ 				 <&rpmhcc RPMH_CXO_CLK_A>,
+ 				 <&sleep_clk>;
++			power-domains = <&rpmhpd RPMHPD_CX>;
+ 		};
+ 
+ 		ipcc: mailbox@408000 {
+-- 
+2.56.0
+

@@ -1,0 +1,39 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Rob Clark <robin.clark@oss.qualcomm.com>
+Date: Wed, 30 Sep 2026 08:26:43 -0700
+Subject: [PATCH] drm/msm/dpu: Fix GAMMA LUT for sm8750 related DPUs
+
+Add missing GC block.  Fixes GAMMA LUT on glymur/knp/etc.
+
+Reported-by: Connor Abbott <cwabbott0@gmail.com>
+Suggested-by: Dmitry Baryshkov <dmitry.baryshkov@oss.qualcomm.com>
+Signed-off-by: Rob Clark <robin.clark@oss.qualcomm.com>
+Reviewed-by: Dmitry Baryshkov <dmitry.baryshkov@oss.qualcomm.com>
+Patchwork: https://patchwork.freedesktop.org/patch/757345/
+Link: https://lore.kernel.org/r/20260930152645.22194-1-robin.clark@oss.qualcomm.com
+Signed-off-by: Dmitry Baryshkov <dmitry.baryshkov@oss.qualcomm.com>
+(cherry picked from commit 3389406e6a032b92c4770380c4aeec8dbf38cfae)
+---
+ drivers/gpu/drm/msm/disp/dpu1/dpu_hw_catalog.c | 3 ++-
+ 1 file changed, 2 insertions(+), 1 deletion(-)
+
+diff --git a/drivers/gpu/drm/msm/disp/dpu1/dpu_hw_catalog.c b/drivers/gpu/drm/msm/disp/dpu1/dpu_hw_catalog.c
+index 08876005af01..256feb3f53f4 100644
+--- a/drivers/gpu/drm/msm/disp/dpu1/dpu_hw_catalog.c
++++ b/drivers/gpu/drm/msm/disp/dpu1/dpu_hw_catalog.c
+@@ -486,10 +486,11 @@ static const struct dpu_reg_dma_cfg sm8650_reg_dma = {
+ 	.version = 0x30000,
+ };
+ 
+-/* GC v2 on this DSPP is a LUT bus block too and is not wired up yet */
+ static const struct dpu_dspp_sub_blks sm8750_dspp_sblk = {
+ 	.pcc = {.name = "pcc", .base = 0x1700,
+ 		.len = 0x90, .version = 0x60000},
++	.gc = {.name = "gc", .base = 0x17c0,
++		.len = 0x40, .version = 0x10008},
+ 	.igc = {.name = "igc", .base = 0x1260,
+ 		.len = 0x1c, .version = 0x50000},
+ 	.gamut = {.name = "gamut", .base = 0x1000,
+-- 
+2.56.0
+
