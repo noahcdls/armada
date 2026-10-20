@@ -1,0 +1,186 @@
+From: Armada <noreply@armada.local>
+Subject: [PATCH] ASoC: qcom: restore SoundWire streams across system suspend
+
+The SoundWire controllers are force-suspended for system sleep, which
+stops the bus clock under any stream still enabled, and LPASS can lose
+their port setup while it is powered down. A PCM left open at suspend
+is resumed without a new prepare: q6asm resumes it in place, and DPCM
+re-prepares an AudioReach BE but qcom_snd_sdw_prepare() skips a stream
+that is already marked prepared. Either way the ports are never set up
+again and the speakers stay silent after resume, which the Retroid
+Pocket Flip 2 shows when suspended with a game running.
+
+Disable and deprepare the prepared SoundWire streams in the card's
+suspend_post, after the PCMs are suspended and DAPM has powered the
+amplifiers down, and prepare and enable them again in resume_pre,
+before DAPM powers the amplifiers back up. The ASoC core's card to
+component device links order this before the controllers suspend and
+after they resume.
+---
+diff --git a/sound/soc/qcom/sc8280xp.c b/sound/soc/qcom/sc8280xp.c
+index 00d3b6c28305..da267a1632e0 100644
+--- a/sound/soc/qcom/sc8280xp.c
++++ b/sound/soc/qcom/sc8280xp.c
+@@ -240,6 +240,8 @@ static int sc8280xp_snd_suspend_post(struct snd_soc_card *card)
+ {
+ 	struct sc8280xp_snd_data *pdata = snd_soc_card_get_drvdata(card);
+ 
++	qcom_snd_sdw_suspend(card, pdata->stream_prepared);
++
+ 	snd_soc_dpcm_mutex_lock(card);
+ 	if (pdata->mi2s_clk_count)
+ 		clk_disable_unprepare(pdata->i2s_clk);
+@@ -262,6 +264,8 @@ static int sc8280xp_snd_resume_pre(struct snd_soc_card *card)
+ 	if (ret)
+ 		dev_err(card->dev, "failed to re-enable the I2S clock: %d\n", ret);
+ 
++	qcom_snd_sdw_resume(card, pdata->stream_prepared);
++
+ 	return 0;
+ }
+ 
+diff --git a/sound/soc/qcom/sdw.c b/sound/soc/qcom/sdw.c
+index 6576b47a4c8c..8d1990325fc8 100644
+--- a/sound/soc/qcom/sdw.c
++++ b/sound/soc/qcom/sdw.c
+@@ -6,6 +6,7 @@
+ #include <dt-bindings/sound/qcom,q6afe.h>
+ #include <linux/module.h>
+ #include <sound/soc.h>
++#include <sound/soc-dpcm.h>
+ #include "sdw.h"
+ 
+ static bool qcom_snd_is_sdw_dai(int id)
+@@ -212,5 +213,83 @@ int qcom_snd_sdw_hw_free(struct snd_pcm_substream *substream, bool *stream_prepa
+ 	return 0;
+ }
+ EXPORT_SYMBOL_GPL(qcom_snd_sdw_hw_free);
++
++static void qcom_snd_sdw_suspend_resume(struct snd_soc_card *card,
++					bool *stream_prepared, bool suspend)
++{
++	struct snd_soc_pcm_runtime *rtd;
++	struct snd_pcm_substream *substream;
++	struct sdw_stream_runtime *sruntime;
++	int id, stream, ret;
++
++	snd_soc_dpcm_mutex_lock(card);
++	for_each_card_rtds(card, rtd) {
++		if (!rtd->dai_link->no_pcm)
++			continue;
++
++		id = snd_soc_rtd_to_cpu(rtd, 0)->id;
++		if (!qcom_snd_is_sdw_dai(id) || !stream_prepared[id])
++			continue;
++
++		for_each_pcm_streams(stream) {
++			substream = snd_soc_dpcm_get_substream(rtd, stream);
++			if (!substream || !rtd->dpcm[stream].users)
++				continue;
++
++			sruntime = qcom_snd_sdw_get_stream(substream);
++			if (!sruntime)
++				continue;
++
++			if (suspend) {
++				sdw_disable_stream(sruntime);
++				sdw_deprepare_stream(sruntime);
++				continue;
++			}
++
++			ret = sdw_prepare_stream(sruntime);
++			if (!ret) {
++				ret = sdw_enable_stream(sruntime);
++				if (ret)
++					sdw_deprepare_stream(sruntime);
++			}
++			if (ret) {
++				dev_err(rtd->dev, "failed to restore Soundwire stream: %d\n", ret);
++				stream_prepared[id] = false;
++			}
++		}
++	}
++	snd_soc_dpcm_mutex_unlock(card);
++}
++
++/**
++ * qcom_snd_sdw_suspend() - Take down prepared Soundwire streams for system sleep
++ * @card: The sound card, as passed to snd_soc_card->suspend_post()
++ * @stream_prepared: The card's per CPU DAI stream_prepared flags
++ *
++ * The Soundwire controllers are clock-stopped across system sleep, and LPASS
++ * can lose their port setup while it is powered down. A PCM left open at
++ * suspend resumes without a new prepare, so qcom_snd_sdw_prepare() would never
++ * set its stream up again. Call this once the PCMs are suspended and DAPM has
++ * powered the amplifiers down, and qcom_snd_sdw_resume() on the way back.
++ */
++void qcom_snd_sdw_suspend(struct snd_soc_card *card, bool *stream_prepared)
++{
++	qcom_snd_sdw_suspend_resume(card, stream_prepared, true);
++}
++EXPORT_SYMBOL_GPL(qcom_snd_sdw_suspend);
++
++/**
++ * qcom_snd_sdw_resume() - Restore the streams qcom_snd_sdw_suspend() took down
++ * @card: The sound card, as passed to snd_soc_card->resume_pre()
++ * @stream_prepared: The card's per CPU DAI stream_prepared flags
++ *
++ * Runs before DAPM powers the amplifiers back up, keeping the port enable
++ * ahead of the PA enable as qcom_snd_sdw_prepare() does.
++ */
++void qcom_snd_sdw_resume(struct snd_soc_card *card, bool *stream_prepared)
++{
++	qcom_snd_sdw_suspend_resume(card, stream_prepared, false);
++}
++EXPORT_SYMBOL_GPL(qcom_snd_sdw_resume);
+ MODULE_DESCRIPTION("Qualcomm ASoC SoundWire helper functions");
+ MODULE_LICENSE("GPL");
+diff --git a/sound/soc/qcom/sdw.h b/sound/soc/qcom/sdw.h
+index 061a63f1ac52..0cd24b083a5f 100644
+--- a/sound/soc/qcom/sdw.h
++++ b/sound/soc/qcom/sdw.h
+@@ -13,4 +13,6 @@ int qcom_snd_sdw_prepare(struct snd_pcm_substream *substream,
+ struct sdw_stream_runtime *qcom_snd_sdw_get_stream(struct snd_pcm_substream *stream);
+ int qcom_snd_sdw_hw_free(struct snd_pcm_substream *substream,
+ 			 bool *stream_prepared);
++void qcom_snd_sdw_suspend(struct snd_soc_card *card, bool *stream_prepared);
++void qcom_snd_sdw_resume(struct snd_soc_card *card, bool *stream_prepared);
+ #endif
+diff --git a/sound/soc/qcom/sm8250.c b/sound/soc/qcom/sm8250.c
+index fad67b382d7e..9b297726fac6 100644
+--- a/sound/soc/qcom/sm8250.c
++++ b/sound/soc/qcom/sm8250.c
+@@ -169,6 +169,24 @@ static void sm8250_add_be_ops(struct snd_soc_card *card)
+ 	}
+ }
+ 
++static int sm8250_snd_suspend_post(struct snd_soc_card *card)
++{
++	struct sm8250_snd_data *data = snd_soc_card_get_drvdata(card);
++
++	qcom_snd_sdw_suspend(card, data->stream_prepared);
++
++	return 0;
++}
++
++static int sm8250_snd_resume_pre(struct snd_soc_card *card)
++{
++	struct sm8250_snd_data *data = snd_soc_card_get_drvdata(card);
++
++	qcom_snd_sdw_resume(card, data->stream_prepared);
++
++	return 0;
++}
++
+ static int sm8250_platform_probe(struct platform_device *pdev)
+ {
+ 	struct snd_soc_card *card;
+@@ -193,6 +211,8 @@ static int sm8250_platform_probe(struct platform_device *pdev)
+ 	if (ret)
+ 		return ret;
+ 
++	card->suspend_post = sm8250_snd_suspend_post;
++	card->resume_pre = sm8250_snd_resume_pre;
+ 	card->driver_name = of_device_get_match_data(dev);
+ 	sm8250_add_be_ops(card);
+ 	return devm_snd_soc_register_card(dev, card);

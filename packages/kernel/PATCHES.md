@@ -884,6 +884,12 @@ no equivalent submission was found, or a permanent URL to the upstream submissio
 - `patches/0565-pinctrl-qcom-sm8650-lpass-lpi-force-runtime-suspend-across-system-sleep.patch`
   source: armada
   upstream: local
+- `patches/0569-ASoC-qcom-sm8250-suspend-the-card-and-its-streams.patch`
+  source: armada
+  upstream: local
+- `patches/0570-ASoC-qcom-restore-soundwire-streams-across-system-suspend.patch`
+  source: armada
+  upstream: local
 
 - `patches/1021-wifi-ath12k-fix-single-pdev-frequency-ranges.patch`
   source: https://lore.kernel.org/r/20260715065218.41232-1-gsh20040816@gmail.com

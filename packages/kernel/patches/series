@@ -258,3 +258,5 @@ v2_20260420_neil_armstrong_arm64_qcom_sm8650_misc_enhancements.patch
 0563-ASoC-codecs-lpass-macro-force-runtime-suspend-across-system-sleep.patch
 0564-soundwire-qcom-force-runtime-suspend-across-system-sleep.patch
 0565-pinctrl-qcom-sm8650-lpass-lpi-force-runtime-suspend-across-system-sleep.patch
+0569-ASoC-qcom-sm8250-suspend-the-card-and-its-streams.patch
+0570-ASoC-qcom-restore-soundwire-streams-across-system-suspend.patch
