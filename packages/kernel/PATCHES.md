@@ -1018,9 +1018,9 @@ no equivalent submission was found, or a permanent URL to the upstream submissio
   upstream: https://lore.kernel.org/r/20261009082639.22662-1-okerixx@gmail.com
   notes: Posted, not yet merged. 0564 force-suspends the SoundWire controllers on every system sleep, which runs the clock-gating path this fixes once per suspend.
 - `patches/0731-Bluetooth-hci_qca-reset-the-in-band-sleep-state-on-power-off.patch`
-  source: https://patchwork.kernel.org/project/linux-arm-msm/patch/179163212446.46972.2306254853726299632@pm.me/
-  upstream: https://lore.kernel.org/r/179163212446.46972.2306254853726299632@pm.me
-  notes: Posted, not yet merged. The Odin 3's WCN7860 Bluetooth runs on hci_qca.
+  source: https://patchwork.kernel.org/project/linux-arm-msm/patch/20261014180201.57109-1-birk.skyum@pm.me/
+  upstream: https://lore.kernel.org/r/20261014180201.57109-1-birk.skyum@pm.me
+  notes: Posted, not yet merged (v2). The Odin 3's WCN7860 Bluetooth runs on hci_qca. v2 also stops the IBS work and timers before resetting the state; tested on an SM8750 OnePlus Pad 3.
 - `patches/0732-arm64-dts-qcom-disable-the-qce-crypto-engine.patch`
   source: armada
   upstream: local
@@ -1098,3 +1098,110 @@ no equivalent submission was found, or a permanent URL to the upstream submissio
 - `patches/0770-wifi-ath12k-Free-allocated-external-IRQs-on-request_.patch`
   source: https://git.kernel.org/next/linux-next/c/9a78703ec4a895bd2e99bf43bd18d76683126c19
   upstream: https://patch.msgid.link/20260819110215.2485514-3-aaradhana.sahu@oss.qualcomm.com
+- `patches/0771-firmware-qcom_scm-align-PAS-resource-table-retry.patch`
+  source: https://git.kernel.org/next/linux-next/c/57e43df2e426ac5561ee3832d425e1071772e963
+  upstream: https://patch.msgid.link/20260921195636.1925869-3-mukesh.ojha@oss.qualcomm.com
+  notes: Follow-up to 0719.
+- `patches/0772-media-iris-cancel-sys-error-work-on-driver-removal.patch`
+  source: https://git.kernel.org/next/linux-next/c/4524809316482b64ff092afb7e7b0525ce137c75
+  upstream: unknown
+- `patches/0773-media-iris-fail-firmware-boot-on-invalid-uc_region.patch`
+  source: https://git.kernel.org/next/linux-next/c/f301102c17f22f4a140bd9a50281473e6b782f0c
+  upstream: unknown
+- `patches/0774-media-iris-take-core-lock-when-scanning-the-instance.patch`
+  source: https://git.kernel.org/next/linux-next/c/428e6f95e685a06a73868aee95dd94dca7b3a027
+  upstream: unknown
+- `patches/0775-media-iris-guard-against-a-NULL-hfi_sys_ops-in-the-i.patch`
+  source: https://git.kernel.org/next/linux-next/c/95f9e9fc9336ca4e8fb4ff0a76ddbde2f60bdb09
+  upstream: unknown
+- `patches/0776-wifi-ath12k-use-per-device-max-QMI-chunk-size.patch`
+  source: https://git.kernel.org/next/linux-next/c/4e286c780d75831a169b0489afd015214838affd
+  upstream: https://patch.msgid.link/20260730-ath12k-align-qmi-memory-v1-1-0fef98dda614@oss.qualcomm.com
+- `patches/0777-wifi-ath12k-clear-chunk-paddr-and-size-in-ath12k_qmi.patch`
+  source: https://git.kernel.org/next/linux-next/c/a1af8645cf2dcdac5c6b3929e1dcb2274ca9f27e
+  upstream: https://patch.msgid.link/20260730-ath12k-align-qmi-memory-v1-2-0fef98dda614@oss.qualcomm.com
+- `patches/0778-wifi-ath12k-align-QMI-target-memory-to-64-KB.patch`
+  source: https://git.kernel.org/next/linux-next/c/f7f05c443361ebaa503e054e882633913273b3fa
+  upstream: https://patch.msgid.link/20260730-ath12k-align-qmi-memory-v1-3-0fef98dda614@oss.qualcomm.com
+- `patches/0779-drm-msm-a6xx-Factor-out-RPMh-arc-vote-helpers.patch`
+  source: https://git.kernel.org/next/linux-next/c/b5269bf0e1adc2f5d313fce9268b9ac594dc26e0
+  upstream: https://lore.kernel.org/r/20260923-hawi-gpu-v1-4-0c3c79a1a470@oss.qualcomm.com
+  notes: 0779-0781 complete the series 0723 and 0724 come from; 0779 and 0780 are prerequisites for 0781.
+- `patches/0780-drm-msm-a6xx-Add-BX-rail-support-to-GMU-dependency-v.patch`
+  source: https://git.kernel.org/next/linux-next/c/020b8eaa1db838c6b58fd500a03218cd1ac76176
+  upstream: https://lore.kernel.org/r/20260923-hawi-gpu-v1-5-0c3c79a1a470@oss.qualcomm.com
+- `patches/0781-drm-msm-a6xx-Clamp-MX-dependency-vote.patch`
+  source: https://git.kernel.org/next/linux-next/c/86f80884fb7f4601a49444a3c36df894b218336e
+  upstream: https://lore.kernel.org/r/20260923-hawi-gpu-v1-6-0c3c79a1a470@oss.qualcomm.com
+- `patches/0782-drm-msm-a6xx-fix-use-after-free-of-OPP-in-a6xx_pm_re.patch`
+  source: https://git.kernel.org/next/linux-next/c/8128ae7af6b4dc95e486c5c0a80839a069df578e
+  upstream: https://lore.kernel.org/r/20260929142103.81854-1-roman.demidov.nn@gmail.com
+  notes: On the GPU resume path, which runs on every wake.
+- `patches/0783-drm-msm-a6xx-check-pm_runtime_resume_and_get-during-.patch`
+  source: https://git.kernel.org/next/linux-next/c/e2f57c576f14f96449cfee840860cb9707501d23
+  upstream: https://lore.kernel.org/r/20260929142103.81854-2-roman.demidov.nn@gmail.com
+- `patches/0784-power-supply-qcom_battmgr-report-the-USB-type-from-U.patch`
+  source: https://git.kernel.org/next/linux-next/c/a49f86cd1333c6e12fd37bc0b3234ace10072553
+  upstream: https://patch.msgid.link/20261012130053.442-1-26rote@gmail.com
+- `patches/0785-power-supply-qcom_battmgr-Notify-charger-supplies-of.patch`
+  source: https://git.kernel.org/next/linux-next/c/87fd20da8ca8bacdaa9bff5860167f208077dc51
+  upstream: https://patch.msgid.link/20261013-upstream-battmgr-charger-online-v1-1-731973e133a0@gmail.com
+- `patches/0786-power-supply-qcom_battmgr-report-full-batteries.patch`
+  source: https://git.kernel.org/next/linux-next/c/6c8098e04ee4d233399e40e7311715844910f8f8
+  upstream: https://patch.msgid.link/20261008-battmgr-full-v1-1-4f5485a9c421@oss.qualcomm.com
+- `patches/0787-serial-qcom-geni-power-the-console-back-up-on-system.patch`
+  source: https://git.kernel.org/next/linux-next/c/e95442c31ae65b57ddffdfa609531c549055f308
+  upstream: https://patch.msgid.link/20260918-qcom-geni-pm-v1-1-cb587e215607@ixit.cz
+- `patches/0788-soc-qcom-geni-se-Fix-endian-conversion-for-serial_pr.patch`
+  source: https://git.kernel.org/next/linux-next/c/34da43344c042bf276abace745d7cf6af27699df
+  upstream: https://lore.kernel.org/r/20260821-fix-write-to-read-only-firmware-buffer-v3-1-43e6a3abd651@oss.qualcomm.com
+  notes: 0788-0791 are the SE firmware-parsing fixes 0792 is based on.
+- `patches/0789-soc-qcom-geni-se-Widen-fw_size-to-u32-to-prevent-wra.patch`
+  source: https://git.kernel.org/next/linux-next/c/570b3d23794bff9ba8dd99dbd5293dc158a7dbce
+  upstream: https://lore.kernel.org/r/20260821-fix-write-to-read-only-firmware-buffer-v3-2-43e6a3abd651@oss.qualcomm.com
+- `patches/0790-soc-qcom-geni-se-Fix-fw_end-computed-before-round-up.patch`
+  source: https://git.kernel.org/next/linux-next/c/091269da39eb0a52cca2549e9ba522ab7b841ff2
+  upstream: https://lore.kernel.org/r/20260821-fix-write-to-read-only-firmware-buffer-v3-3-43e6a3abd651@oss.qualcomm.com
+- `patches/0791-soc-qcom-geni-se-Fix-write-to-read-only-firmware-buf.patch`
+  source: https://git.kernel.org/next/linux-next/c/f38399670d0701ede4f8da397807aa64d7dc98be
+  upstream: https://lore.kernel.org/r/20260821-fix-write-to-read-only-firmware-buffer-v3-4-43e6a3abd651@oss.qualcomm.com
+- `patches/0792-soc-qcom-geni-se-provide-PROG_RAM_DEPTH-for-I2C-HUB-.patch`
+  source: https://git.kernel.org/next/linux-next/c/803f9950a6c6e0b37ed7f24925feed823703467e
+  upstream: https://patch.msgid.link/20260923-topic-sm8x50-i2c-hub-fw-ram-v3-1-44287b4e814b@linaro.org
+  notes: The Odin 3's HTR3212 LED controllers sit on I2C hub serial engines.
+- `patches/0793-usb-dwc3-qcom-Defer-VBUS-override-update-during-syst.patch`
+  source: https://patchwork.kernel.org/project/linux-arm-msm/patch/20261018143126.3978-1-tvlad744@gmail.com/
+  upstream: https://lore.kernel.org/r/20261018143126.3978-1-tvlad744@gmail.com
+  notes: Posted, not yet merged. On SM8750, unplugging USB during s2idle made dwc3-qcom write QSCRATCH with its clocks off and reset the SoC.
+- `patches/0794-soc-qcom-pmic_glink-Hold-back-notifications-over-sys.patch`
+  source: https://patchwork.kernel.org/project/linux-arm-msm/patch/20261022164151.592-2-tvlad744@gmail.com/
+  upstream: https://lore.kernel.org/r/20261022164151.592-2-tvlad744@gmail.com
+  notes: RFC, posted, not yet merged; 0794-0797 are one series. Notifications that arrive from ->prepare() on are passed to the clients from freezable work after resume, so the UCSI connector work can no longer touch suspended devices (the other half of the SM8750 unplug reset). 0713's freezable-workqueue stop-gap stays in place.
+- `patches/0795-soc-qcom-pmic_glink-Report-wakeup-events-on-behalf-o.patch`
+  source: https://patchwork.kernel.org/project/linux-arm-msm/patch/20261022164151.592-3-tvlad744@gmail.com/
+  upstream: https://lore.kernel.org/r/20261022164151.592-3-tvlad744@gmail.com
+  notes: RFC, posted, not yet merged.
+- `patches/0796-usb-typec-ucsi-glink-Wake-up-the-system-on-connector.patch`
+  source: https://patchwork.kernel.org/project/linux-arm-msm/patch/20261022164151.592-4-tvlad744@gmail.com/
+  upstream: https://lore.kernel.org/r/20261022164151.592-4-tvlad744@gmail.com
+  notes: RFC, posted, not yet merged. A USB-C plug or unplug now wakes the system from s2idle.
+- `patches/0797-power-supply-qcom_battmgr-Allow-charger-changes-to-w.patch`
+  source: https://patchwork.kernel.org/project/linux-arm-msm/patch/20261022173225.58-1-tvlad744@gmail.com/
+  upstream: https://lore.kernel.org/r/20261022173225.58-1-tvlad744@gmail.com
+  notes: RFC, posted, not yet merged.
+- `patches/0798-power-supply-qcom_battmgr-do-not-report-power_now-on.patch`
+  source: https://patchwork.kernel.org/project/linux-arm-msm/patch/20261013002124.332111-1-xiaqinghuan@mail.ustc.edu.cn/
+  upstream: https://lore.kernel.org/r/20261013002124.332111-1-xiaqinghuan@mail.ustc.edu.cn
+  notes: Posted, not yet merged. The SM8750 firmware fills POWER_NOW from its maximum-load path. Rebased onto 0903, keeping the charge-current properties ahead of POWER_NOW so the SM8750 descriptor still drops only POWER_NOW. SM8750 boards previously matched the SM8550 entry; the new SM8750 variant is otherwise handled like SM8550, since the driver's other variant checks only single out SC8280XP and X1E80100.
+- `patches/0799-serial-qcom-geni-Clear-pending-IRQs-while-suspended.patch`
+  source: https://patchwork.kernel.org/project/linux-arm-msm/patch/20261021-ack-interrupts-on-suspended-port-v1-1-2747a58ca7cb@oss.qualcomm.com/
+  upstream: https://lore.kernel.org/r/20261021-ack-interrupts-on-suspended-port-v1-1-2747a58ca7cb@oss.qualcomm.com
+  notes: Posted, not yet merged.
+- `patches/0800-dt-bindings-clock-qcom-sm8450-videocc-Fix-clock-inpu.patch`
+  source: https://patchwork.kernel.org/project/linux-arm-msm/patch/20261017045817.1506961-2-shengchao.guo@oss.qualcomm.com/
+  upstream: https://lore.kernel.org/r/20261017045817.1506961-2-shengchao.guo@oss.qualcomm.com
+  notes: Posted, not yet merged (v3). Binding for 0801; the series' Glymur and Nord DTS patches are not carried.
+- `patches/0801-arm64-dts-qcom-sm8750-Fix-videocc-clock-inputs.patch`
+  source: https://patchwork.kernel.org/project/linux-arm-msm/patch/20261017045817.1506961-4-shengchao.guo@oss.qualcomm.com/
+  upstream: https://lore.kernel.org/r/20261017045817.1506961-4-shengchao.guo@oss.qualcomm.com
+  notes: Posted, not yet merged (v3). Describes the controller's real inputs (XO, active-only XO, sleep clock); no functional change.

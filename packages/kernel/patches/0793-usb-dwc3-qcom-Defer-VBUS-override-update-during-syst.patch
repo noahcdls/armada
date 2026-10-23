@@ -1,0 +1,167 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Vladyslav Tymoshchuk <tvlad744@gmail.com>
+Date: Sun, 18 Oct 2026 17:31:26 +0300
+Subject: [PATCH] usb: dwc3: qcom: Defer VBUS override update during system
+ suspend
+
+dwc3_qcom_set_role_notifier() updates the VBUS override in QSCRATCH
+synchronously, from the context of the usb_role_switch_set_role()
+caller. The glue assumes that role switches only happen from a
+freezable workqueue, but that holds for the dwc3 core's mode switch,
+not for this notifier: the UCSI connector work, for one, runs on the
+non-freezable system workqueue.
+
+On SM8750, when the USB cable is unplugged while the system is in
+s2idle, the UCSI connector work for the change runs before the devices
+have resumed. It switches the role to USB_ROLE_NONE, and the notifier
+accesses QSCRATCH while the glue clocks are still off, before
+dwc3_qcom_pm_resume() turns them back on. The access does not complete
+and the SoC resets. pm_runtime_resume_and_get() does not prevent this:
+runtime PM is disabled at that point and the device is still marked
+active, so it returns success without resuming anything.
+
+While the glue is suspended for system sleep, only record the VBUS
+override update and apply it from dwc3_qcom_pm_resume() once the
+clocks are on. Apply it after the core has resumed, since resuming the
+gadget enables the override and the role switch is the more recent
+event. Serialize the notifier against system suspend and resume with a
+mutex, so that a role switch can't race with the clocks being turned
+off.
+
+Fixes: 21188e8d6d75 ("usb: dwc3: qcom: Implement glue callbacks to facilitate runtime suspend")
+Cc: stable@vger.kernel.org
+Signed-off-by: Vladyslav Tymoshchuk <tvlad744@gmail.com>
+---
+ drivers/usb/dwc3/dwc3-qcom.c | 67 ++++++++++++++++++++++++++++--------
+ 1 file changed, 52 insertions(+), 15 deletions(-)
+
+diff --git a/drivers/usb/dwc3/dwc3-qcom.c b/drivers/usb/dwc3/dwc3-qcom.c
+index ac68b4218b..2997479988 100644
+--- a/drivers/usb/dwc3/dwc3-qcom.c
++++ b/drivers/usb/dwc3/dwc3-qcom.c
+@@ -10,6 +10,7 @@
+ #include <linux/irq.h>
+ #include <linux/of_clk.h>
+ #include <linux/module.h>
++#include <linux/mutex.h>
+ #include <linux/kernel.h>
+ #include <linux/interconnect.h>
+ #include <linux/platform_device.h>
+@@ -85,6 +86,11 @@ struct dwc3_qcom {
+ 	struct icc_path		*icc_path_apps;
+ 
+ 	enum usb_role		current_role;
++
++	/* Serializes the role notifier against system suspend and resume */
++	struct mutex		role_lock;
++	bool			vbus_override_pending;
++	bool			vbus_override;
+ };
+ 
+ #define to_dwc3_qcom(d) container_of((d), struct dwc3_qcom, dwc)
+@@ -561,27 +567,40 @@ static int dwc3_qcom_setup_irq(struct dwc3_qcom *qcom, struct platform_device *p
+ static void dwc3_qcom_set_role_notifier(struct dwc3 *dwc, enum usb_role next_role)
+ {
+ 	struct dwc3_qcom *qcom = to_dwc3_qcom(dwc);
++	bool enable;
++
++	guard(mutex)(&qcom->role_lock);
+ 
+ 	if (qcom->current_role == next_role)
+ 		return;
+ 
++	enable = qcom->current_role != USB_ROLE_DEVICE;
++
++	/*
++	 * Not every caller of usb_role_switch_set_role() is frozen during
++	 * system sleep, e.g. the UCSI connector work can run in the noirq
++	 * resume phase. The glue clocks are off then and runtime PM can't
++	 * turn them on, so leave QSCRATCH alone and let
++	 * dwc3_qcom_pm_resume() apply the update.
++	 */
++	if (qcom->pm_suspended) {
++		qcom->vbus_override_pending = true;
++		qcom->vbus_override = enable;
++		qcom->current_role = next_role;
++		return;
++	}
++
+ 	if (pm_runtime_resume_and_get(qcom->dev)) {
+ 		dev_dbg(qcom->dev, "Failed to resume device\n");
+ 		return;
+ 	}
+ 
+-	if (qcom->current_role == USB_ROLE_DEVICE)
+-		dwc3_qcom_vbus_override_enable(qcom, false);
+-	else if (qcom->current_role != USB_ROLE_DEVICE)
+-		dwc3_qcom_vbus_override_enable(qcom, true);
++	qcom->vbus_override_pending = false;
++	dwc3_qcom_vbus_override_enable(qcom, enable);
+ 
+ 	pm_runtime_mark_last_busy(qcom->dev);
+ 	pm_runtime_put_sync(qcom->dev);
+ 
+-	/*
+-	 * Current role changes via usb_role_switch_set_role callback protected
+-	 * internally by mutex lock.
+-	 */
+ 	qcom->current_role = next_role;
+ }
+ 
+@@ -624,6 +643,10 @@ static int dwc3_qcom_probe(struct platform_device *pdev)
+ 
+ 	qcom->dev = &pdev->dev;
+ 
++	ret = devm_mutex_init(dev, &qcom->role_lock);
++	if (ret)
++		return ret;
++
+ 	qcom->resets = devm_reset_control_array_get_optional_exclusive(dev);
+ 	if (IS_ERR(qcom->resets)) {
+ 		return dev_err_probe(&pdev->dev, PTR_ERR(qcom->resets),
+@@ -756,6 +779,8 @@ static int dwc3_qcom_pm_suspend(struct device *dev)
+ 	if (ret)
+ 		return ret;
+ 
++	guard(mutex)(&qcom->role_lock);
++
+ 	ret = dwc3_qcom_suspend(qcom, wakeup);
+ 	if (ret)
+ 		return ret;
+@@ -772,17 +797,29 @@ static int dwc3_qcom_pm_resume(struct device *dev)
+ 	bool wakeup = device_may_wakeup(dev);
+ 	int ret;
+ 
+-	ret = dwc3_qcom_resume(qcom, wakeup);
+-	if (ret)
+-		return ret;
++	scoped_guard(mutex, &qcom->role_lock) {
++		ret = dwc3_qcom_resume(qcom, wakeup);
++		if (ret)
++			return ret;
+ 
+-	qcom->pm_suspended = false;
++		qcom->pm_suspended = false;
++	}
+ 
+ 	ret = dwc3_pm_resume(&qcom->dwc);
+-	if (ret)
+-		return ret;
+ 
+-	return 0;
++	/*
++	 * Apply a VBUS override update from a role switch that came in while
++	 * suspended. Do it after the core has resumed, as resuming the gadget
++	 * enables the override and the role switch is the more recent event.
++	 */
++	scoped_guard(mutex, &qcom->role_lock) {
++		if (qcom->vbus_override_pending) {
++			dwc3_qcom_vbus_override_enable(qcom, qcom->vbus_override);
++			qcom->vbus_override_pending = false;
++		}
++	}
++
++	return ret;
+ }
+ 
+ static void dwc3_qcom_complete(struct device *dev)

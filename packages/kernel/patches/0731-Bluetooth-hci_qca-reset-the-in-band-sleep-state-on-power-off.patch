@@ -1,5 +1,8 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
 From: Birk Skyum <birk.skyum@pm.me>
-Subject: [PATCH] Bluetooth: hci_qca: Reset the in-band sleep state on power off
+Date: Wed, 14 Oct 2026 18:02:03 +0000
+Subject: [PATCH] Bluetooth: hci_qca: Reset the in-band sleep state on power
+ off
 
 qca_power_off() cuts the power of the controller but leaves the host
 side of the in-band sleep (IBS) protocol as it was. tx_ibs_state and
@@ -7,7 +10,24 @@ rx_ibs_state are initialised in qca_open() only, so a controller that
 qca_setup() powers on again meets whatever state the last session ended
 in.
 
-If that state is HCI_IBS_TX_WAKING, the host is waiting for a wake
+If that state is HCI_IBS_TX_AWAKE, the host sends the frames after the
+next setup without a wake indication. qca_hci_shutdown() stops both IBS
+timers, but the pre-shutdown command it sends afterwards goes through
+qca_enqueue() and arms tx_idle_timer again for 2 s, so a power on within
+those 2 s finds the state at AWAKE. On a OnePlus Pad 3 (WCN7880) this
+happens with a power off and on within 2 s, and at every boot of a board
+without local-bd-address when user space sets the address right after
+the controller registers. The controller comes back asleep, and the
+first command after it has gone to sleep breaks the link:
+
+  Bluetooth: hci0: Frame reassembly failed (-84)
+  Bluetooth: hci0: Opcode 0x0c56 failed: -110
+  Bluetooth: hci0: crash the soc to collect controller dump
+
+The timer left armed can also send HCI_IBS_SLEEP_IND in the middle of
+the next setup.
+
+If the state is HCI_IBS_TX_WAKING, the host is waiting for a wake
 acknowledgment, and qca_hci_shutdown() has deleted the timer that
 sends the wake indication again. The setup still works, because frames
 bypass IBS while QCA_IBS_DISABLED is set. Once the flag is cleared,
@@ -24,53 +44,49 @@ the core closes the device and sets it up again. From then on
 tx_ibs_state reads 1 in debugfs and Bluetooth stays dead until hci_uart
 is reloaded.
 
-When the controller loses power, put both sides back to asleep, which
-is where qca_open() starts, and stop the two IBS timers.
+When the controller loses power, cancel the IBS work, wait for the IBS
+timers, drop what was queued and put both sides back to asleep, which
+is where qca_open() starts. The timer callbacks take hci_ibs_lock, so
+the timers are deleted outside of it. All callers of qca_power_off()
+can sleep, and the work items do not call it.
 
+Fixes: 3e4be65eb82c ("Bluetooth: hci_qca: Add poweroff support during hci down for wcn3990")
+Cc: stable@vger.kernel.org
+Assisted-by: Claude:claude-opus-5-5
+Co-developed-by: Vladyslav Tymoshchuk <tvlad744@gmail.com>
+Signed-off-by: Vladyslav Tymoshchuk <tvlad744@gmail.com>
 Signed-off-by: Birk Skyum <birk.skyum@pm.me>
 ---
-Tested on a Lenovo Yoga Slim 7x with Arch Linux ARM's v7.2 kernel and
-hci_uart rebuilt with this change. qca_open(), qca_enqueue() and
-qca_hci_shutdown() are the same there as in bluetooth-next, which this
-is based on and where it builds without warnings (W=1).
-
-Each run is a fresh boot, a hibernation with a real power-off and a
-resume, with Bluetooth powered before it:
-
-- Without the patch Bluetooth is dead afterwards in four runs out of
-  four, with the log above. In the one run where I read it, debugfs
-  showed tx_ibs_state=1, ibs_sent_wakes=109 and ibs_recv_wake_acks=8.
-- With the patch it is powered again by itself in two runs out of two,
-  about 20 seconds after the resume. The log shows a failed version
-  read and "Retry BT power ON:0" before a setup that works. In the run
-  where I read it, debugfs showed tx_ibs_state=0 afterwards.
-- Powering the controller off and on with bluetoothctl still works.
-
-The 20 seconds are the commands that time out before the core gives up
-on the old session. This patch does not change that part.
-
-The kernel also carried the hibernation changes in [1], [2] and [3],
-without which this machine does not get this far, and a GENI serial
-change that is not ready for the list.
-
-[1] https://lore.kernel.org/r/179157746908.73485.2343672865542690797@pm.me
-[2] https://lore.kernel.org/r/179158127177.70185.5691100900886332545@pm.me
-[3] https://lore.kernel.org/r/179163141354.18006.80461347454353634@pm.me
-
- drivers/bluetooth/hci_qca.c | 5 +++++
- 1 file changed, 5 insertions(+)
+ drivers/bluetooth/hci_qca.c | 17 +++++++++++++++--
+ 1 file changed, 15 insertions(+), 2 deletions(-)
 
 diff --git a/drivers/bluetooth/hci_qca.c b/drivers/bluetooth/hci_qca.c
-index 7089e9b63..19a75faba 100644
+index da82156d40..6d937955ac 100644
 --- a/drivers/bluetooth/hci_qca.c
 +++ b/drivers/bluetooth/hci_qca.c
-@@ -2235,6 +2235,11 @@ static void qca_power_off(struct hci_uart *hu)
+@@ -2291,12 +2291,25 @@ static void qca_power_off(struct hci_uart *hu)
+ 	struct qca_power *power;
+ 
+ 	/* From this point we go into power off state. But serial port may
+-	 * still be open, stop queueing the IBS data and flush all the buffered
+-	 * data in skb's.
++	 * still be open, stop queueing the IBS data.
+ 	 */
  	spin_lock_irqsave(&qca->hci_ibs_lock, flags);
  	set_bit(QCA_IBS_DISABLED, &qca->flags);
++	spin_unlock_irqrestore(&qca->hci_ibs_lock, flags);
++
++	/* The controller loses the IBS state with its power and comes back
++	 * with both sides asleep, as qca_open() assumes. Stop the IBS work and
++	 * timers, drop what they queued and start over from there.
++	 */
++	cancel_work_sync(&qca->ws_awake_device);
++	cancel_work_sync(&qca->ws_awake_rx);
++	timer_delete_sync(&qca->wake_retrans_timer);
++	timer_delete_sync(&qca->tx_idle_timer);
++
++	spin_lock_irqsave(&qca->hci_ibs_lock, flags);
  	qca_flush(hu);
-+	/* A controller that loses power is asleep when it comes back. */
-+	timer_delete(&qca->wake_retrans_timer);
-+	timer_delete(&qca->tx_idle_timer);
 +	qca->tx_ibs_state = HCI_IBS_TX_ASLEEP;
 +	qca->rx_ibs_state = HCI_IBS_RX_ASLEEP;
  	spin_unlock_irqrestore(&qca->hci_ibs_lock, flags);
