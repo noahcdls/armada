@@ -354,3 +354,4 @@ v9_20260801_sachin_garg_media_iris_cache_work_mode_in_iris_set_stage.patch
 0799-serial-qcom-geni-Clear-pending-IRQs-while-suspended.patch
 0800-dt-bindings-clock-qcom-sm8450-videocc-Fix-clock-inpu.patch
 0801-arm64-dts-qcom-sm8750-Fix-videocc-clock-inputs.patch
+0802-wifi-ath12k-Fix-missing-station-power-save-configura.patch

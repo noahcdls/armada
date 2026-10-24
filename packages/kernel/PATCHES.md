@@ -1205,3 +1205,7 @@ no equivalent submission was found, or a permanent URL to the upstream submissio
   source: https://patchwork.kernel.org/project/linux-arm-msm/patch/20261017045817.1506961-4-shengchao.guo@oss.qualcomm.com/
   upstream: https://lore.kernel.org/r/20261017045817.1506961-4-shengchao.guo@oss.qualcomm.com
   notes: Posted, not yet merged (v3). Describes the controller's real inputs (XO, active-only XO, sleep clock); no functional change.
+- `patches/0802-wifi-ath12k-Fix-missing-station-power-save-configura.patch`
+  source: https://github.com/qualcomm-linux/kernel/commit/9ce0019b303715c1b8b5e37fcca18660da7f1325
+  upstream: https://lore.kernel.org/r/20250908015025.1301398-1-miaoqing.pan@oss.qualcomm.com
+  notes: Posted, not yet merged; carried in qcom-next. ath12k disables power save when it creates a station vdev and only re-enables it on BSS_CHANGED_PS, which it handled in the link callback while mac80211 reports it through vif_cfg_changed. Without this, the WCN7860 on the Odin 3 stays out of power save for the whole connection.
