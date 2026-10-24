@@ -1209,3 +1209,65 @@ no equivalent submission was found, or a permanent URL to the upstream submissio
   source: https://github.com/qualcomm-linux/kernel/commit/9ce0019b303715c1b8b5e37fcca18660da7f1325
   upstream: https://lore.kernel.org/r/20250908015025.1301398-1-miaoqing.pan@oss.qualcomm.com
   notes: Posted, not yet merged; carried in qcom-next. ath12k disables power save when it creates a station vdev and only re-enables it on BSS_CHANGED_PS, which it handled in the link callback while mac80211 reports it through vif_cfg_changed. Without this, the WCN7860 on the Odin 3 stays out of power save for the whole connection.
+- `patches/0803-PCI-pwrctrl-Only-destroy-devices-created-by-pwrctrl-.patch`
+  source: https://git.kernel.org/torvalds/c/7bf2ebcb7ca1e8814d3d0e35214a8e4b2193a619
+  upstream: https://git.kernel.org/torvalds/c/7bf2ebcb7ca1e8814d3d0e35214a8e4b2193a619
+- `patches/0804-PCI-pwrctrl-generic-Fix-leaking-array-from-of_regula.patch`
+  source: https://git.kernel.org/torvalds/c/ee450e3a2d334c7e6383d8a55ad2d53b3822bacc
+  upstream: https://git.kernel.org/torvalds/c/ee450e3a2d334c7e6383d8a55ad2d53b3822bacc
+- `patches/0805-PCI-qcom-Only-check-bridge-nodes-for-PERST-GPIOs.patch`
+  source: https://git.kernel.org/torvalds/c/1b3b0bc2b3672e928e06997444528f8797579eb2
+  upstream: https://git.kernel.org/torvalds/c/1b3b0bc2b3672e928e06997444528f8797579eb2
+- `patches/0806-firmware-qcom-tzmem-Use-DO_ONCE_SLEEPABLE-in-qcom_tz.patch`
+  source: https://git.kernel.org/torvalds/c/60d4a6edea9ec617725db6dd1e66d96a13bc8d0a
+  upstream: https://git.kernel.org/torvalds/c/60d4a6edea9ec617725db6dd1e66d96a13bc8d0a
+- `patches/0807-ASoC-qcom-q6apm-dai-wrap-the-position-of-a-full-ring.patch`
+  source: https://git.kernel.org/next/linux-next/c/0ea3e0b196f9dcc17b40ac881a6efef06459975b
+  upstream: https://patch.msgid.link/20261014162703.10172-2-tvlad744@gmail.com
+- `patches/0808-ASoC-qcom-q6apm-reset-the-hw-pointer-with-the-fragme.patch`
+  source: https://git.kernel.org/next/linux-next/c/0337b8129cf676b8eb767b2a1f312955760a5460
+  upstream: https://patch.msgid.link/20261014162703.10172-3-tvlad744@gmail.com
+- `patches/0809-ASoC-qcom-q6asm-dai-wrap-the-position-of-a-full-ring.patch`
+  source: https://git.kernel.org/next/linux-next/c/222d04cf55bc5b4b63602454014619c78deda89a
+  upstream: https://patch.msgid.link/20261014162703.10172-4-tvlad744@gmail.com
+- `patches/0810-ASoC-qcom-q6apm-Guard-callbacks-until-probe-data-is-.patch`
+  source: https://github.com/qualcomm-linux/kernel/commit/77fb4931c771292302a16655f5f93d33ae5ef5e8
+  upstream: https://lore.kernel.org/r/20261022144130.2443667-2-mohit.sharma@oss.qualcomm.com
+  notes: Posted, not yet merged; carried in qcom-next.
+- `patches/0811-soc-qcom-apr-Publish-GPR-callback-before-client-prob.patch`
+  source: https://github.com/qualcomm-linux/kernel/commit/4e0101dea22b76f128a939ea4f17c89565c5ebda
+  upstream: https://lore.kernel.org/r/20261022144130.2443667-3-mohit.sharma@oss.qualcomm.com
+  notes: Posted, not yet merged; carried in qcom-next.
+- `patches/0812-ASoC-codecs-wcd939x-read-the-SoundWire-port-switches.patch`
+  source: https://git.kernel.org/next/linux-next/c/e7860dc5d8d45f6a0e98bfe542c7b776c5ede2a4
+  upstream: https://patch.msgid.link/20261007123954.1709-1-26rote@gmail.com
+  notes: Rebased onto 0073, which remaps the HPH switches onto the HIFI_PCM port in HPH PCM mode: the channel mask is taken from the remapped channel.
+- `patches/0813-usb-typec-ucsi-Skip-CAM-query-when-partner-has-no-al.patch`
+  source: https://git.kernel.org/next/linux-next/c/7c590f0716ed3c9ae9809dbc6d488d76c19fdf52
+  upstream: https://patch.msgid.link/20260930234611.468765-2-cnfourt@gmail.com
+- `patches/0814-drm-msm-dp-wake-threaded-handler-for-HPD-IRQs.patch`
+  source: https://github.com/qualcomm-linux/kernel/commit/b09ba7ef33e7d0726065118997ce7d4db62b999e
+  upstream: https://lore.kernel.org/r/20260929-msm-dp-mst-v7-33-4b81473185e7@oss.qualcomm.com
+  notes: Posted as patch 33 of the DP MST series, not yet merged; carried in qcom-next. Stands alone.
+- `patches/0815-phy-qcom-qmp-combo-delay-Type-C-mux-switch-while-DP-.patch`
+  source: https://github.com/qualcomm-linux/kernel/commit/47ac5dcc84f730a0c6fc314956d2709748030ccf
+  upstream: https://lore.kernel.org/r/20260824-qcom-dp-typec-reconnect-fixes-v1-1-2825e5bf8a96@oss.qualcomm.com
+  notes: Posted, not yet merged; carried in qcom-next.
+- `patches/0816-arm64-dts-qcom-sm8750-bind-traceNoC-on-the-platform-.patch`
+  source: https://github.com/qualcomm-linux/kernel/commit/6f7cb71984a572869d71be4baff76cdbfe8a07b2
+  upstream: https://lore.kernel.org/r/20260710-fix-tracenoc-probe-issue-v6-4-41eb36fef8d9@oss.qualcomm.com
+  notes: Posted, not yet merged; carried in qcom-next.
+- `patches/0817-arm64-dts-qcom-sm8250-Fix-PCIe-wake-GPIO-polarity.patch`
+  source: https://github.com/qualcomm-linux/kernel/commit/a44a69c59a22628efcfbc34b61f27881e0235945
+  upstream: https://lore.kernel.org/r/20260611-wake-v2-6-2744251b1181@oss.qualcomm.com
+  notes: Posted, not yet merged; carried in qcom-next.
+- `patches/0818-wifi-ath12k-fix-incorrect-channel-survey-index.patch`
+  source: https://github.com/qualcomm-linux/kernel/commit/193c7df72d5b3c784c5f664c75a38eedd020b331
+  upstream: https://lore.kernel.org/r/20260210024440.3422264-1-yingying.tang@oss.qualcomm.com
+  notes: Posted, not yet merged; carried in qcom-next.
+- `patches/0819-wifi-ath11k-fix-sporadic-WLAN-initialization-failure.patch`
+  source: https://git.kernel.org/torvalds/c/32ec8488d75d122768b1977501bcb5ec799230c4
+  upstream: https://git.kernel.org/torvalds/c/32ec8488d75d122768b1977501bcb5ec799230c4
+- `patches/0820-wifi-ath11k-unregister-PM-notifier-on-QMI-init-failu.patch`
+  source: https://git.kernel.org/torvalds/c/1d8e73163ef933624341075f576e2f36ef9133f7
+  upstream: https://git.kernel.org/torvalds/c/1d8e73163ef933624341075f576e2f36ef9133f7

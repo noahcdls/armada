@@ -1,0 +1,40 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Jie Gan <jie.gan@oss.qualcomm.com>
+Date: Fri, 10 Jul 2026 10:39:03 +0800
+Subject: [PATCH] arm64: dts: qcom: sm8750: bind traceNoC on the platform bus
+
+The traceNoC node used the "qcom,coresight-tnoc", "arm,primecell"
+compatible, which places the device on the AMBA bus. To bind an AMBA
+device, the bus reads the peripheral and component ID registers (PID/CID)
+at the top of the device's register block and matches them against the
+primecell ID. The traceNoC exposes the CID registers, but the Component ID
+value returned by the hardware is 0x00000000 instead of a valid AMBA
+Component ID, so the match never succeeds, the AMBA probe fails, and the
+device is left stuck in deferred probe indefinitely.
+
+Drop the "arm,primecell" entry and use the standalone "qcom,coresight-tnoc"
+compatible, which binds via the platform driver by compatible string and
+does not rely on the component ID register at all. This lets the device
+probe on hardware that does not return a valid CID, while remaining an
+Aggregator TNOC that retains ATID functionality.
+
+Link: https://lore.kernel.org/all/20260710-fix-tracenoc-probe-issue-v6-4-41eb36fef8d9@oss.qualcomm.com/
+Fixes: ebd1eb365cae ("arm64: qcom: dts: sm8750: add coresight nodes")
+Signed-off-by: Jie Gan <jie.gan@oss.qualcomm.com>
+---
+ arch/arm64/boot/dts/qcom/sm8750.dtsi | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/arch/arm64/boot/dts/qcom/sm8750.dtsi b/arch/arm64/boot/dts/qcom/sm8750.dtsi
+index 17c1b07ddf..3cde1dfdd7 100644
+--- a/arch/arm64/boot/dts/qcom/sm8750.dtsi
++++ b/arch/arm64/boot/dts/qcom/sm8750.dtsi
+@@ -5261,7 +5261,7 @@ tpdm_rdpm_cmb2_out: endpoint {
+ 		};
+ 
+ 		tn@109ab000 {
+-			compatible = "qcom,coresight-tnoc", "arm,primecell";
++			compatible = "qcom,coresight-tnoc";
+ 			reg = <0x0 0x109ab000 0x0 0x4200>;
+ 
+ 			clocks = <&aoss_qmp>;
