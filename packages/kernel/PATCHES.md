@@ -101,6 +101,9 @@ no equivalent submission was found, or a permanent URL to the upstream submissio
   source: https://github.com/portare-ch/portareos/blob/be06100b6d127692ed99401d23980fc04888ae01/projects/PortareOS/devices/SM8550/patches/linux/1098-drm-msm-dpu-send-the-flip-event-after-the-vblank-irq.patch
   upstream: unknown
   notes: Companion flip-event ordering fix for AVR; refreshed offsets for Armada and added the source link to the patch header. Armada restricts the kickoff-count wait to encoders that receive the vblank irq: a bonded DSI slave never does, so on dual-DSI panels (AYANEO Pocket S 2K) every commit hit the 50 ms timeout.
+- `patches/0109-drm-panel-il97680a-defer-display-enable.patch`
+  source: armada
+  upstream: local
 - `patches/0062-gpu-drm-panel-add-wt0630-panel.patch`
   source: https://github.com/ROCKNIX/distribution/blob/bcf3b5bc574990b96543484575b06f912153a715/projects/ROCKNIX/devices/SM8550/patches/linux/0062-gpu-drm-panel-add-wt0630-panel.patch
   upstream: https://lore.kernel.org/r/20260625-topic-sm8650-ayaneo-pocket-s2-r63419-v8-2-8570e692143e@linaro.org
@@ -484,6 +487,10 @@ no equivalent submission was found, or a permanent URL to the upstream submissio
 - `patches/0904-power-supply-qcom-battmgr-report-charge-threshold-set-failures.patch`
   source: armada
   upstream: local
+- `patches/0910-firmware-qcom-scm-allow-QSEECOM-on-OpenABL-s-platforms.patch`
+  source: https://github.com/OpenHandheldCollective/OpenABL/blob/8f09253f8f93e7d9ff0b5baf3bda87976f0c54ac/Linux/0001-firmware-qcom-scm-allow-QSEECOM-on-OpenABL-s-platforms.patch
+  upstream: unknown
+  notes: Upstream tested it on SM6115 only. Armada needs it for SM8250, SM8550, SM8650 and SM8750, where OpenABL keeps its settings in UEFI variables.
 - `patches/0001-pcie-update-sm8650-dtsi.patch`
   source: https://github.com/ROCKNIX/distribution/blob/bcf3b5bc574990b96543484575b06f912153a715/projects/ROCKNIX/devices/SM8650/patches/linux/0001-pcie-update-sm8650-dtsi.patch
   upstream: https://lore.kernel.org/r/20260611-wake-v2-35-2744251b1181@oss.qualcomm.com
@@ -678,6 +685,10 @@ no equivalent submission was found, or a permanent URL to the upstream submissio
 - `patches/0073-ASoC-wcd939x-add-HPH-PCM-HiFi-mode.patch`
   source: https://github.com/ROCKNIX/distribution/blob/bcf3b5bc574990b96543484575b06f912153a715/projects/ROCKNIX/devices/SM8750/patches/linux/0073-ASoC-wcd939x-add-HPH-PCM-HiFi-mode.patch
   upstream: unknown
+  notes: Armada keeps the HPH PCM remap off the TX device, whose channel ids overlap the HPH ones, and writes the crosstalk coefficients before the compander-off return.
+- `patches/0081-ASoC-wcd939x-fix-headphone-analog-volume-controls.patch`
+  source: armada
+  upstream: local
 - `patches/0074-soundwire-qcom-PCM-data-port-format-enable.patch`
   source: https://github.com/ROCKNIX/distribution/blob/bcf3b5bc574990b96543484575b06f912153a715/projects/ROCKNIX/devices/SM8750/patches/linux/0074-soundwire-qcom-PCM-data-port-format-enable.patch
   upstream: unknown
@@ -813,7 +824,7 @@ no equivalent submission was found, or a permanent URL to the upstream submissio
   notes: Armada extracted this DTS from the cited ROCKNIX patch and then applied later ROCKNIX DTS updates.
 - `dts/cq8725s-ayn-odin3.dts.patch`
   source: armada
-  notes: Armada enables DPU dithering and codec-rail LPM sleep states after copying `dts/cq8725s-ayn-odin3.dts`.
+  notes: Armada enables DPU dithering, codec-rail LPM sleep states, the PM8550 RGB charge LED and the WCD DMIC internal mic route after copying `dts/cq8725s-ayn-odin3.dts`.
 - `dts/cq8725s-ayn-common.dtsi.patch`
   source: armada
   notes: Armada keeps volume-up from waking the system, marks Odin 3's RSInput node as connected to the Qualcomm haptics device, supplies the device's 1024 range, marks PCIe WAKE# active-low, and keeps the four switched WCN7860 PMU supply rails always-on because re-enabling them at resume can hang the SoC. The 70-count `axis-deadzone` (an unmeasured ROCKNIX bring-up value) was dropped; like the RP6 and every other RSInput device the Odin 3 now passes its stick value through, leaving deadzone policy to Steam Input and the game.
@@ -877,6 +888,9 @@ no equivalent submission was found, or a permanent URL to the upstream submissio
   source: armada
   upstream: local
   notes: The macros stay runtime-active through s2idle while SoundWire is held; force-suspend so the ADSP (the "AUDIO" CXPC voter) can release LPASS.
+- `patches/0080-ASoC-codecs-lpass-tx-macro-track-every-active-decimator.patch`
+  source: armada
+  upstream: local
 - `patches/0564-soundwire-qcom-force-runtime-suspend-across-system-sleep.patch`
   source: armada
   upstream: local

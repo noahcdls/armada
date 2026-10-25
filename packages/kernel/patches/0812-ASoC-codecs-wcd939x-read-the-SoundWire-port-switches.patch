@@ -31,7 +31,7 @@ Signed-off-by: Mark Brown <broonie@kernel.org>
  2 files changed, 9 insertions(+), 4 deletions(-)
 
 diff --git a/sound/soc/codecs/wcd939x.c b/sound/soc/codecs/wcd939x.c
-index 44f1fa7078..2d0b09bc46 100644
+index 391f2025bb..5ddccef5dc 100644
 --- a/sound/soc/codecs/wcd939x.c
 +++ b/sound/soc/codecs/wcd939x.c
 @@ -2044,6 +2044,7 @@ static int wcd939x_get_swr_port(struct snd_kcontrol *kcontrol,
@@ -41,7 +41,7 @@ index 44f1fa7078..2d0b09bc46 100644
 +	u8 ch_mask;
  
  	/* in HPH PCM mode the HPH stream rides the HIFI_PCM port */
- 	if (wcd939x->hph_pcm_enabled) {
+ 	if (wcd939x->hph_pcm_enabled && !wcd->is_tx) {
 @@ -2053,8 +2054,9 @@ static int wcd939x_get_swr_port(struct snd_kcontrol *kcontrol,
  			ch_id = WCD939X_HIFI_PCM_R;
  	}
@@ -61,7 +61,7 @@ index 44f1fa7078..2d0b09bc46 100644
 +	bool enable = !!ucontrol->value.integer.value[0];
  
  	/* in HPH PCM mode the HPH stream rides the HIFI_PCM port */
- 	if (wcd939x->hph_pcm_enabled) {
+ 	if (wcd939x->hph_pcm_enabled && !wcd->is_tx) {
 @@ -2090,10 +2094,12 @@ static int wcd939x_set_swr_port(struct snd_kcontrol *kcontrol,
  			ch_id = WCD939X_HIFI_PCM_R;
  	}
