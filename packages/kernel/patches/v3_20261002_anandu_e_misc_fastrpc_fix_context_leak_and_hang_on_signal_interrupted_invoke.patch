@@ -77,28 +77,31 @@ Signed-off-by: Anandu Krishnan E <anandu.e@oss.qualcomm.com>
 
 --- a/drivers/misc/fastrpc.c
 +++ b/drivers/misc/fastrpc.c
-@@ -233,9 +233,12 @@
+@@ -263,12 +263,15 @@
  	int pid;
  	int client_id;
  	u32 sc;
 +	u32 handle;
+ 	u64 *fdlist;
  	u32 *crc;
+ 	/* Poll memory that DSP updates */
+ 	u32 *poll_addr;
  	u64 ctxid;
  	u64 msg_sz;
 +	/* set once put_work has been scheduled; xchg() so the IRQ callback takes no lock */
 +	bool put_work_scheduled;
- 	struct kref refcount;
- 	struct list_head node; /* list of ctxs */
- 	struct completion work;
-@@ -280,7 +283,6 @@
+ 	/* work done status flag */
+ 	bool is_work_done;
+ 	/* process updates poll memory instead of glink response */
+@@ -318,7 +321,6 @@
  	struct fastrpc_device *secure_fdevice;
  	struct fastrpc_device *fdevice;
  	struct fastrpc_buf *remote_heap;
 -	struct list_head invoke_interrupted_mmaps;
  	bool secure;
  	bool unsigned_support;
- 	u64 dma_mask;
-@@ -297,6 +299,7 @@
+ 	bool poll_mode_supported;
+@@ -338,6 +340,7 @@
  	struct list_head user;
  	struct list_head maps;
  	struct list_head pending;
@@ -106,8 +109,8 @@ Signed-off-by: Anandu Krishnan E <anandu.e@oss.qualcomm.com>
  	struct list_head mmaps;
  
  	struct fastrpc_channel_ctx *cctx;
-@@ -519,7 +522,12 @@
- 		fastrpc_buf_free(fl->init_mem);
+@@ -564,7 +567,12 @@
+ 	fastrpc_buf_free(fl->init_mem);
  
  	list_for_each_entry_safe(ctx, n, &fl->pending, node) {
 -		list_del(&ctx->node);
@@ -120,7 +123,7 @@ Signed-off-by: Anandu Krishnan E <anandu.e@oss.qualcomm.com>
  		fastrpc_context_put(ctx);
  	}
  
-@@ -558,6 +566,11 @@
+@@ -603,6 +611,11 @@
  	cctx = ctx->cctx;
  	fl = ctx->fl;
  
@@ -132,7 +135,7 @@ Signed-off-by: Anandu Krishnan E <anandu.e@oss.qualcomm.com>
  	for (i = 0; i < ctx->nbufs; i++)
  		fastrpc_map_put(ctx->maps[i]);
  
-@@ -570,6 +583,7 @@
+@@ -614,6 +627,7 @@
  
  	kfree(ctx->maps);
  	kfree(ctx->olaps);
@@ -140,7 +143,7 @@ Signed-off-by: Anandu Krishnan E <anandu.e@oss.qualcomm.com>
  	kfree(ctx);
  
  	/* Release the reference taken in fastrpc_context_alloc() */
-@@ -595,6 +609,43 @@
+@@ -639,6 +653,43 @@
  	fastrpc_context_put(ctx);
  }
  
@@ -184,7 +187,7 @@ Signed-off-by: Anandu Krishnan E <anandu.e@oss.qualcomm.com>
  #define CMP(aa, bb) ((aa) == (bb) ? 0 : (aa) < (bb) ? -1 : 1)
  static int olaps_cmp(const void *a, const void *b)
  {
-@@ -675,7 +726,15 @@
+@@ -719,7 +770,15 @@
  			kfree(ctx);
  			return ERR_PTR(-ENOMEM);
  		}
@@ -201,7 +204,7 @@ Signed-off-by: Anandu Krishnan E <anandu.e@oss.qualcomm.com>
  		fastrpc_get_buff_overlaps(ctx);
  	}
  
-@@ -717,6 +776,7 @@
+@@ -763,6 +822,7 @@
  	fastrpc_channel_ctx_put(cctx);
  	kfree(ctx->maps);
  	kfree(ctx->olaps);
@@ -209,7 +212,7 @@ Signed-off-by: Anandu Krishnan E <anandu.e@oss.qualcomm.com>
  	kfree(ctx);
  
  	return ERR_PTR(ret);
-@@ -1244,8 +1304,7 @@
+@@ -1353,8 +1413,7 @@
  				   struct fastrpc_invoke_args *args)
  {
  	struct fastrpc_invoke_ctx *ctx = NULL;
@@ -219,7 +222,7 @@ Signed-off-by: Anandu Krishnan E <anandu.e@oss.qualcomm.com>
  	int err = 0;
  
  	if (!fl->sctx)
-@@ -1259,9 +1318,21 @@
+@@ -1368,9 +1427,21 @@
  		return -EPERM;
  	}
  
@@ -244,29 +247,15 @@ Signed-off-by: Anandu Krishnan E <anandu.e@oss.qualcomm.com>
  
  	err = fastrpc_get_args(kernel, ctx);
  	if (err)
-@@ -1274,11 +1345,20 @@
- 	if (err)
- 		goto bail;
+@@ -1390,6 +1461,7 @@
+ 	if (handle > FASTRPC_MAX_STATIC_HANDLE && fl->pd == USER_PD && fl->poll_mode)
+ 		ctx->is_polled = true;
  
 +wait:
- 	if (kernel) {
--		if (!wait_for_completion_timeout(&ctx->work, 10 * HZ))
-+		if (!wait_for_completion_timeout(&ctx->work, 10 * HZ)) {
- 			err = -ETIMEDOUT;
-+			dev_warn(ctx->fl->sctx->dev,
-+				 "fastrpc_invoke: TIMEOUT ctxid=0x%llx handle=0x%x nscalars=%d\n",
-+				 ctx->ctxid, ctx->handle, ctx->nscalars);
-+		}
- 	} else {
- 		err = wait_for_completion_interruptible(&ctx->work);
-+		if (err == -ERESTARTSYS)
-+			dev_warn(ctx->fl->sctx->dev,
-+				 "fastrpc_invoke: INTERRUPTED ctxid=0x%llx handle=0x%x nscalars=%d\n",
-+				 ctx->ctxid, ctx->handle, ctx->nscalars);
- 	}
- 
+ 	err = fastrpc_wait_for_completion(ctx, kernel);
  	if (err)
-@@ -1297,21 +1377,13 @@
+ 		goto bail;
+@@ -1407,21 +1479,13 @@
  		goto bail;
  
  bail:
@@ -292,7 +281,7 @@ Signed-off-by: Anandu Krishnan E <anandu.e@oss.qualcomm.com>
  	}
  
  	if (err)
-@@ -1628,6 +1700,7 @@
+@@ -1738,6 +1802,7 @@
  {
  	struct fastrpc_user *fl = (struct fastrpc_user *)file->private_data;
  	struct fastrpc_channel_ctx *cctx = fl->cctx;
@@ -300,7 +289,7 @@ Signed-off-by: Anandu Krishnan E <anandu.e@oss.qualcomm.com>
  	unsigned long flags;
  
  	fastrpc_release_current_dsp_process(fl);
-@@ -1636,6 +1709,18 @@
+@@ -1746,6 +1811,18 @@
  	list_del(&fl->user);
  	spin_unlock_irqrestore(&cctx->lock, flags);
  
@@ -319,7 +308,7 @@ Signed-off-by: Anandu Krishnan E <anandu.e@oss.qualcomm.com>
  	fastrpc_session_free(cctx, fl->sctx);
  	file->private_data = NULL;
  	/* Release the reference taken in fastrpc_device_open */
-@@ -1665,6 +1750,7 @@
+@@ -1775,6 +1852,7 @@
  	spin_lock_init(&fl->lock);
  	mutex_init(&fl->mutex);
  	INIT_LIST_HEAD(&fl->pending);
@@ -327,7 +316,7 @@ Signed-off-by: Anandu Krishnan E <anandu.e@oss.qualcomm.com>
  	INIT_LIST_HEAD(&fl->maps);
  	INIT_LIST_HEAD(&fl->mmaps);
  	INIT_LIST_HEAD(&fl->user);
-@@ -1770,6 +1856,7 @@
+@@ -1880,6 +1958,7 @@
  	}
  
  	err = fastrpc_internal_invoke(fl, false, inv.handle, inv.sc, args);
@@ -335,7 +324,7 @@ Signed-off-by: Anandu Krishnan E <anandu.e@oss.qualcomm.com>
  	kfree(args);
  
  	return err;
-@@ -2465,7 +2552,6 @@
+@@ -2635,7 +2714,6 @@
  	rdev->dma_mask = &data->dma_mask;
  	dma_set_mask_and_coherent(rdev, DMA_BIT_MASK(32));
  	INIT_LIST_HEAD(&data->users);
@@ -343,7 +332,7 @@ Signed-off-by: Anandu Krishnan E <anandu.e@oss.qualcomm.com>
  	spin_lock_init(&data->lock);
  	idr_init(&data->ctx_idr);
  	data->domain_id = domain_id;
-@@ -2498,13 +2584,19 @@
+@@ -2668,13 +2746,19 @@
  		ctx->retval = -EPIPE;
  		complete(&ctx->work);
  	}
@@ -364,7 +353,7 @@ Signed-off-by: Anandu Krishnan E <anandu.e@oss.qualcomm.com>
  	struct fastrpc_user *user;
  	unsigned long flags;
  
-@@ -2521,9 +2613,6 @@
+@@ -2691,9 +2775,6 @@
  	if (cctx->secure_fdevice)
  		misc_deregister(&cctx->secure_fdevice->miscdev);
  
@@ -374,7 +363,7 @@ Signed-off-by: Anandu Krishnan E <anandu.e@oss.qualcomm.com>
  	if (cctx->remote_heap)
  		fastrpc_buf_free(cctx->remote_heap);
  
-@@ -2564,9 +2653,11 @@
+@@ -2760,9 +2841,11 @@
  	/*
  	 * The DMA buffer associated with the context cannot be freed in
  	 * interrupt context so schedule it through a worker thread to
