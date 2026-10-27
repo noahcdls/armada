@@ -16,11 +16,9 @@ value when the B3 write fails, and report the error.
  .../gpu/drm/panel/panel-chipone-icna35xx.c    | 35 ++++++++++++++++---
  1 file changed, 30 insertions(+), 5 deletions(-)
 
-diff --git a/drivers/gpu/drm/panel/panel-chipone-icna35xx.c b/drivers/gpu/drm/panel/panel-chipone-icna35xx.c
-index 95e55f4..dd18c57 100644
 --- a/drivers/gpu/drm/panel/panel-chipone-icna35xx.c
 +++ b/drivers/gpu/drm/panel/panel-chipone-icna35xx.c
-@@ -34,6 +34,8 @@ struct panel_info {
+@@ -35,6 +35,8 @@
  	struct regulator_bulk_data *supplies;
  	struct backlight_device *backlight;
  	struct drm_panel_bl_levels bl_levels;
@@ -29,7 +27,7 @@ index 95e55f4..dd18c57 100644
  	bool enabled;
  
  	int vrefresh;
-@@ -250,7 +252,8 @@ static int icna3520_init_sequence(struct panel_info *pinfo)
+@@ -251,7 +253,8 @@
  	mipi_dsi_msleep(&dsi_ctx, 120);
  
  	pinfo->vrefresh = cur_vrefresh;
@@ -39,7 +37,7 @@ index 95e55f4..dd18c57 100644
  
  	mipi_dsi_generic_write_seq_multi(&dsi_ctx, 0x9F, 0x01);
  	mipi_dsi_generic_write_seq_multi(&dsi_ctx, 0xB2, 0x00);
-@@ -610,7 +613,9 @@ static int icna35xx_disable(struct drm_panel *panel)
+@@ -611,7 +614,9 @@
  	struct panel_info *pinfo = to_panel_info(panel);
  	struct mipi_dsi_multi_context dsi_ctx = { .dsi = pinfo->dsi };
  
@@ -49,7 +47,7 @@ index 95e55f4..dd18c57 100644
  
  	pinfo->dsi->mode_flags &= ~MIPI_DSI_MODE_LPM;
  
-@@ -688,7 +693,9 @@ static int icna35xx_enable(struct drm_panel *panel)
+@@ -689,7 +694,9 @@
  {
  	struct panel_info *pinfo = to_panel_info(panel);
  
@@ -59,7 +57,7 @@ index 95e55f4..dd18c57 100644
  
  	return 0;
  }
-@@ -717,6 +724,8 @@ static int icna35xx_bl_update_status(struct backlight_device *bl)
+@@ -718,6 +725,8 @@
  	 * is cached by the backlight core and re-applied from init_sequence()
  	 * on every prepare(), so skipping the write while disabled is safe.
  	 */
@@ -68,7 +66,7 @@ index 95e55f4..dd18c57 100644
  	if (!pinfo->enabled)
  		return 0;
  
-@@ -761,7 +770,7 @@ static ssize_t icna3520_frame_len_store(struct device *dev, u16 *frame_len,
+@@ -762,7 +771,7 @@
  {
  	struct panel_info *pinfo = dev_get_drvdata(dev);
  	struct mipi_dsi_multi_context dsi_ctx = { .dsi = pinfo->dsi };
@@ -77,7 +75,7 @@ index 95e55f4..dd18c57 100644
  	int ret;
  
  	ret = kstrtou16(buf, 0, &val);
-@@ -771,6 +780,9 @@ static ssize_t icna3520_frame_len_store(struct device *dev, u16 *frame_len,
+@@ -772,6 +781,9 @@
  	if (val < min || val > max)
  		return -EINVAL;
  
@@ -87,7 +85,7 @@ index 95e55f4..dd18c57 100644
  	*frame_len = val;
  
  	if (!pinfo->enabled || pinfo->vrefresh != vrefresh)
-@@ -778,13 +790,18 @@ static ssize_t icna3520_frame_len_store(struct device *dev, u16 *frame_len,
+@@ -779,13 +791,18 @@
  
  	pinfo->dsi->mode_flags &= ~MIPI_DSI_MODE_LPM;
  	icna3520_set_frame_len(&dsi_ctx, pinfo);
@@ -109,7 +107,7 @@ index 95e55f4..dd18c57 100644
  }
  
  static ssize_t frame_len_120_show(struct device *dev,
-@@ -792,6 +809,8 @@ static ssize_t frame_len_120_show(struct device *dev,
+@@ -793,6 +810,8 @@
  {
  	struct panel_info *pinfo = dev_get_drvdata(dev);
  
@@ -118,7 +116,7 @@ index 95e55f4..dd18c57 100644
  	return sysfs_emit(buf, "%u\n", pinfo->frame_len_120);
  }
  
-@@ -811,6 +830,8 @@ static ssize_t frame_len_60_show(struct device *dev,
+@@ -812,6 +831,8 @@
  {
  	struct panel_info *pinfo = dev_get_drvdata(dev);
  
@@ -127,7 +125,7 @@ index 95e55f4..dd18c57 100644
  	return sysfs_emit(buf, "%u\n", pinfo->frame_len_60);
  }
  
-@@ -847,6 +868,10 @@ static int icna35xx_probe(struct mipi_dsi_device *dsi)
+@@ -848,6 +869,10 @@
  	if (IS_ERR(pinfo))
  		return PTR_ERR(pinfo);
  
