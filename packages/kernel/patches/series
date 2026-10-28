@@ -36,7 +36,6 @@
 0104a-drm-panel-visionox-vtdr6130-add-sm8250.patch
 0105-dt-bindings-display-panel-retroid-il97680a.patch
 0105a-drm-panel-retroid-il97680a.patch
-0105b-drm-panel-il97680a-backport-orientation-helper.patch
 0108-drm-msm-dpu-send-the-flip-event-after-the-vblank-irq.patch
 0064_Mangmi-Air-Y-Pro-panel.patch
 

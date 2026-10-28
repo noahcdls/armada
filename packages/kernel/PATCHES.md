@@ -110,10 +110,6 @@ no equivalent submission was found, or a permanent URL to the upstream submissio
 - `patches/0105a-drm-panel-retroid-il97680a.patch`
   source: https://github.com/JPyke3/linux/commit/c102403bfcfe545d34e7124630f60e56d090753b
   upstream: not submitted
-- `patches/0105b-drm-panel-il97680a-backport-orientation-helper.patch`
-  source: armada
-  upstream: not applicable
-  notes: Only renames drm_of_get_panel_orientation() to of_drm_get_panel_orientation() for Linux 7.2.6. Drop when the base kernel provides the new name.
 - `patches/0108-drm-msm-dpu-send-the-flip-event-after-the-vblank-irq.patch`
   source: https://github.com/portare-ch/portareos/blob/be06100b6d127692ed99401d23980fc04888ae01/projects/PortareOS/devices/SM8550/patches/linux/1098-drm-msm-dpu-send-the-flip-event-after-the-vblank-irq.patch
   upstream: unknown
