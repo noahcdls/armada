@@ -30,4 +30,3 @@ index 4c042133261c..1997bf46aef1 100644
  			.gbif_cx = a640_gbif,
  			.gmu_chipid = 0x7020100,
  			.gmu_cgc_mode = 0x00020202,
-    
