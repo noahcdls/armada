@@ -1578,3 +1578,124 @@ no equivalent submission was found, or a permanent URL to the upstream submissio
   source: armada
   upstream: local
   notes: Add configurable ADC references and share reset and supply sequencing between probe and resume; existing board defaults are retained.
+- `patches/0821-mailbox-qcom-ipcc-Remove-redundant-mbox_controller_u.patch`
+  source: https://git.kernel.org/torvalds/c/da988ac6afe152f802140ccaa0ad5e8f675b8814
+  upstream: unknown
+- `patches/0822-mailbox-qcom-ipcc-Guard-against-NULL-con_priv-in-sen.patch`
+  source: https://git.kernel.org/torvalds/c/7b3cc361b5942ac600f38e5dff7aed009be34964
+  upstream: unknown
+  notes: Include context refreshed for 0504's changes to the headers of qcom-ipcc.c; the fix itself is unchanged.
+- `patches/0823-mailbox-qcom-ipcc-remove-stray-disable_irq_wake-call.patch`
+  source: https://git.kernel.org/torvalds/c/134ef0278d4e48bcc325a7699250dfe861c11953
+  upstream: unknown
+- `patches/0824-arm64-dts-qcom-eliza-Connect-USB3-PHY-pipe-clock-to-.patch`
+  source: https://git.kernel.org/torvalds/c/1c34e5dd83217f8952c8d96f9851981999acc8b7
+  upstream: https://lore.kernel.org/r/20260826-dts-qcom-eliza-add-missing-usb-dp-phy-clk-to-gcc-v2-1-bf6746a849ba@oss.qualcomm.com
+- `patches/0825-soc-qcom-smem-fix-32-bit-overflow-in-DDR-frequency-c.patch`
+  source: https://git.kernel.org/torvalds/c/7bb5f186784074f2a91d83e191e305238be47103
+  upstream: https://lore.kernel.org/r/20260827-glymur_dramc-v1-1-eba358d504b8@oss.qualcomm.com
+- `patches/0826-soc-qcom-smem-Fix-byte-order-in-v3-14-frequency-pars.patch`
+  source: https://git.kernel.org/torvalds/c/9f3136c0c5bcb26d5c864f8a5658c1a6f449d351
+  upstream: https://lore.kernel.org/r/20260827020447.2642830-1-lilinmao@kylinos.cn
+- `patches/0827-soc-qcom-smem-Fix-signedness-bug-in-smem_dram_parse.patch`
+  source: https://git.kernel.org/torvalds/c/f3c95a76d2ee9c17034e9d96917b37d194dd9f91
+  upstream: https://lore.kernel.org/r/an1toQ-acGR0kOWj@stanley.mountain
+- `patches/0828-soc-qcom-apr-clean-up-failed-service-registrations.patch`
+  source: https://git.kernel.org/torvalds/c/bb5c846a74ca119679fdc3241888a3de179d02c2
+  upstream: https://lore.kernel.org/r/20260806060541.820-1-getshell@seu.edu.cn
+- `patches/0829-soc-qcom-pmic_pdcharger_ulog-prevent-work-requeue-du.patch`
+  source: https://git.kernel.org/torvalds/c/66894a1c51366cc2d5c498178105dfe3bcccc1e4
+  upstream: https://patch.msgid.link/20260912161210.1683266-1-lhfff@tju.edu.cn
+- `patches/0830-wifi-ath11k-Fix-possible-memory-leak-in-ath11k_dp_sr.patch`
+  source: https://git.kernel.org/torvalds/c/6132d70d0890c03546f6970893fd71938efb2a2f
+  upstream: https://patch.msgid.link/20260801114911.91483-1-nihaal@cse.iitm.ac.in
+- `patches/0831-wifi-ath11k-disable-interrupts-during-firmware-crash.patch`
+  source: https://git.kernel.org/torvalds/c/f7a74e131d3f0de04335dbe278bfb82bdafcdb3e
+  upstream: https://patch.msgid.link/20260726221908.104873-3-julius@bairaktaris.de
+- `patches/0832-wifi-ath11k-modify-null-check-logic-in-ath11k_ce_rx_.patch`
+  source: https://git.kernel.org/torvalds/c/52953d149ab4da0432d54b09f3c8add42b4d4a82
+  upstream: https://patch.msgid.link/20240909150824.28195-1-m.lobanov@rosalinux.ru
+- `patches/0833-wifi-ath11k-fix-locking-problem-in-ath11k_dp_rx_tid_.patch`
+  source: https://git.kernel.org/torvalds/c/c7555d47b1d051e0406474349deccf74b491ae01
+  upstream: https://patch.msgid.link/20260813-ath11k-locking-v2-1-f4113a0bd0f4@gmail.com
+- `patches/0834-wifi-ath11k-fix-reg_info_store-leak-in-ath11k_servic.patch`
+  source: https://git.kernel.org/torvalds/c/64828f091c7de5c1324427b140fb545f93ef073f
+  upstream: https://patch.msgid.link/20260817-reg_info_store-leak-v1-1-77025a99b074@oss.qualcomm.com
+- `patches/0835-wifi-ath11k-fix-unbalanced-IRQ-enable-disable-during.patch`
+  source: https://git.kernel.org/torvalds/c/e56c9d429ba004d5416b03091fd7656187cdcaf1
+  upstream: https://patch.msgid.link/20260928-ath11k-unbalanced-irq-enable-disable-v1-1-75166f534763@oss.qualcomm.com
+- `patches/0836-wifi-ath11k-avoid-IDR-mutation-during-pending-mgmt-T.patch`
+  source: https://git.kernel.org/torvalds/c/3e7f5d362b2b3a21b3adb4b860aad14b69a896ad
+  upstream: https://patch.msgid.link/20261003092104.520135-3-yaojiale02@163.com
+- `patches/0837-wifi-ath11k-avoid-IDR-mutation-during-vif-mgmt-TX-cl.patch`
+  source: https://git.kernel.org/torvalds/c/dc29226dada34a6d19af77b4b51e90f8a3a8de34
+  upstream: https://patch.msgid.link/20261003092104.520135-4-yaojiale02@163.com
+- `patches/0838-drm-msm-Properly-handle-msm_ioremap-without-name.patch`
+  source: https://git.kernel.org/torvalds/c/14fe0ea79e0e25efc603f6f4bc81cb5b813f0e69
+  upstream: https://lore.kernel.org/r/20260911-drm-msm-hdmi-fixes-before-eliza-v4-5-87bdb9f1987f@oss.qualcomm.com
+- `patches/0839-drm-msm-dsi-Fix-VM-leak-in-dsi_tx_buf_alloc_6g.patch`
+  source: https://git.kernel.org/torvalds/c/ab91ba61871a896ca2ecc6e048d80a152136da44
+  upstream: https://lore.kernel.org/r/20260916175738.2089950-1-vulab@iscas.ac.cn
+- `patches/0840-drm-msm-dp-Initialize-the-debugfs-connector-pointer.patch`
+  source: https://git.kernel.org/torvalds/c/c2f772ec52898a3f6967d17035da7b739465f81c
+  upstream: https://lore.kernel.org/r/20260930-msm-dp-hdr10-v1-11-dbbf8b2b42bc@radxa.com
+- `patches/0841-drm-msm-dp-don-t-report-link-training-success-after-.patch`
+  source: https://git.kernel.org/torvalds/c/a47987366e7fc2c05aeffc97f8e1f776e583f792
+  upstream: https://lore.kernel.org/r/20260925125314.16563-1-okerixx@gmail.com
+- `patches/0842-spmi-pmic-arb-return-0-in-spmi_pmic_arb_register_bus.patch`
+  source: https://git.kernel.org/torvalds/c/82f4c1948a4f951d7d501757a31c6a10eccd37ae
+  upstream: unknown
+- `patches/0843-spmi-Fix-potential-use-after-free-by-grabbing-of_nod.patch`
+  source: https://git.kernel.org/torvalds/c/f7aa9de4f2b197cdd704cdc476901b68ee128433
+  upstream: unknown
+- `patches/0844-ASoC-qcom-q6apm-clear-g_apm-on-driver-removal.patch`
+  source: https://git.kernel.org/torvalds/c/be2172758f2b7c801ae80b9c8d1510b31eeffdaa
+  upstream: https://patch.msgid.link/20260923-vmid-v4-v6-1-3d61a0319b1c@oss.qualcomm.com
+- `patches/0845-media-iris-Fix-bus_info-prefix-in-VIDIOC_QUERYCAP.patch`
+  source: https://git.kernel.org/torvalds/c/1facae9bc3c1cfcabc77184754d64c349831cbc5
+  upstream: unknown
+- `patches/0846-media-iris-Fix-frame-interval-enumeration-for-non-di.patch`
+  source: https://git.kernel.org/torvalds/c/3ad393b701dd99274f09403185f71ec7a93135bd
+  upstream: unknown
+- `patches/0847-Revert-media-iris-Add-Gen2-firmware-autodetect-and-f.patch`
+  source: https://git.kernel.org/torvalds/c/6f4eb91fa27644ed57cbb43fa44ce8eea02bce0c
+  upstream: unknown
+- `patches/0848-media-iris-Add-Gen2-firmware-autodetect-and-fallback.patch`
+  source: https://git.kernel.org/torvalds/c/a9ff6152780577176fa00fcfa3480e73285099e3
+  upstream: unknown
+- `patches/0849-ASoC-qcom-qdsp6-q6afe-fix-clk-vote-response-type-mis.patch`
+  source: https://git.kernel.org/torvalds/c/f3c7bee984aa0ba2b48a44e16a6f3ec2c27f851e
+  upstream: https://lore.kernel.org/all/5976946.DvuYhMxLoT@antlia/
+- `patches/0850-ASoC-qcom-q6apm-Fix-unmap-regions-response-handling.patch`
+  source: https://git.kernel.org/torvalds/c/4b832a2af523cbf857a977414c0f07d7f90a4c9d
+  upstream: https://patch.msgid.link/20261021041044.2080369-2-shengchao.guo@oss.qualcomm.com
+- `patches/0851-ASoC-qcom-q6apm-Clear-the-right-handle-on-pos-buffer.patch`
+  source: https://git.kernel.org/torvalds/c/43c69604271d8b54c494fde70bd4a9eaab7a974d
+  upstream: https://patch.msgid.link/20261021041044.2080369-3-shengchao.guo@oss.qualcomm.com
+- `patches/0852-ASoC-qcom-q6apm-Unmap-DSP-buffers-before-removing-th.patch`
+  source: https://git.kernel.org/torvalds/c/a51c5dd7f7fc7cdf4ae28fec4a013d8418d1cb53
+  upstream: https://patch.msgid.link/20261021041044.2080369-4-shengchao.guo@oss.qualcomm.com
+- `patches/0853-ASoC-qcom-audioreach-fix-module-cfg-blob-size-handli.patch`
+  source: https://git.kernel.org/torvalds/c/e21fb64a8c4aecae31ec63f994423ac944705c3e
+  upstream: https://patch.msgid.link/20261023171316.819857-2-srinivas.kandagatla@oss.qualcomm.com
+- `patches/0854-ASoC-codecs-wsa884x-Accept-temperatures-across-the-f.patch`
+  source: https://git.kernel.org/torvalds/c/00535515e3c14fbee20de4a1aa61cfb3390f0f50
+  upstream: https://patch.msgid.link/20261023171316.819857-3-srinivas.kandagatla@oss.qualcomm.com
+- `patches/0855-ASoC-codecs-wsa884x-disable-runtime-PM-on-unbind.patch`
+  source: https://git.kernel.org/torvalds/c/54c121eaeed8ee7751935db8100b6b5c57124db9
+  upstream: https://patch.msgid.link/20261023171316.819857-5-srinivas.kandagatla@oss.qualcomm.com
+- `patches/0856-ASoC-codecs-wsa884x-Fix-VI-sense-port-channel-count.patch`
+  source: https://git.kernel.org/torvalds/c/a6093f98cbfc4a717ef3d1048b0e38fb2035be98
+  upstream: https://patch.msgid.link/20261023171316.819857-7-srinivas.kandagatla@oss.qualcomm.com
+- `patches/0857-ASoC-codecs-wcd939x-fix-ref-leak-and-NULL-deref-with.patch`
+  source: https://git.kernel.org/next/linux-next/c/9003f8ad9c4ea1a9f645874ccba6eb77e923120c
+  upstream: https://patch.msgid.link/20261020170341.1641325-5-val@packett.cool
+- `patches/0858-ASoC-codecs-lpass-rx-macro-fix-PM-ref-leak-in-swclk_.patch`
+  source: https://git.kernel.org/next/linux-next/c/e2df0223ba6dbdf028c45b4a018e6b15642a39af
+  upstream: https://patch.msgid.link/20261028114501.2192-1-tangbin@cmss.chinamobile.com
+- `patches/0859-ASoC-qcom-qdsp6-Add-an-error-handling-path-in-q6usb_.patch`
+  source: https://git.kernel.org/next/linux-next/c/789a11cc2f983c1733d081da9a9ccbfc1789e319
+  upstream: https://patch.msgid.link/68e28df174c8524bef54cb437e568afcb8a82e1e.1792834312.git.christophe.jaillet@wanadoo.fr
+- `patches/0860-usb-typec-ucsi-Set-ucsi-connector-before-enabling-no.patch`
+  source: https://git.kernel.org/next/linux-next/c/5b4b83c2ffe8740f6f3e54ea4d4962a62c063ef1
+  upstream: https://patch.msgid.link/20260929092939.1806907-1-uttkarsh.aggarwal@oss.qualcomm.com

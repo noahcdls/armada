@@ -1,0 +1,60 @@
+From 789a11cc2f983c1733d081da9a9ccbfc1789e319 Mon Sep 17 00:00:00 2001
+From: Christophe JAILLET <christophe.jaillet@wanadoo.fr>
+Date: Sat, 24 Oct 2026 11:32:09 +0200
+Subject: [PATCH] ASoC: qcom: qdsp6: Add an error handling path in
+ q6usb_component_probe()
+
+If an error occurs after a successful q6usb_dai_add_aux_device() call,
+some resources should be released as already done in the remove function.
+
+Re-order the code to avoid unnecessarily destruction of devices in the
+probe path and add an error handling path with the missing clean-up.
+
+Fixes: 72b0b8b29980 ("ASoC: qcom: qdsp6: Add USB backend ASoC driver for Q6")
+Signed-off-by: Christophe JAILLET <christophe.jaillet@wanadoo.fr>
+Link: https://patch.msgid.link/68e28df174c8524bef54cb437e568afcb8a82e1e.1792834312.git.christophe.jaillet@wanadoo.fr
+Signed-off-by: Mark Brown <broonie@kernel.org>
+---
+ sound/soc/qcom/qdsp6/q6usb.c | 16 ++++++++++------
+ 1 file changed, 10 insertions(+), 6 deletions(-)
+
+diff --git a/sound/soc/qcom/qdsp6/q6usb.c b/sound/soc/qcom/qdsp6/q6usb.c
+index 6381b289c55c..e226dd126364 100644
+--- a/sound/soc/qcom/qdsp6/q6usb.c
++++ b/sound/soc/qcom/qdsp6/q6usb.c
+@@ -322,22 +322,26 @@ static int q6usb_component_probe(struct snd_soc_component *component)
+ 	struct snd_soc_usb *usb;
+ 	int ret;
+ 
+-	/* Add the QC USB SND aux device */
+-	ret = q6usb_dai_add_aux_device(data, &data->uauxdev);
+-	if (ret < 0)
+-		return ret;
+-
+ 	usb = snd_soc_usb_allocate_port(component, &data->priv);
+ 	if (IS_ERR(usb))
+-		return -ENOMEM;
++		return PTR_ERR(usb);
+ 
+ 	usb->connection_status_cb = q6usb_alsa_connection_cb;
+ 	usb->update_offload_route_info = q6usb_update_offload_route;
+ 
++	/* Add the QC USB SND aux device */
++	ret = q6usb_dai_add_aux_device(data, &data->uauxdev);
++	if (ret < 0)
++		goto free_usb_port;
++
+ 	snd_soc_usb_add_port(usb);
+ 	data->usb = usb;
+ 
+ 	return 0;
++
++free_usb_port:
++	snd_soc_usb_free_port(usb);
++	return ret;
+ }
+ 
+ static void q6usb_component_remove(struct snd_soc_component *component)
+-- 
+2.56.0
+
