@@ -14,20 +14,13 @@ ARG GAMESCOPE_REF
 ARG GAMESCOPE_SESSION_REF
 ARG GAMESCOPE_SESSION_STEAM_REF
 ARG KWIN_REF
-ARG PLASMA_MOBILE_REF
 ARG POWERDEVIL_REF
 ARG PROTON_CACHYOS_REF
 ARG PROTONTRICKS_REF
 ARG KERNEL_REF
 ARG INPUTPLUMBER_REF
-FROM ${INPUTPLUMBER_REF} AS inputplumber
-
 ARG LIBSSC_REF
-FROM ${LIBSSC_REF} AS libssc
-
 ARG HEXAGONRPC_REF
-FROM ${HEXAGONRPC_REF} AS hexagonrpc
-
 ARG STEAMOS_MANAGER_REF
 ARG NETWORKMANAGER_REF
 ARG WPA_SUPPLICANT_REF
@@ -42,11 +35,8 @@ ARG ARMADA_SPLASH_REF
 ARG ARMADA_LOGOS_REF
 ARG OPENABL_UPDATER_REF
 ARG ARMADA_RGB_REF
-FROM ${ARMADA_RGB_REF} AS armada-rgb
-
 ARG ARMADA_SSC_REF
-FROM ${ARMADA_SSC_REF} AS armada-ssc
-
+ARG DTBLOADER_REF
 ARG UMTP_RESPONDER_REF
 
 FROM ${STEAM_BOOTSTRAP_REF} AS steam-bootstrap
@@ -58,12 +48,13 @@ FROM ${GAMESCOPE_REF} AS gamescope
 FROM ${GAMESCOPE_SESSION_REF} AS gamescope-session
 FROM ${GAMESCOPE_SESSION_STEAM_REF} AS gamescope-session-steam
 FROM ${KWIN_REF} AS kwin
-FROM ${PLASMA_MOBILE_REF} AS plasma-mobile
 FROM ${POWERDEVIL_REF} AS powerdevil
 FROM ${PROTON_CACHYOS_REF} AS proton-cachyos
 FROM ${PROTONTRICKS_REF} AS protontricks
 FROM ${KERNEL_REF} AS kernel
 FROM ${INPUTPLUMBER_REF} AS inputplumber
+FROM ${LIBSSC_REF} AS libssc
+FROM ${HEXAGONRPC_REF} AS hexagonrpc
 FROM ${STEAMOS_MANAGER_REF} AS steamos-manager
 FROM ${NETWORKMANAGER_REF} AS networkmanager
 FROM ${WPA_SUPPLICANT_REF} AS wpa_supplicant
@@ -78,6 +69,8 @@ FROM ${ARMADA_SPLASH_REF} AS armada-splash
 FROM ${ARMADA_LOGOS_REF} AS armada-logos
 FROM ${OPENABL_UPDATER_REF} AS openabl-updater
 FROM ${ARMADA_RGB_REF} AS armada-rgb
+FROM ${ARMADA_SSC_REF} AS armada-ssc
+FROM ${DTBLOADER_REF} AS dtbloader
 FROM ${UMTP_RESPONDER_REF} AS umtp-responder
 
 FROM docker.io/library/node:22-slim AS decky-build
@@ -111,7 +104,6 @@ RUN --mount=type=bind,from=ctx,source=/,target=/ctx \
     --mount=type=bind,from=gamescope-session,source=/rpms,target=/packages/gamescope-session \
     --mount=type=bind,from=gamescope-session-steam,source=/rpms,target=/packages/gamescope-session-steam \
     --mount=type=bind,from=kwin,source=/rpms,target=/packages/kwin \
-    --mount=type=bind,from=plasma-mobile,source=/rpms,target=/packages/plasma-mobile \
     --mount=type=bind,from=powerdevil,source=/rpms,target=/packages/powerdevil \
     --mount=type=bind,from=proton-cachyos,source=/,target=/packages/proton-cachyos \
     --mount=type=bind,from=protontricks,source=/rpms,target=/packages/protontricks \
@@ -133,6 +125,7 @@ RUN --mount=type=bind,from=ctx,source=/,target=/ctx \
     --mount=type=bind,from=armada-rgb,source=/rpms,target=/packages/armada-rgb \
     --mount=type=bind,from=armada-ssc,source=/rpms,target=/packages/armada-ssc \
     --mount=type=bind,from=openabl-updater,source=/rpms,target=/packages/openabl-updater \
+    --mount=type=bind,from=dtbloader,source=/rpms,target=/packages/dtbloader \
     --mount=type=bind,from=umtp-responder,source=/rpms,target=/packages/umtp-responder \
     --mount=type=bind,from=decky-build,source=/build/armada-control/dist,target=/packages/decky-dist \
     --mount=type=bind,from=decky-build,source=/build/armada-store/dist,target=/packages/decky-store-dist \

@@ -1,0 +1,26 @@
+From: Armada contributors <noreply@armada-os.org>
+Subject: [PATCH] dt-bindings: describe Eliza audio resources
+
+Backport RetroidPocket/linux bindings from:
+ f81bcaae1edd (Ravi Hothi): Eliza LPASS LPI pinctrl
+ 54324f3973c8 (Mohammad Rafi Shaik): Q6APM MI2S DAI clocks
+ e192bf797bdb (Teguh Sobirin): ES8326 supplies
+
+---
+diff --git a/Documentation/devicetree/bindings/sound/everest,es8326.yaml b/Documentation/devicetree/bindings/sound/everest,es8326.yaml
+index b5594a9d508e..c7719a122f15 100644
+--- a/Documentation/devicetree/bindings/sound/everest,es8326.yaml
++++ b/Documentation/devicetree/bindings/sound/everest,es8326.yaml
+@@ -31,6 +31,12 @@ properties:
+   "#sound-dai-cells":
+     const: 0
+ 
++  vdd-supply:
++    description: Analog and digital core supply (AVDD/DVDD)
++
++  vddio-supply:
++    description: I/O supply
++
+   everest,jack-pol:
+     $ref: /schemas/types.yaml#/definitions/uint8
+     description: |
