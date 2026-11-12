@@ -1649,7 +1649,7 @@ plugin_power.POWER_CONFIG = plugin_power.Path(os.path.join(WORK, "etc-armada-pow
 data = plugin_power.resolve_limits(plugin_power.parse_power(), plugin_limits, "SM8250")
 factory_data = plugin_power.resolve_limits(
     plugin_power.parse_power(plugin_power.FACTORY_POWER_CONFIG), plugin_limits, "SM8250")
-check("governor exposed in parse", data["profiles"]["eco"]["cpu_governor"] == "conservative")
+check("governor exposed in parse", data["profiles"]["eco"]["cpu_governor"] == "schedutil")
 
 # untouched config renders no /etc profile sections (factory keeps tracking /usr)
 rendered = plugin_power.render_power(data, factory_data, plugin_limits, "SM8250")
