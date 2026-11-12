@@ -80,6 +80,13 @@ def status():
         "fan_rpm",
         "temperature",
         "suspended",
+        "tdp_limit",
+        "tdp_limit_max",
+        "tdp_active",
+        "tdp_level",
+        "tdp_uclamp_max",
+        "tdp_gpu_cap",
+        "tdp_watts",
     ):
         value = data[key].unpack() if hasattr(data[key], "unpack") else data[key]
         print(f"{key}={value}")
@@ -91,7 +98,8 @@ def call_method(name):
 
 def usage():
     print(
-        "Usage: armada-power status|reload|profile [name]|gpu-auto|gpu-manual <mhz>|suspend|resume",
+        "Usage: armada-power status|reload|profile [name]|gpu-auto|gpu-manual <mhz>"
+        "|tdp [watts|off]|suspend|resume",
         file=sys.stderr,
     )
     return 2
@@ -117,6 +125,21 @@ def main():
     if cmd == "gpu-manual" and len(sys.argv) == 3:
         set_prop("GpuPerformanceLevel", GLib.Variant("s", "manual"))
         set_prop("ManualGpuClock", GLib.Variant("u", int(sys.argv[2])))
+        return 0
+    if cmd == "tdp":
+        if len(sys.argv) == 2:
+            print(get_prop("TdpLimit"))
+            return 0
+        if len(sys.argv) != 3:
+            return usage()
+        arg = sys.argv[2]
+        if arg == "off":
+            watts = get_prop("TdpLimitMax")
+        elif arg.isdigit():
+            watts = int(arg)
+        else:
+            return usage()
+        set_prop("TdpLimit", GLib.Variant("u", watts))
         return 0
     if cmd == "suspend":
         call_method("Suspend")

@@ -14,6 +14,7 @@ from pathlib import Path
 
 sys.path.insert(0, "/usr/lib/armada")
 import armada_perf
+import armada_tdp
 
 warnings.filterwarnings("ignore", category=DeprecationWarning)
 
@@ -24,10 +25,13 @@ IFACE_PROFILE = "com.steampowered.SteamOSManager1.PerformanceProfile1"
 IFACE_GPU = "com.steampowered.SteamOSManager1.GpuPerformanceLevel1"
 IFACE_CPU = "com.steampowered.SteamOSManager1.CpuScaling1"
 IFACE_LOW_POWER = "com.steampowered.SteamOSManager1.LowPowerMode1"
+IFACE_TDP = "com.steampowered.SteamOSManager1.TdpLimit1"
 LOGIN1_NAME = "org.freedesktop.login1"
 LOGIN1_PATH = "/org/freedesktop/login1"
 LOGIN1_IFACE = "org.freedesktop.login1.Manager"
 PROFILES = ["eco", "balanced", "performance"]
+TDP_TICK_MS = 1000
+TDP_SAMPLES = 2
 STATE_FILE = Path("/var/lib/armada/powerd.state")
 FACTORY_CONFIG_FILE = Path("/usr/share/armada/power-profiles.conf")
 CONFIG_FILE = Path("/etc/armada/power-profiles.conf")
@@ -62,6 +66,9 @@ XML = f"""
     <property name="FanPwm" type="u" access="read"/>
     <property name="FanRpm" type="u" access="read"/>
     <property name="Temperature" type="u" access="read"/>
+    <property name="TdpLimit" type="u" access="readwrite"/>
+    <property name="TdpLimitMin" type="u" access="read"/>
+    <property name="TdpLimitMax" type="u" access="read"/>
   </interface>
   <interface name="{IFACE_PROFILE}">
     <property name="AvailablePerformanceProfiles" type="as" access="read"/>
@@ -88,6 +95,11 @@ XML = f"""
       <arg type="a{{su}}" name="identifiers" direction="out"/>
     </method>
   </interface>
+  <interface name="{IFACE_TDP}">
+    <property name="TdpLimit" type="u" access="readwrite"/>
+    <property name="TdpLimitMin" type="u" access="read"/>
+    <property name="TdpLimitMax" type="u" access="read"/>
+  </interface>
 </node>
 """
 
@@ -108,6 +120,11 @@ REMOTE_PROPS = {
     IFACE_CPU: {
         "AvailableCpuScalingGovernors": "AvailableCpuScalingGovernors",
         "CpuScalingGovernor": "CpuScalingGovernor",
+    },
+    IFACE_TDP: {
+        "TdpLimit": "TdpLimit",
+        "TdpLimitMin": "TdpLimitMin",
+        "TdpLimitMax": "TdpLimitMax",
     },
 }
 
@@ -216,6 +233,33 @@ def parse_governor_tunables(parser):
     return tunables
 
 
+TDP_DEFAULTS = {"min_watts": 4, "max_watts": 15, "min_level": 0.15}
+
+
+def parse_tdp_config(parser, device_class):
+    # [tdp.<SOC>] overrides [tdp] key by key; bad values keep the default.
+    config = dict(TDP_DEFAULTS)
+    for section in ("tdp", f"tdp.{device_class}" if device_class else None):
+        if not section or not parser.has_section(section):
+            continue
+        for key in ("min_watts", "max_watts"):
+            try:
+                value = parser.getint(section, key, fallback=config[key])
+            except ValueError:
+                continue
+            if value > 0:
+                config[key] = value
+        try:
+            level = parser.getfloat(section, "min_level", fallback=config["min_level"])
+        except ValueError:
+            level = config["min_level"]
+        if math.isfinite(level):
+            config["min_level"] = clamp(level, 0.05, 1.0)
+    if config["min_watts"] >= config["max_watts"]:
+        config["min_watts"], config["max_watts"] = TDP_DEFAULTS["min_watts"], TDP_DEFAULTS["max_watts"]
+    return config
+
+
 def require_section(parser, section):
     if not parser.has_section(section):
         raise ValueError(f"missing config section [{section}]")
@@ -301,6 +345,15 @@ class ArmadaPower:
         self.scx_spec = None
         self.scx_failed = None
         self.scx_warned = set()
+        self.tdp_limit = 0
+        self.tdp_level = 1.0
+        self.tdp_samples = []
+        self.tdp_watts = None
+        self.tdp_active = False
+        self.tdp_gpu_cap = None
+        self.tdp_warned = set()
+        self.uclamp = armada_tdp.Uclamp()
+        self.battery = armada_tdp.battery_path()
         self.load_config()
         self.profile = self.default_profile
         self.discover()
@@ -314,6 +367,7 @@ class ArmadaPower:
         self.apply_sleep_charging_pwm()
         self.fan_tick()
         GLib.timeout_add_seconds(3, self.fan_tick)
+        GLib.timeout_add(TDP_TICK_MS, self.tdp_tick)
 
     def discover(self):
         self.gpu = self.discover_gpu()
@@ -455,6 +509,7 @@ class ArmadaPower:
         system_config = {
             "irq_cores": parser.get("system", "irq_cores", fallback="auto").strip(),
             "governor_tunables": parse_governor_tunables(parser),
+            "tdp": parse_tdp_config(parser, getattr(self, "env", {}).get("ARMADA_SOC_CLASS", "")),
         }
         return (default_profile, underclock_config, fan_curves, profile_config,
                 fan_config, suspend_config, system_config)
@@ -625,6 +680,8 @@ class ArmadaPower:
                 self.gpu_level = value
             elif key == "manual_gpu_clock" and value.isdigit():
                 self.manual_gpu_clock = int(value)
+            elif key == "tdp_limit" and value.isdigit():
+                self.tdp_limit = int(value)
 
     def save_state(self):
         STATE_FILE.parent.mkdir(parents=True, exist_ok=True)
@@ -632,6 +689,7 @@ class ArmadaPower:
             f"profile={self.profile}\n"
             f"gpu_level={self.gpu_level}\n"
             f"manual_gpu_clock={self.manual_gpu_clock}\n"
+            f"tdp_limit={getattr(self, 'tdp_limit', 0)}\n"
         )
 
     def gpu_freqs(self):
@@ -845,6 +903,10 @@ class ArmadaPower:
         if not freqs:
             return
         min_freq, max_freq = self.resolved_gpu_auto_limits()
+        tdp_cap = getattr(self, "tdp_gpu_cap", None)
+        if tdp_cap:
+            max_freq = min(max_freq, tdp_cap)
+            min_freq = min(min_freq, max_freq)
         write_text(self.gpu / "governor", "simple_ondemand")
         write_text(self.gpu / "min_freq", freqs[0])
         write_text(self.gpu / "max_freq", max_freq)
@@ -868,6 +930,99 @@ class ArmadaPower:
         write_text(self.gpu / "governor", "userspace")
         write_text(self.gpu / "max_freq", hz)
         write_text(self.gpu / "min_freq", hz)
+
+    # Steam's TDP slider. The limit is whole-device battery power, held by
+    # clamping only the game: per-task uclamp.max (schedutil caps the
+    # frequency it requests) and the GPU ceiling, from one shared level.
+    def tdp_range(self):
+        config = self.system_config.get("tdp", TDP_DEFAULTS)
+        return config["min_watts"], config["max_watts"]
+
+    def tdp_effective_limit(self):
+        low, high = self.tdp_range()
+        return clamp(self.tdp_limit, low, high) if self.tdp_limit else high
+
+    def tdp_enabled(self):
+        # Steam's toggle off writes TdpLimitMax, which means no limit.
+        return self.tdp_effective_limit() < self.tdp_range()[1]
+
+    def tdp_warn(self, key, message):
+        if key not in self.tdp_warned:
+            self.tdp_warned.add(key)
+            print(f"armada-powerd: tdp: {message}", file=sys.stderr)
+
+    def tdp_tick(self):
+        try:
+            self.tdp_step()
+        except Exception as exc:
+            print(f"armada-powerd: tdp tick failed: {exc}", file=sys.stderr)
+        return True
+
+    def tdp_step(self):
+        tids = []
+        if self.tdp_enabled() and not self.suspended:
+            tids = armada_tdp.game_tids(armada_perf.descendant_pids)
+        if not tids:
+            self.tdp_release()
+            return
+        watts = armada_tdp.battery_watts(self.battery)
+        if watts is None:
+            self.tdp_warn("battery", "no battery current/voltage; holding the current level")
+            self.tdp_samples = []
+        elif external_power_online():
+            # On the charger the gauge reads charge current, not device draw.
+            self.tdp_samples = []
+        else:
+            self.tdp_samples.append(watts)
+        if len(self.tdp_samples) >= TDP_SAMPLES:
+            # Decide on samples taken after the last change only, so a step
+            # is never judged on power drawn before it.
+            self.tdp_watts = sum(self.tdp_samples) / len(self.tdp_samples)
+            self.tdp_samples = []
+            self.tdp_level = armada_tdp.next_level(
+                self.tdp_level, self.tdp_watts, self.tdp_effective_limit(),
+                self.system_config["tdp"]["min_level"])
+        self.tdp_active = True
+        self.tdp_apply(tids)
+
+    def tdp_apply(self, tids):
+        governor = self.current_governor()
+        if governor != "schedutil":
+            self.tdp_warn(("governor", governor),
+                          f"CPU governor {governor} ignores uclamp; only the GPU is limited")
+        if self.scx_spec:
+            self.tdp_warn(("scx", self.scx_spec[0]),
+                          f"scx_{self.scx_spec[0]} may not honour uclamp; CPU limit may not apply")
+        if not self.uclamp.available:
+            self.tdp_warn("uclamp", "sched_setattr not available on this architecture")
+        err = self.uclamp.apply(tids, armada_tdp.level_uclamp(self.tdp_level))
+        if err:
+            self.tdp_warn(("uclamp", err), f"sched_setattr failed: {os.strerror(err)}")
+        self.tdp_set_gpu_cap(self.tdp_level)
+
+    def tdp_set_gpu_cap(self, level):
+        cap = None
+        if self.gpu and self.gpu_level == "auto" and level < 1.0:
+            freqs = self.gpu_freqs()
+            profile_max = self.resolved_gpu_auto_limits()[1]
+            if freqs and profile_max:
+                cap = self.choose_at_most(freqs, int(profile_max * level))
+        if cap == self.tdp_gpu_cap:
+            return
+        self.tdp_gpu_cap = cap
+        if self.gpu and self.gpu_level == "auto" and not self.suspended:
+            self.apply_gpu_auto()
+
+    def tdp_release(self):
+        if not self.tdp_enabled():
+            self.tdp_level = 1.0
+        if not self.tdp_active and not self.uclamp.applied and self.tdp_gpu_cap is None:
+            return
+        self.uclamp.release()
+        self.tdp_active = False
+        self.tdp_samples = []
+        self.tdp_watts = None
+        self.tdp_set_gpu_cap(1.0)
 
     def read_temps(self):
         values = []
@@ -1030,6 +1185,12 @@ class ArmadaPower:
             return GLib.Variant("u", self.fan_rpm_value())
         if prop == "Temperature":
             return GLib.Variant("u", self.read_temp())
+        if prop == "TdpLimit":
+            return GLib.Variant("u", self.tdp_effective_limit())
+        if prop == "TdpLimitMin":
+            return GLib.Variant("u", self.tdp_range()[0])
+        if prop == "TdpLimitMax":
+            return GLib.Variant("u", self.tdp_range()[1])
         raise KeyError(prop)
 
     def set_property(self, prop, value):
@@ -1067,6 +1228,12 @@ class ArmadaPower:
             mhz = self.gpu_manual_effective(self.gpu_freqs()) // 1000000
             self.gpu_manual_shown["ManualGpuClock"] = mhz
             changed["ManualGpuClock"] = GLib.Variant("u", mhz)
+        elif prop == "TdpLimit":
+            low, high = self.tdp_range()
+            self.tdp_limit = clamp(value.get_uint32(), low, high)
+            if not self.tdp_enabled():
+                self.tdp_release()
+            changed["TdpLimit"] = GLib.Variant("u", self.tdp_effective_limit())
         else:
             raise KeyError(prop)
         self.save_state()
@@ -1090,6 +1257,13 @@ class ArmadaPower:
             "fan_rpm": self.get_property("FanRpm"),
             "temperature": self.get_property("Temperature"),
             "suspended": GLib.Variant("b", self.suspended),
+            "tdp_limit": self.get_property("TdpLimit"),
+            "tdp_limit_max": self.get_property("TdpLimitMax"),
+            "tdp_active": GLib.Variant("b", self.tdp_active),
+            "tdp_level": GLib.Variant("d", round(self.tdp_level, 3)),
+            "tdp_uclamp_max": GLib.Variant("u", armada_tdp.level_uclamp(self.tdp_level)),
+            "tdp_gpu_cap": GLib.Variant("u", (self.tdp_gpu_cap or 0) // 1000000),
+            "tdp_watts": GLib.Variant("d", round(self.tdp_watts or 0.0, 2)),
         }
 
     def emit_properties(self, changed):
@@ -1262,6 +1436,7 @@ def main():
     def stop(_signum, _frame):
         power.fan_safe()
         power.stop_scx()
+        power.uclamp.release()
         loop.quit()
 
     for sig in (signal.SIGINT, signal.SIGTERM):
@@ -1271,6 +1446,7 @@ def main():
     finally:
         power.fan_safe()
         power.stop_scx()
+        power.uclamp.release()
         Gio.bus_unown_name(owner_id)
 
 

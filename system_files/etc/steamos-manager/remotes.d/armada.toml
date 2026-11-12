@@ -16,3 +16,9 @@ object_path = "/org/armada/Power"
 [LowPowerMode1]
 bus_name = "org.armada.Power"
 object_path = "/org/armada/Power"
+
+# Steam's TDP slider. With no [tdp_limit] in the device config steamos-manager
+# falls back to a remote limit manager, so no patch is needed.
+[TdpLimit1]
+bus_name = "org.armada.Power"
+object_path = "/org/armada/Power"

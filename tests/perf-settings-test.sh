@@ -1345,6 +1345,180 @@ finally:
     ap.apply_gamescope = real_apply
 check("perf_tick contains exceptions", True)
 
+# --- armada-powerd: TDP limit (Steam's TdpLimit1) ---------------------------
+import armada_tdp as at_tdp
+import configparser
+
+
+def tdp_config(text, soc=""):
+    parser = configparser.ConfigParser()
+    parser.read_string(text)
+    return powerd.parse_tdp_config(parser, soc)
+
+
+check("tdp defaults without [tdp]", tdp_config("") == powerd.TDP_DEFAULTS)
+check("factory [tdp] parses", power.parse_config(include_user=False)[6]["tdp"]["max_watts"] == 15)
+soc_tdp = tdp_config("[tdp]\nmax_watts=15\n[tdp.SM8750]\nmax_watts=20\nmin_level=0.3\n", "SM8750")
+check("tdp per-SoC override", soc_tdp["max_watts"] == 20 and soc_tdp["min_level"] == 0.3)
+check("tdp other SoC keeps [tdp]",
+      tdp_config("[tdp]\nmax_watts=12\n[tdp.SM8750]\nmax_watts=20\n", "SM8550")["max_watts"] == 12)
+check("tdp bad values keep defaults",
+      tdp_config("[tdp]\nmin_watts=abc\nmax_watts=-3\nmin_level=nan\n") == powerd.TDP_DEFAULTS)
+check("tdp inverted range resets",
+      tdp_config("[tdp]\nmin_watts=20\nmax_watts=10\n") == powerd.TDP_DEFAULTS)
+
+check("next_level over target drops", at_tdp.next_level(1.0, 12.0, 8, 0.15) < 1.0)
+check("next_level big overshoot step is bounded",
+      at_tdp.next_level(1.0, 40.0, 8, 0.15) == 1.0 - at_tdp.MAX_STEP_DOWN)
+check("next_level under target rises", 0.5 < at_tdp.next_level(0.5, 5.0, 8, 0.15) <= 0.5 + at_tdp.MAX_STEP_UP)
+check("next_level holds in deadband", at_tdp.next_level(0.5, 7.8, 8, 0.15) == 0.5)
+check("next_level floors at min_level", at_tdp.next_level(0.16, 30.0, 8, 0.15) == 0.15)
+check("next_level caps at 1", at_tdp.next_level(0.99, 2.0, 8, 0.15) == 1.0)
+check("next_level holds without a reading", at_tdp.next_level(0.5, None, 8, 0.15) == 0.5)
+check("level_uclamp scale", at_tdp.level_uclamp(1.0) == 1024 and at_tdp.level_uclamp(0.5) == 512)
+check("level_uclamp floor", at_tdp.level_uclamp(0.0) == at_tdp.UCLAMP_FLOOR)
+
+psy = pathlib.Path(WORK, "power_supply")
+(psy / "usb").mkdir(parents=True)
+(psy / "usb/type").write_text("USB\n")
+(psy / "usb/current_now").write_text("9000\n")
+(psy / "battery").mkdir()
+(psy / "battery/type").write_text("Battery\n")
+(psy / "battery/current_now").write_text("-1480757\n")
+(psy / "battery/voltage_now").write_text("3926076\n")
+(psy / "battery/power_now").write_text("57324465\n")
+bat = at_tdp.battery_path(psy)
+check("battery_path picks the Battery supply", bat == psy / "battery")
+check("battery_watts uses I*V, not power_now", abs(at_tdp.battery_watts(bat) - 5.81) < 0.01)
+check("battery_watts without a battery", at_tdp.battery_watts(None) is None)
+
+
+class FakeUclamp(at_tdp.Uclamp):
+    def __init__(self):
+        self.nr_set = 0
+        self.applied = {}
+        self.calls = []
+
+    def set_max(self, tid, value):
+        self.calls.append((tid, value))
+        return 3 if tid == 999 else 0
+
+
+fu = FakeUclamp()
+check("uclamp apply ignores exited tids (ESRCH)", fu.apply([10, 11, 999], 512) == 0)
+fu.calls.clear()
+fu.apply([10, 11], 512)
+check("uclamp apply skips unchanged tids", fu.calls == [])
+fu.apply([11, 12], 400)
+check("uclamp apply prunes and updates", fu.applied == {11: 400, 12: 400})
+fu.release()
+check("uclamp release resets to full scale",
+      sorted(fu.calls[-2:]) == [(11, 1024), (12, 1024)] and fu.applied == {})
+
+tdp_gpu = os.path.join(WORK, "tdp-gpu")
+shutil.copytree(fake_gpu, tdp_gpu)
+tdp = powerd.ArmadaPower.__new__(powerd.ArmadaPower)
+tdp.env = {"ARMADA_SOC_CLASS": "SM8250", "ARMADA_GPU_STOCK_MAX_MHZ": "587"}
+tdp.underclock_config = {}
+tdp.profile_config = power.parse_config(include_user=False)[3]
+tdp.system_config = {"tdp": dict(powerd.TDP_DEFAULTS)}
+tdp.profile = "balanced"
+tdp.gpu = powerd.Path(tdp_gpu)
+tdp.gpu_level = "auto"
+tdp.cpu_policies = []
+tdp.suspended = False
+tdp.scx_spec = None
+tdp.tdp_limit = 0
+tdp.tdp_level = 1.0
+tdp.tdp_samples = []
+tdp.tdp_watts = None
+tdp.tdp_active = False
+tdp.tdp_gpu_cap = None
+tdp.tdp_warned = set()
+tdp.uclamp = FakeUclamp()
+tdp.battery = None
+tdp.current_governor = lambda: "schedutil"
+
+state = {"tids": [100, 101], "watts": 12.0, "charging": False}
+real_game_tids, real_battery_watts = at_tdp.game_tids, at_tdp.battery_watts
+real_external = powerd.external_power_online
+at_tdp.game_tids = lambda descendants: list(state["tids"])
+at_tdp.battery_watts = lambda supply: state["watts"]
+powerd.external_power_online = lambda: state["charging"]
+try:
+    check("tdp unset reports max", tdp.tdp_effective_limit() == 15 and not tdp.tdp_enabled())
+    tdp.tdp_step()
+    check("tdp disabled does not clamp", not tdp.uclamp.applied and not tdp.tdp_active)
+
+    tdp.tdp_limit = 8
+    for _ in range(6):
+        tdp.tdp_step()
+    gpu_max = int(pathlib.Path(tdp_gpu, "max_freq").read_text())
+    check("tdp over target lowers the level", tdp.tdp_level < 1.0 and tdp.tdp_active)
+    check("tdp clamps game threads",
+          set(tdp.uclamp.applied) == {100, 101}
+          and set(tdp.uclamp.applied.values()) == {at_tdp.level_uclamp(tdp.tdp_level)})
+    check("tdp lowers the GPU ceiling", tdp.tdp_gpu_cap and gpu_max == tdp.tdp_gpu_cap
+          and gpu_max < tdp.resolved_gpu_auto_limits()[1])
+
+    held = tdp.tdp_level
+    state["charging"] = True
+    for _ in range(4):
+        tdp.tdp_step()
+    check("tdp holds the level on the charger", tdp.tdp_level == held)
+    state["charging"] = False
+
+    state["watts"] = 4.0
+    for _ in range(4):
+        tdp.tdp_step()
+    check("tdp under target raises the level", tdp.tdp_level > held)
+
+    state["tids"] = []
+    tdp.tdp_step()
+    gpu_max = int(pathlib.Path(tdp_gpu, "max_freq").read_text())
+    check("tdp game exit releases clamps",
+          not tdp.uclamp.applied and tdp.tdp_gpu_cap is None and not tdp.tdp_active
+          and gpu_max == tdp.resolved_gpu_auto_limits()[1])
+
+    state["tids"] = [100]
+    tdp.gpu_level = "manual"
+    tdp.tdp_step()
+    tdp.tdp_step()
+    check("tdp leaves a manual GPU clock alone", tdp.tdp_gpu_cap is None)
+    tdp.gpu_level = "auto"
+
+    tdp.suspended = True
+    tdp.tdp_step()
+    check("tdp releases while suspended", not tdp.uclamp.applied and not tdp.tdp_active)
+    tdp.suspended = False
+
+    tdp_emitted = []
+    tdp.emit_properties = lambda changed: tdp_emitted.append({k: v.unpack() for k, v in changed.items()})
+    tdp.manual_gpu_clock = 0
+    tdp.save_state()
+    tdp.set_property("TdpLimit", FakeVariant("u", 2))
+    check("TdpLimit clamps to TdpLimitMin", tdp.tdp_limit == 4 and tdp_emitted[-1] == {"TdpLimit": 4})
+    tdp.tdp_step()
+    tdp.tdp_step()
+    check("tdp active after a limit is set", tdp.tdp_active and tdp.uclamp.applied)
+    tdp.set_property("TdpLimit", FakeVariant("u", 99))
+    check("TdpLimit at max turns the limit off",
+          tdp.get_property("TdpLimit").unpack() == 15 and not tdp.tdp_enabled()
+          and not tdp.uclamp.applied and tdp.tdp_level == 1.0)
+    check("TdpLimit range props",
+          tdp.get_property("TdpLimitMin").unpack() == 4 and tdp.get_property("TdpLimitMax").unpack() == 15)
+    check("TdpLimit relayed on the SteamOS interface",
+          powerd.REMOTE_PROPS[powerd.IFACE_TDP]["TdpLimit"] == "TdpLimit")
+    tdp.tdp_limit = 7
+    tdp.save_state()
+    tdp.tdp_limit = 0
+    tdp.profile, tdp.gpu_level = "balanced", "auto"
+    tdp.load_state()
+    check("tdp_limit persists in the state file", tdp.tdp_limit == 7)
+finally:
+    at_tdp.game_tids, at_tdp.battery_watts = real_game_tids, real_battery_watts
+    powerd.external_power_online = real_external
+
 # --- plugin: tweaks sanitize keeps the flat perf keys -----------------------
 sys.path.insert(0, os.path.join(ROOT, "decky/armada-control/py_modules"))
 from armada_control import tweaks as plugin_tweaks
