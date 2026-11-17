@@ -15,6 +15,8 @@
 0070-arm64-dts-qcom-dpu-lutdma-reg.patch
 0076-drm-msm-dpu-expose-abgr-xbgr-2101010-on-planes.patch
 0077-drm-msm-dpu-plane-igc-3d-lut-color-pipelines.patch
+0077a-drm-atomic-duplicate-state-of-all-colorops.patch
+0077b-drm-msm-dpu-return-einval-when-no-sspp-is-free.patch
 0078-drm-msm-dpu-fix-vblank-timestamps-on-command-mode-panels.patch
 0078a-drm-msm-dpu-program-merge3d-for-command-mode.patch
 0016-rp5-smooth-brightness-adjustment.patch
@@ -34,6 +36,7 @@
 0063-gpu-drm-panel-add-wt0600-1k-panel.patch
 0104-drm-panel-Add-Retroid-Pocket-6-panel.patch
 0104a-drm-panel-visionox-vtdr6130-add-sm8250.patch
+1111-drm-panel-vtdr6130-add-pocket-duo.patch
 0105-dt-bindings-display-panel-retroid-il97680a.patch
 0105a-drm-panel-retroid-il97680a.patch
 0108-drm-msm-dpu-send-the-flip-event-after-the-vblank-irq.patch
@@ -225,7 +228,7 @@ v9_20260801_sachin_garg_media_iris_cache_work_mode_in_iris_set_stage.patch
 0304-ASoC-wcd938x-treat-failed-zdet-ramp-as-floating.patch
 0305-backlight-qcom-wled-always-disable-ovp-irq-at-probe.patch
 
-# ============== SM8750 (AYN Odin 3, KONKR Pocket FIT Elite) ==============
+# ============== SM8750 (AYN Odin 3 / Portal, KONKR Pocket FIT Elite) ==============
 0026-dt-bindings-arm-qcom-ids-Add-SoC-ID-for-CQ8725S.patch
 0027-soc-qcom-socinfo-Add-CQ8725S-SoC-ID.patch
 0742-dt-bindings-display-msm-Document-Adreno-830-GPU-GMU.patch
@@ -239,7 +242,10 @@ v9_20260801_sachin_garg_media_iris_cache_work_mode_in_iris_set_stage.patch
 0037-arm64-dts-qcom-sm8750-add-CPU-thermal-cooling.patch
 0542-arm64-dts-qcom-sm8750-describe-the-tcsr-download-mode-cookie.patch
 0557-arm64-dts-qcom-sm8750-add-the-soccp.patch
+0038b-arm64-dts-qcom-sm8750-keep-the-A830-chip-id-0x44050000.patch
+0038c-arm64-dts-qcom-sm8750-poll-the-GPU-thermal-zones-while-throttling.patch
 0749-drm-msm-a8xx-Add-support-for-Adreno-830-GPU.patch
+0049c-drm-msm-a8xx-accept-the-A830-chip-id-0x44050000.patch
 0750-drm-msm-a8xx-report-the-GMEM-size-of-the-active-slic.patch
 0039-wifi-ath12k-add-initial-hardware-definition-for-WCN7.patch
 0040-wifi-ath12k-send-QDSS-config-when-CNSS_QDSS_CFG_MISS.patch
@@ -255,7 +261,11 @@ v9_20260801_sachin_garg_media_iris_cache_work_mode_in_iris_set_stage.patch
 0072-ASoC-lpass-rx-macro-add-HPH-PCM-mode.patch
 0073-ASoC-wcd939x-add-HPH-PCM-HiFi-mode.patch
 0081-ASoC-wcd939x-fix-headphone-analog-volume-controls.patch
+0082-ASoC-wcd939x-sdw-program-the-class-H-port-window.patch
+0083-ASoC-wcd-clsh-run-the-class-H-start-up-only-once.patch
+0084-ASoC-wcd-common-skip-the-interrupt-loop-without-a-regmap.patch
 0074-soundwire-qcom-PCM-data-port-format-enable.patch
+0086-soundwire-qcom-add-an-optional-SSP-period.patch
 0075-ASoC-wsa884x-preserve-Pocket-S2-compander-gain.patch
 0612-ROCKNIX-odin3-q6apm-start-mi2s-port-at-prepare.patch
 0613-ASoC-q6apm-scope-prepare-start-to-MI2S.patch
@@ -265,10 +275,15 @@ v9_20260801_sachin_garg_media_iris_cache_work_mode_in_iris_set_stage.patch
 0531-ASoC-qcom-sc8280xp-release-the-board-i2s-clock-across-system-suspend.patch
 0532-hwmon-pwm-fan-optionally-run-the-fan-while-charging-in-s2idle.patch
 
+# ============== AYN Odin 3 Portal ==============
+1304-drm-panel-vtdr6130-add-odin3portal.patch
+1305-drm-panel-vtdr6130-allow-calibrating-the-odin3portal-frame-length.patch
+
 # ============== LPASS clocks released in s2idle (force suspend; the pm_clk conversion is upstream since 7.3) ==============
 0563-ASoC-codecs-lpass-macro-force-runtime-suspend-across-system-sleep.patch
 0080-ASoC-codecs-lpass-tx-macro-track-every-active-decimator.patch
 0564-soundwire-qcom-force-runtime-suspend-across-system-sleep.patch
+0570-soundwire-qcom-skip-the-clock-stop-handshake-for-the-pmic-haptics-port.patch
 0565-pinctrl-qcom-sm8650-lpass-lpi-force-runtime-suspend-across-system-sleep.patch
 
 # ============== Upstream fixes from linux-next (Oct 2026) ==============
@@ -398,7 +413,6 @@ v9_20260801_sachin_garg_media_iris_cache_work_mode_in_iris_set_stage.patch
 1108-arm64-dts-qcom-eliza-gpu-smmu.patch
 1109-arm64-dts-qcom-eliza-gpu.patch
 1110-arm64-dts-qcom-eliza-gpu-cooling.patch
-1111-drm-panel-vtdr6130-add-pocket-duo.patch
 1114-remoteproc-qcom-add-eliza-wpss.patch
 1115-drm-msm-a6xx-mask-unhandled-rbbm-interrupts.patch
 1116-drm-msm-a6xx-set-up-a722-without-a-bv-pipe.patch
@@ -436,11 +450,15 @@ v9_20260801_sachin_garg_media_iris_cache_work_mode_in_iris_set_stage.patch
 1176-ASoC-es8326-enable-codec-supplies.patch
 1177-dt-bindings-describe-eliza-audio-resources.patch
 1179-ASoC-qcom-fix-duo-speaker-slot-width.patch
+0085-ASoC-qcom-sc8280xp-restart-SoundWire-streams-across-system-suspend.patch
 1180-ASoC-qcom-q6apm-allow-s32-playback.patch
 1181-cpufreq-dt-platdev-blocklist-eliza.patch
 1182-arm64-dts-qcom-eliza-add-cpu-l3-scaling.patch
+1183-wifi-ath12k-associate-WCN7750-as-HE-on-6-GHz.patch
 1302-input-rsinput-support-retroid-pocket-duo.patch
 1303-serial-qcom-geni-allow-shorter-rx-dma-transfer.patch
+1306-input-gpio-keys-let-other-drivers-read-a-button-state.patch
+1307-input-pm8941-pwrkey-ignore-presses-while-lid-is-closed.patch
 
 # ============== Upstream fixes on top of Linux 7.3, November 2026 sweep ==============
 0821-mailbox-qcom-ipcc-Remove-redundant-mbox_controller_u.patch

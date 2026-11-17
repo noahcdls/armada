@@ -49,6 +49,13 @@ no equivalent submission was found, or a permanent URL to the upstream submissio
 - `patches/0077-drm-msm-dpu-plane-igc-3d-lut-color-pipelines.patch`
   source: armada
   upstream: local
+- `patches/0077a-drm-atomic-duplicate-state-of-all-colorops.patch`
+  source: https://lore.kernel.org/r/20260811171011.184964-4-mwen@igalia.com
+  upstream: https://lore.kernel.org/r/20260811171011.184964-4-mwen@igalia.com
+  notes: Patch 3 of the v4 series "drm/atomic: don't allow changes to inactive colorops & other fixes", taken alone; the patch 2 check it depends on isn't in this kernel. Keeps a plane's colorops across a suspend entered while gamescope was compositing.
+- `patches/0077b-drm-msm-dpu-return-einval-when-no-sspp-is-free.patch`
+  source: armada
+  upstream: local
 - `patches/0078-drm-msm-dpu-fix-vblank-timestamps-on-command-mode-panels.patch`
   source: armada
   upstream: local
@@ -651,6 +658,13 @@ no equivalent submission was found, or a permanent URL to the upstream submissio
 - `patches/0748-arm64-dts-qcom-sm8750-Add-GCC-CX-power-domain.patch`
   source: https://git.kernel.org/next/linux-next/c/ee35c132956f4797ed6be33c451decb94d1752af
   upstream: https://patch.msgid.link/20260924-qcom-tie-cx-to-gcc-v5-41-38732033e5b5@oss.qualcomm.com
+- `patches/0038b-arm64-dts-qcom-sm8750-keep-the-A830-chip-id-0x44050000.patch`
+  source: armada
+  upstream: local
+- `patches/0038c-arm64-dts-qcom-sm8750-poll-the-GPU-thermal-zones-while-throttling.patch`
+  source: armada
+  upstream: local
+  notes: 0038b and 0038c apply after 0542/0557 on this branch because 0542's tcsr hunk uses the GPU compatible line as context.
 - `patches/0035-arm64-dts-qcom-sm8750-set-CPU-capacity-dmips-mhz.patch`
   source: https://github.com/ROCKNIX/distribution/blob/f3e2b6187cd2ae2dc5122edfebe84228a314f2c5/projects/ROCKNIX/devices/SM8750/patches/linux/0076-arm64-dts-qcom-sm8750-set-CPU-capacity-dmips-mhz.patch
   upstream: unknown
@@ -671,6 +685,9 @@ no equivalent submission was found, or a permanent URL to the upstream submissio
 - `patches/0750-drm-msm-a8xx-report-the-GMEM-size-of-the-active-slic.patch`
   source: https://git.kernel.org/next/linux-next/c/efbda69d92e6a4822c5f2d09910f547872a9498d
   upstream: https://patch.msgid.link/20260930183840.1171-1-theflyingrahul@gmail.com
+- `patches/0049c-drm-msm-a8xx-accept-the-A830-chip-id-0x44050000.patch`
+  source: armada
+  upstream: local
 - `patches/0039-wifi-ath12k-add-initial-hardware-definition-for-WCN7.patch`
   source: https://github.com/ROCKNIX/distribution/blob/bcf3b5bc574990b96543484575b06f912153a715/projects/ROCKNIX/devices/SM8750/patches/linux/0039-wifi-ath12k-add-initial-hardware-definition-for-WCN7.patch
   upstream: unknown
@@ -719,9 +736,25 @@ no equivalent submission was found, or a permanent URL to the upstream submissio
 - `patches/0081-ASoC-wcd939x-fix-headphone-analog-volume-controls.patch`
   source: armada
   upstream: local
+- `patches/0082-ASoC-wcd939x-sdw-program-the-class-H-port-window.patch`
+  source: armada
+  upstream: local
+  notes: Declares only the class-H port SDW_DPN_FULL; the SM8550, SM8650 and SM8750 RX masters all give port 2 hstart 3 and hstop 6. Hardware-confirmed on the KONKR Pocket FIT.
+- `patches/0083-ASoC-wcd-clsh-run-the-class-H-start-up-only-once.patch`
+  source: armada
+  upstream: local
+  notes: Matches Qualcomm's downstream wcd-clsh.c, whose stereo state does nothing when the second headphone channel joins. Hardware-confirmed on the KONKR Pocket FIT.
+- `patches/0084-ASoC-wcd-common-skip-the-interrupt-loop-without-a-regmap.patch`
+  source: armada
+  upstream: not submitted
+  notes: The WCD937x/8x/9x RX SoundWire device has no regmap, but shares wcd_interrupt_callback(); an interrupt from it NULL-derefs in regmap_read() and kills the SoundWire IRQ thread. Return early without a regmap.
 - `patches/0074-soundwire-qcom-PCM-data-port-format-enable.patch`
   source: https://github.com/ROCKNIX/distribution/blob/bcf3b5bc574990b96543484575b06f912153a715/projects/ROCKNIX/devices/SM8750/patches/linux/0074-soundwire-qcom-PCM-data-port-format-enable.patch
   upstream: unknown
+- `patches/0086-soundwire-qcom-add-an-optional-SSP-period.patch`
+  source: armada
+  upstream: local
+  notes: Optional qcom,ssp-period for the master FRAME_CTRL. The WCD939x class-H port (interval 64) does not divide the 50x16 RX frame; without an SSP its stream starts at a random phase and about half of the Odin 3's headphone streams are fuzzy.
 - `patches/0075-ASoC-wsa884x-preserve-Pocket-S2-compander-gain.patch`
   source: armada
   upstream: local
@@ -848,16 +881,10 @@ no equivalent submission was found, or a permanent URL to the upstream submissio
   notes: Armada adapts the Elite touchscreen node to the full ROCKNIX Chipone fork shared with the SM8650 Pocket FIT, keeps volume-up from waking the system, and adds the DisplayPort playback link required for USB-C DP Alt Mode audio; the touchscreen driver is selected only by those two device-tree nodes. Armada also marks PCIe WAKE# active-low and idles the codec rails in LPM during s2idle, and points the SoCCP remoteproc at the Elite's own firmware.
 - `dts/cq8725s-ayn-common.dtsi`
   source: https://github.com/ROCKNIX/distribution/blob/bcf3b5bc574990b96543484575b06f912153a715/projects/ROCKNIX/devices/SM8750/patches/linux/0046-arm64-dts-qcom-Add-AYN-CQ8725S-Common.patch
-  notes: Armada extracted this DTS from the cited ROCKNIX patch and then applied later ROCKNIX DTS updates, including the Odin 3 haptics nodes from ROCKNIX commit `81a31e3d0f`.
+  notes: Maintained directly by Armada. Shares clocks, regulators, ADSP and CDSP enablement, PMIC-GLINK, speaker I2S wiring and amplifiers, Adreno 830, WCN7860 Wi-Fi, RSInput controller and back paddles, SD, display/touch wiring, keys, fan wiring and USB2 between Odin 3 and Portal. The USB QMP PHY takes vdda-phy from the 0.88 V rail and vdda-pll from the 1.2 V rail, the swap upstream also fixed on the SM8750 MTP/QRD.
 - `dts/cq8725s-ayn-odin3.dts`
   source: https://github.com/ROCKNIX/distribution/blob/bcf3b5bc574990b96543484575b06f912153a715/projects/ROCKNIX/devices/SM8750/patches/linux/0047-arm64-dts-qcom-Add-AYN-Odin3.patch
-  notes: Armada extracted this DTS from the cited ROCKNIX patch and then applied later ROCKNIX DTS updates.
-- `dts/cq8725s-ayn-odin3.dts.patch`
-  source: armada
-  notes: Armada enables DPU dithering, codec-rail LPM sleep states, the PM8550 RGB charge LED and the WCD DMIC internal mic route after copying `dts/cq8725s-ayn-odin3.dts`.
-- `dts/cq8725s-ayn-common.dtsi.patch`
-  source: armada
-  notes: Armada keeps volume-up from waking the system, marks Odin 3's RSInput node as connected to the Qualcomm haptics device, supplies the device's 1024 range, marks PCIe WAKE# active-low, and keeps the four switched WCN7860 PMU supply rails always-on because re-enabling them at resume can hang the SoC. The 70-count `axis-deadzone` (an unmeasured ROCKNIX bring-up value) was dropped; like the RP6 and every other RSInput device the Odin 3 now passes its stick value through, leaving deadzone policy to Steam Input and the game.
+  notes: Maintained directly by Armada with later ROCKNIX updates, including haptics from commit `81a31e3d0f`. Carries Odin 3 peripherals and Armada display, audio, gamepad and suspend settings, including the suspend-trail and ramoops memory with its PMK8550 SDAMs (0541), LPM sleep states for the WCN7860 rails, and the display sequencer handoff node (0566).
 - `dts/qcs8550-ayaneo-pocket-common.dtsi.patch`
   source: armada
   notes: Armada keeps volume-up from waking the system, removes the SDHCI capability mask, marks PCIe WAKE# active-low, and idles the codec rail in LPM during s2idle after copying `dts/qcs8550-ayaneo-pocket-common.dtsi`.
@@ -897,7 +924,7 @@ no equivalent submission was found, or a permanent URL to the upstream submissio
   notes: Armada disables the inherited Pocket 6 PWM backlight and removes its panel reference so Nova uses its panel driver’s DSI backlight. Matches Retroid’s Nova panel wiring: L11B/L12B/L13B for vdd/vddio/vci, GPIO 70/143 fixed regulators for vdd18/vdd28, and rotation 0. Removes the inherited avdd supply and retains Armada DPU dithering and Nova's own ADSP firmware. The ROCKNIX Nova → RP6 → AYN common inheritance remains unchanged for other systems.
 - `dts/qcs8550-ayn-thor.dts.patch`
   source: armada
-  notes: Armada fixes the hall-sensor pinctrl, makes only the lid-open edge wake, corrects touch orientation, and enables DPU dithering on the top panel after copying `dts/qcs8550-ayn-thor.dts`.
+  notes: Armada fixes the hall-sensor pinctrl, makes only the lid-open edge wake, corrects touch orientation, and enables DPU dithering on the top panel after copying `dts/qcs8550-ayn-thor.dts`. It also sets `lid-switch` on the power key so it can't wake the device with the lid closed (patches 1306 and 1307).
 - `dts/sm8650-ayaneo-common.dtsi.patch`
   source: armada
   notes: Armada keeps volume-up from waking the system, wires the upstream SY7758 driver, marks PCIe WAKE# active-low, idles the codec rails in LPM during s2idle, and keeps the RTC offset in an SDAM cell with the alarm enabled after copying `dts/sm8650-ayaneo-common.dtsi`.
@@ -926,6 +953,9 @@ no equivalent submission was found, or a permanent URL to the upstream submissio
   source: armada
   upstream: local
   notes: Same for the SoundWire controller; the WCD9390 peripherals are kept runtime-active for jack detection.
+- `patches/0570-soundwire-qcom-skip-the-clock-stop-handshake-for-the-pmic-haptics-port.patch`
+  source: armada
+  upstream: local
 - `patches/0565-pinctrl-qcom-sm8650-lpass-lpi-force-runtime-suspend-across-system-sleep.patch`
   source: armada
   upstream: local
@@ -1323,6 +1353,15 @@ no equivalent submission was found, or a permanent URL to the upstream submissio
   upstream: local
   notes: Adds an optional qcom,rx-dma-len DT property to shorten GENI UART RX DMA transfers. The Duo gamepad MCU streams without idle gaps, so the default 2048-byte transfer delivered input in ~245 ms bursts. On Linux 7.3 the RX buffer is mapped once at probe, so only the programmed transfer length and the cache sync length change.
 
+- `patches/1306-input-gpio-keys-let-other-drivers-read-a-button-state.patch`
+  source: armada
+  upstream: local
+  notes: Lets another driver read a gpio-keys button or switch through a DT phandle, including from hard IRQ context. gpio-keys still owns the GPIO. Used by 1307 to read the lid during suspend.
+
+- `patches/1307-input-pm8941-pwrkey-ignore-presses-while-lid-is-closed.patch`
+  source: armada
+  upstream: local
+  notes: Adds an optional lid-switch phandle so the power key can't wake the device while the lid is closed (lid sensors only wake on open). Reads the lid through 1306. Enabled on the Duo and Thor.
 
 - `dts/sm7750-retroidpocket-duo.dts`
   source: armada
@@ -1556,6 +1595,10 @@ no equivalent submission was found, or a permanent URL to the upstream submissio
 - `patches/1179-ASoC-qcom-fix-duo-speaker-slot-width.patch`
   source: armada; register definitions from https://github.com/awinic-driver/aw883xx/blob/main/aw883xx_pid_2066_reg.h
   upstream: local
+- `patches/0085-ASoC-qcom-sc8280xp-restart-SoundWire-streams-across-system-suspend.patch`
+  source: armada
+  upstream: local
+  notes: qcom_snd_sdw_prepare() skips a stream still marked prepared, so a SoundWire stream open across s2idle is never re-enabled and headphones come back thin and distorted. Tear the streams down in suspend_post and re-enable them in resume_pre. Needs 0528 and 0530.
 
 - `patches/1180-ASoC-qcom-q6apm-allow-s32-playback.patch`
   source: armada
@@ -1567,6 +1610,10 @@ no equivalent submission was found, or a permanent URL to the upstream submissio
 
 - `patches/1182-arm64-dts-qcom-eliza-add-cpu-l3-scaling.patch`
   source: Armada
+  upstream: local
+
+- `patches/1183-wifi-ath12k-associate-WCN7750-as-HE-on-6-GHz.patch`
+  source: armada
   upstream: local
 
 - `patches/0515a-input-rsinput-accept-large-uart-batches.patch`
@@ -1699,3 +1746,17 @@ no equivalent submission was found, or a permanent URL to the upstream submissio
 - `patches/0860-usb-typec-ucsi-Set-ucsi-connector-before-enabling-no.patch`
   source: https://git.kernel.org/next/linux-next/c/5b4b83c2ffe8740f6f3e54ea4d4962a62c063ef1
   upstream: https://patch.msgid.link/20260929092939.1806907-1-uttkarsh.aggarwal@oss.qualcomm.com
+
+- `dts/cq8725s-ayn-odin3portal.dts`
+  source: Armada; includes the shared `cq8725s-ayn-common.dtsi` base derived from Teguh Sobirin's Odin 3 work.
+  upstream: local
+  notes: Speaker playback reuses the Odin 3 topology and amplifier firmware. The Portal stock ACF has identical DSP firmware and tuning, differing only in I2SCTRL1 framing and checksums; Odin 3's 16-bit settings match the current Linux MI2S stream.
+
+- `patches/1304-drm-panel-vtdr6130-add-odin3portal.patch`
+  source: Armada
+  upstream: local
+
+- `patches/1305-drm-panel-vtdr6130-allow-calibrating-the-odin3portal-frame-length.patch`
+  source: https://github.com/ROCKNIX/distribution/blob/abfdcfb57ff42180a50fca60a2a150641608d57e/projects/ROCKNIX/devices/SM8550/patches/linux/0508-ROCKNIX-rp6-panel-frame-length-calibration.patch
+  upstream: local
+  notes: Armada reimplements the RP6 interface for the Odin 3 Portal, whose init sequence reaches B1 through offset writes.
