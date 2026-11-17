@@ -1269,6 +1269,10 @@ no equivalent submission was found, or a permanent URL to the upstream submissio
   source: https://patchwork.kernel.org/project/linux-arm-msm/patch/20261013002124.332111-1-xiaqinghuan@mail.ustc.edu.cn/
   upstream: https://lore.kernel.org/r/20261013002124.332111-1-xiaqinghuan@mail.ustc.edu.cn
   notes: Posted, not yet merged. The SM8750 firmware fills POWER_NOW from its maximum-load path. Rebased onto 0903, keeping the charge-current properties ahead of POWER_NOW so the SM8750 descriptor still drops only POWER_NOW. SM8750 boards previously matched the SM8550 entry; the new SM8750 variant is otherwise handled like SM8550, since the driver's other variant checks only single out SC8280XP and X1E80100.
+- `patches/0798a-power-supply-qcom_battmgr-name-the-SM8750-battery-battery.patch`
+  source: armada
+  upstream: local
+  notes: Extends 0503's "battery" name to the SM8750 descriptor that 0798 adds. Without it the Odin 3 charge LED's `battery-charging-orange-full-green` trigger never registers and MangoHud's battery path is missing on SM8750.
 - `patches/0799-serial-qcom-geni-Clear-pending-IRQs-while-suspended.patch`
   source: https://patchwork.kernel.org/project/linux-arm-msm/patch/20261021-ack-interrupts-on-suspended-port-v1-1-2747a58ca7cb@oss.qualcomm.com/
   upstream: https://lore.kernel.org/r/20261021-ack-interrupts-on-suspended-port-v1-1-2747a58ca7cb@oss.qualcomm.com

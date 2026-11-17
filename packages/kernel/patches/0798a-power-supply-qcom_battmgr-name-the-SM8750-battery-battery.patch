@@ -1,0 +1,24 @@
+From: Armada <noreply@armada.local>
+Subject: [PATCH] power: supply: qcom_battmgr: name the SM8750 battery "battery"
+
+0503 renames the SM8550 battery supply to "battery", which Armada's
+userspace and devicetrees rely on: MangoHud reads
+/sys/class/power_supply/battery, and the Odin 3 charge LED uses the
+"battery-charging-orange-full-green" trigger. 0798 gives SM8750 its own
+battery descriptor, so SM8750 boards registered "qcom-battmgr-bat"
+instead and the charge LED never got its trigger. Use the same name.
+
+---
+diff --git a/drivers/power/supply/qcom_battmgr.c b/drivers/power/supply/qcom_battmgr.c
+index e75ddb3a23f0..60a7fbc0953f 100644
+--- a/drivers/power/supply/qcom_battmgr.c
++++ b/drivers/power/supply/qcom_battmgr.c
+@@ -981,7 +981,7 @@ static const struct power_supply_desc sm8550_bat_psy_desc = {
+  * this platform.
+  */
+ static const struct power_supply_desc sm8750_bat_psy_desc = {
+-	.name = "qcom-battmgr-bat",
++	.name = "battery",
+ 	.type = POWER_SUPPLY_TYPE_BATTERY,
+ 	.properties = sm8550_bat_props,
+ 	.num_properties = ARRAY_SIZE(sm8550_bat_props) - 1,

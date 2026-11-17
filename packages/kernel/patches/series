@@ -378,6 +378,7 @@ v9_20260801_sachin_garg_media_iris_cache_work_mode_in_iris_set_stage.patch
 0796-usb-typec-ucsi-glink-Wake-up-the-system-on-connector.patch
 0797-power-supply-qcom_battmgr-Allow-charger-changes-to-w.patch
 0798-power-supply-qcom_battmgr-do-not-report-power_now-on.patch
+0798a-power-supply-qcom_battmgr-name-the-SM8750-battery-battery.patch
 0799-serial-qcom-geni-Clear-pending-IRQs-while-suspended.patch
 0800-dt-bindings-clock-qcom-sm8450-videocc-Fix-clock-inpu.patch
 0801-arm64-dts-qcom-sm8750-Fix-videocc-clock-inputs.patch
